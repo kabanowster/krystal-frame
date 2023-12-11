@@ -1,9 +1,8 @@
 package framework.core;
 
-import com.google.common.io.Resources;
 import framework.KrystalFramework;
 import framework.logging.LoggingInterface;
-import krystal.Utils;
+import krystal.Tools;
 
 import java.io.IOException;
 import java.io.InputStream;
@@ -31,7 +30,7 @@ public interface PropertyInterface extends LoggingInterface {
 	}
 	
 	static void loadAppProperties(String propertiesPath) {
-		try (InputStream source = Resources.getResource(propertiesPath).openStream()) {
+		try (InputStream source = Tools.getResource(propertiesPath).openStream()) {
 			Properties props = new Properties();
 			props.load(source);
 			for (var prop : props.stringPropertyNames()) {
@@ -69,7 +68,7 @@ public interface PropertyInterface extends LoggingInterface {
 	}
 	
 	static String printAll() {
-		return Utils.concat(KrystalFramework.getDefaultDelimeter(), properties.entrySet().stream().map(e -> String.format("[%s = %s]", e.getKey(), e.getValue())));
+		return Tools.concat(KrystalFramework.getDefaultDelimeter(), properties.entrySet().stream().map(e -> String.format("[%s = %s]", e.getKey(), e.getValue())));
 	}
 	
 	static boolean areAny() {

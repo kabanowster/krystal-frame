@@ -2,6 +2,7 @@ package framework.logging;
 
 import framework.KrystalFramework;
 import framework.core.PropertiesAndArguments;
+import krystal.Tools;
 import org.apache.logging.log4j.Level;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.core.Logger;
@@ -24,7 +25,8 @@ public class LoggingWrapper {
 	// custom test level
 	public static final Level TEST = Level.forName("TEST", 700);
 	// set the logfile name pattern here for setupLogger() method
-	private static final String DEFAULT_LOGFILE = KrystalFramework.getExposedDirPath() + "\\logs\\logfile";
+	private static final String DEFAULT_LOGFILE =
+			Tools.joinAsURIPath(KrystalFramework.getExposedDirPath(), "logs/logfile");
 	
 	private LoggingWrapper() {
 		

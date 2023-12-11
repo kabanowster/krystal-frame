@@ -5,7 +5,7 @@ import framework.database.abstraction.ColumnInterface;
 import framework.database.abstraction.ProviderInterface;
 import framework.database.abstraction.TableInterface;
 import framework.database.implementation.Providers;
-import krystal.Utils;
+import krystal.Tools;
 
 import java.util.*;
 import java.util.stream.Collectors;
@@ -67,7 +67,7 @@ public class InsertStatement extends Query {
 		query = new StringBuilder(String.format(
 				"INSERT INTO %s %s",
 				into.sqlName(),
-				!columns.isEmpty() ? String.format("(%s)", Utils.concat(KrystalFramework.getDefaultDelimeter(), columns.stream())) : ""
+				!columns.isEmpty() ? String.format("(%s)", Tools.concat(KrystalFramework.getDefaultDelimeter(), columns.stream())) : ""
 		));
 		
 		if (Providers.sqlserver.equals(provider))
@@ -83,7 +83,7 @@ public class InsertStatement extends Query {
 				" VALUES %s",
 				values.stream()
 				      .filter(v -> columns.isEmpty() || v.length == columns.size())
-				      .map(v -> String.format("(%s)", Utils.concat(KrystalFramework.getDefaultDelimeter(), Stream.of(v))))
+				      .map(v -> String.format("(%s)", Tools.concat(KrystalFramework.getDefaultDelimeter(), Stream.of(v))))
 				      .collect(Collectors.joining(KrystalFramework.getDefaultDelimeter())))
 		);
 		

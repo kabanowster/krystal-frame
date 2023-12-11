@@ -4,7 +4,7 @@ import framework.KrystalFramework;
 import framework.database.abstraction.ColumnInterface;
 import framework.database.abstraction.QueryResultInterface;
 import framework.logging.LoggingInterface;
-import krystal.Utils;
+import krystal.Tools;
 
 import java.sql.ResultSet;
 import java.sql.ResultSetMetaData;
@@ -83,7 +83,7 @@ public record QueryResult(List<Map<ColumnInterface, Object>> rows, Map<ColumnInt
 		                     .map(e -> String.format("%s (%s)", e.getKey().sqlName(), e.getValue().getSimpleName()))
 		                     .collect(Collectors.joining(KrystalFramework.getDefaultDelimeter())))
 		      .append(System.lineSeparator());
-		rows.forEach(row -> result.append(Utils.concat(KrystalFramework.getDefaultDelimeter(), row.values().stream())).append(System.lineSeparator()));
+		rows.forEach(row -> result.append(Tools.concat(KrystalFramework.getDefaultDelimeter(), row.values().stream())).append(System.lineSeparator()));
 		return result.toString();
 	}
 	

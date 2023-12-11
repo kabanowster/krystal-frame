@@ -2,7 +2,7 @@ package framework.database.queryfactory;
 
 import framework.KrystalFramework;
 import framework.database.abstraction.ColumnInterface;
-import krystal.Utils;
+import krystal.Tools;
 
 import java.util.List;
 
@@ -24,7 +24,7 @@ public record ColumnIsPair(ColumnInterface column, ColumnOperators operator, Lis
 				column.sqlName(),
 				nullValue ? "IS" : operator.face,
 				switch (operator) {
-					case In, notIn -> nullValue ? "NULL" : Utils.concat(KrystalFramework.getDefaultDelimeter(), values().stream());
+					case In, notIn -> nullValue ? "NULL" : Tools.concat(KrystalFramework.getDefaultDelimeter(), values().stream());
 					default -> values().stream().findFirst().get();
 				}
 		);

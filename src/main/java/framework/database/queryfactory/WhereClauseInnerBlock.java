@@ -1,6 +1,6 @@
 package framework.database.queryfactory;
 
-import krystal.Utils;
+import krystal.Tools;
 import lombok.Getter;
 import lombok.Setter;
 
@@ -26,7 +26,7 @@ public class WhereClauseInnerBlock {
 	
 	@Override
 	public String toString() {
-		return Utils.concat(delimiter.toString(), columnIsPairs.stream());
+		return Tools.concat(delimiter.toString(), columnIsPairs.stream());
 	}
 	
 }

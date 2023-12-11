@@ -1,17 +1,20 @@
 package framework.database.implementation;
 
-import com.google.common.io.Resources;
 import framework.KrystalFramework;
 import framework.core.PropertiesAndArguments;
 import framework.database.abstraction.ProviderInterface;
 import framework.database.abstraction.QueryExecutorInterface;
 import framework.database.abstraction.QueryResultInterface;
+import krystal.Tools;
 import lombok.Getter;
 import org.springframework.stereotype.Service;
 
 import java.io.IOException;
 import java.sql.ResultSet;
-import java.util.*;
+import java.util.Collections;
+import java.util.HashMap;
+import java.util.Map;
+import java.util.Properties;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
@@ -35,7 +38,7 @@ public final class QueryExecutor implements QueryExecutorInterface {
 		Stream.of(Providers.values()).forEach(provider -> {
 			var props = new Properties();
 			try {
-				props.load(Resources.getResource(KrystalFramework.getExposedDirPath() + provider.toString() + ".properties").openStream());
+				props.load(Tools.getResource(KrystalFramework.getExposedDirPath(), provider.toString() + ".properties").openStream());
 				connectionProperties.put(provider, props);
 				
 				// TODO error throw if mandatory missing?
@@ -50,7 +53,7 @@ public final class QueryExecutor implements QueryExecutorInterface {
 				);
 				
 			} catch (IOException ex) {
-				log().fatal("!!! IO exception while loading Provider's properties file!");
+				log().fatal(String.format("!!! IO exception while loading '%s' provider properties file!", provider));
 			}
 		});
 		

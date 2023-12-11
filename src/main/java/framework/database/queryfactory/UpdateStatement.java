@@ -3,7 +3,7 @@ package framework.database.queryfactory;
 import framework.KrystalFramework;
 import framework.database.abstraction.ProviderInterface;
 import framework.database.abstraction.TableInterface;
-import krystal.Utils;
+import krystal.Tools;
 
 import java.util.Collections;
 import java.util.HashSet;
@@ -47,7 +47,7 @@ public class UpdateStatement extends Query implements WhereClauseInterface {
 				String.format(
 						"UPDATE %s SET %s",
 						table.sqlName(),
-						Utils.concat(KrystalFramework.getDefaultDelimeter(), columnSetPairs.stream())
+						Tools.concat(KrystalFramework.getDefaultDelimeter(), columnSetPairs.stream())
 					)
 				);
 		//@formatter:on
