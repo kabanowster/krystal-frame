@@ -33,7 +33,11 @@ public class LoggingWrapper {
 		
 		// Start file appender if not suspended by cmdArgs
 		if ((Boolean) PropertiesAndArguments.logtofile.value().orElse(true))
-			startFileAppender();
+			try {
+				startFileAppender();
+			} catch (IllegalStateException ex) {
+				ROOT_LOGGER.fatal("=== Logging to file - failed initiation. Check directory access.");
+			}
 		
 	}
 	
