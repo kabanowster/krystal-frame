@@ -12,22 +12,26 @@ import java.util.stream.Stream;
 
 public class UpdateStatement extends Query implements WhereClauseInterface {
 	
-	private final Set<ColumnsPairingInterface> columnSetPairs = Collections.synchronizedSet(new HashSet<>());
-	private TableInterface table;
+	private final Set<ColumnsPairingInterface> columnSetPairs;
+	private final TableInterface table;
+	
+	public UpdateStatement(TableInterface table) {
+		super(QueryType.UPDATE);
+		columnSetPairs = Collections.synchronizedSet(new HashSet<>());
+		this.table = table;
+	}
 	
 	public UpdateStatement(TableInterface table, ColumnsPairingInterface... columnSetPairs) {
-		super(QueryType.UPDATE);
-		table(table);
-		set(columnSetPairs);
+		this(table);
+		this.columnSetPairs.addAll(Stream.of(columnSetPairs).toList());
+	}
+	
+	public static UpdateStatement table(TableInterface table) {
+		return new UpdateStatement(table);
 	}
 	
 	public UpdateStatement set(ColumnsPairingInterface... columnSetPairs) {
 		this.columnSetPairs.addAll(Stream.of(columnSetPairs).toList());
-		return this;
-	}
-	
-	public UpdateStatement table(TableInterface table) {
-		this.table = table;
 		return this;
 	}
 	

@@ -39,7 +39,7 @@ public class OrderByKeyword extends Query {
 		if (type != QueryType.SELECT || columns.isEmpty())
 			return;
 		
-		query.append(String.format(" ORDER BY %s%s",
+		query.append(String.format("\nORDER BY %s%s",
 		                           columns.stream().map(ColumnInterface::sqlName).collect(Collectors.joining(KrystalFramework.getDefaultDelimeter())),
 		                           order != null ? " " + order : ""));
 	}

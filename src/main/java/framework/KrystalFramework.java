@@ -1,7 +1,7 @@
 package framework;
 
-import framework.core.JavaFXApplication;
 import framework.core.PropertyInterface;
+import framework.core.jfxApp;
 import javafx.application.Application;
 import lombok.Getter;
 import lombok.Setter;
@@ -27,6 +27,9 @@ public class KrystalFramework {
 	 * Path and name of the text file used as the source of application properties.
 	 */
 	private static @Getter @Setter String appPropertiesFile;
+	
+	private static @Getter @Setter String providersPropertiesDir;
+	
 	/**
 	 * Path and name of the text file used as the source of external commands.
 	 */
@@ -52,7 +55,7 @@ public class KrystalFramework {
 	private static @Getter @Setter String loggingPattern = "%highlight{%d{yyyy.MM.dd HH:mm:ss.SSS} %-5level: %msg [%t]%n}{STYLE=Logback}";
 	
 	private static @Getter ApplicationContext springContext;
-	private static @Getter @Setter JavaFXApplication javaFXApplication;
+	private static @Getter @Setter jfxApp jfxApplication;
 	
 	/**
 	 * Loads arguments, properties and Spring annotation configuration context.
@@ -61,6 +64,7 @@ public class KrystalFramework {
 		if (appPropertiesFile == null) appPropertiesFile = exposedDirPath + "/application.properties";
 		if (commanderFile == null) commanderFile = exposedDirPath + "/commander.txt";
 		if (cssCustomFile == null) cssCustomFile = exposedDirPath + "/style.css";
+		if (providersPropertiesDir == null) providersPropertiesDir = exposedDirPath;
 		
 		PropertyInterface.load(appPropertiesFile, args);
 		log.fatal("=== App started" + (PropertyInterface.areAny() ? " with properties: " + PropertyInterface.printAll() : ""));
@@ -69,12 +73,21 @@ public class KrystalFramework {
 	/**
 	 * Launches JavaFX application, using basic framework implementation. Follow-up with {@link javafx.application.Platform#runLater(Runnable) Platform.runLater()}.
 	 */
-	public static void startJavaFX(String[] args) {
-		CompletableFuture.runAsync(() -> Application.launch(JavaFXApplication.class, args));
+	public static void startJavaFX(String... args) {
+		CompletableFuture.runAsync(() -> Application.launch(jfxApp.class, args));
 	}
 	
 	public static void startSpringCore(Class<?> contextRootClass) {
 		springContext = new AnnotationConfigApplicationContext(KrystalFramework.class, contextRootClass);
+	}
+	
+	/**
+	 * Frame and launch JavaFX application backed with Spring annotation context.
+	 */
+	public static void frameSpringJavaFX(Class<?> springContextRootClass, String... args) {
+		primaryInitialization(args);
+		startJavaFX(args);
+		startSpringCore(springContextRootClass);
 	}
 	
 	public static void quit() {

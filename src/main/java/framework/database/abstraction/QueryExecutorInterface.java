@@ -2,7 +2,10 @@ package framework.database.abstraction;
 
 import framework.KrystalFramework;
 import framework.logging.LoggingInterface;
+import krystal.Tools;
+import lombok.val;
 
+import java.io.IOException;
 import java.sql.*;
 import java.util.Map;
 import java.util.Optional;
@@ -26,12 +29,43 @@ public interface QueryExecutorInterface extends LoggingInterface {
 	/**
 	 * Set of properties applied to the connection, including user and password, loaded from <i>provider.properties</i>.
 	 */
-	Map<? extends ProviderInterface, Properties> getConnectionProperties();
+	Map<ProviderInterface, Properties> getConnectionProperties();
 	
 	/**
 	 * Connection string is <i>"jdbc:driver//server/database"</i>
 	 */
-	Map<? extends ProviderInterface, String> getConnectionStrings();
+	Map<ProviderInterface, String> getConnectionStrings();
+	
+	/*
+	 * Initialization
+	 */
+	
+	default void loadProviderProperties(ProviderInterface... providers) {
+		val connectionProperties = getConnectionProperties();
+		val connectionStrings = getConnectionStrings();
+		
+		Stream.of(providers).forEach(provider -> {
+			val props = new Properties();
+			try {
+				props.load(Tools.getResource(KrystalFramework.getProvidersPropertiesDir(), provider.toString() + ".properties").openStream());
+				connectionProperties.put(provider, props);
+				
+				// TODO throw if mandatory missing?
+				connectionStrings.put(
+						provider,
+						provider.jdbcDriver().getConnectionStringBase()
+								+ props.entrySet().stream()
+								       .filter(e -> Stream.of(MandatoryProperties.values()).map(Enum::toString).anyMatch(m -> m.equals(e.getKey().toString())))
+								       .sorted((e1, e2) -> e2.getKey().toString().compareTo(e1.getKey().toString()))
+								       .map(e -> e.getValue().toString())
+								       .collect(Collectors.joining("/"))
+				);
+				
+			} catch (IOException | IllegalArgumentException ex) {
+				log().fatal(String.format("!!! Exception while loading '%s' provider properties file. Skipping.", provider));
+			}
+		});
+	}
 	
 	/*
 	 * Read

@@ -4,7 +4,7 @@ import framework.database.abstraction.ColumnInterface;
 
 interface OrderByInterface {
 	
-	public abstract Query pack();
+	Query pack();
 	
 	default OrderByKeyword orderBy(OrderByDirection order, ColumnInterface... columns) {
 		return new OrderByKeyword(pack(), order, columns);

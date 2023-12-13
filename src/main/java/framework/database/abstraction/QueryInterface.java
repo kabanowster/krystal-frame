@@ -28,7 +28,7 @@ public interface QueryInterface {
 	default QueryType determineType() {
 		// too short for stream
 		for (QueryType type : QueryType.values())
-			if (sqlQuery().matches(String.format("^%s.*", type.toString()))) return type;
+			if (sqlQuery().matches(String.format("^%s[\\w\\W]*", type.toString()))) return type;
 		return null;
 	}
 	

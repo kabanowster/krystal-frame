@@ -35,7 +35,7 @@ public class WhereClause extends Query implements OrderByInterface, GroupByInter
 	
 	@Override
 	public void build() {
-		query.append(" WHERE ");
+		query.append("\nWHERE ");
 		where.forEach(query::append);
 	}
 	

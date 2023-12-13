@@ -28,7 +28,8 @@ public class GroupByStatement extends Query implements OrderByInterface {
 		if (type != QueryType.SELECT || columns.isEmpty())
 			return;
 		
-		query.append(String.format(" GROUP BY %s", columns.stream().map(ColumnInterface::sqlName).collect(Collectors.joining(KrystalFramework.getDefaultDelimeter()))));
+		query.append(String.format("\nGROUP BY %s",
+		                           columns.stream().map(ColumnInterface::sqlName).collect(Collectors.joining(KrystalFramework.getDefaultDelimeter()))));
 	}
 	
 }

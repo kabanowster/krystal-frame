@@ -22,8 +22,10 @@ public interface FlowControlInterface extends LoggingInterface {
 	
 	List<Task> getTasksList();
 	
-	default void initializeTaskManager() {
+	default void initializeTaskManager(FlowInterface... flows) {
 		log().debug("*** Initializing Tasks Manager.");
+		for (FlowInterface s : flows)
+			getFlowControls().put(s, new Phaser(1));
 		getScheduledExecutor().scheduleWithFixedDelay(this::removeCompletedTasks, 3, 1, TimeUnit.SECONDS);
 	}
 	
@@ -72,7 +74,7 @@ public interface FlowControlInterface extends LoggingInterface {
 		tasks.forEach(t -> {
 			log().trace(t.report());
 			t.task().handle((result, ex) -> {
-				if (result != null) log().trace("  > Task result: " + result.toString());
+				if (result != null) log().trace("  > Task result: " + result);
 				if (ex != null) {
 					log().debug(String.format("  ! [%s] Exception: %s", t.name(), ex.getMessage()));
 					ex.printStackTrace();

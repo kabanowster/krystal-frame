@@ -1,6 +1,9 @@
 package framework.database.abstraction;
 
 import framework.database.queryfactory.*;
+import lombok.val;
+
+import java.util.stream.Stream;
 
 /**
  * Represents the database table instance. Attach to enum to create a convenient query factory out of it.
@@ -31,6 +34,18 @@ public interface TableInterface {
 	
 	default DeleteStatement delete() {
 		return new DeleteStatement(this);
+	}
+	
+	default TableInterface as(String alias) {
+		return () -> "%s %s".formatted(sqlName(), alias);
+	}
+	
+	default TableInterface join(JoinTypes joinType, TableInterface table, ColumnsPairingInterface... on) {
+		return () -> {
+			val result = new StringBuilder("%s %s JOIN %s ON 1=1".formatted(sqlName(), joinType, table.sqlName()));
+			Stream.of(on).forEach(cpi -> result.append(" AND ").append(cpi.pairTogether()));
+			return result.toString();
+		};
 	}
 	
 }

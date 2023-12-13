@@ -1,14 +1,13 @@
 package framework.database.queryfactory;
 
 import framework.KrystalFramework;
-import framework.database.abstraction.ProviderInterface;
-import framework.database.abstraction.QueryExecutorInterface;
-import framework.database.abstraction.QueryInterface;
-import framework.database.abstraction.QueryResultInterface;
+import framework.database.abstraction.*;
 import lombok.Getter;
 
 import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.util.LinkedHashSet;
+import java.util.Set;
 import java.util.stream.Stream;
 
 @Getter
@@ -17,11 +16,13 @@ public abstract class Query implements QueryInterface {
 	protected StringBuilder query;
 	protected ProviderInterface provider;
 	protected QueryType type;
+	protected Set<String> appendLast = new LinkedHashSet<>();
 	
 	public Query(Query query) {
 		this.query = query.getQuery();
 		provider = query.getProvider();
 		type = query.getType();
+		appendLast = query.getAppendLast();
 	}
 	
 	public Query(StringBuilder query) {
@@ -68,13 +69,28 @@ public abstract class Query implements QueryInterface {
 	
 	// Overloading
 	public QueryResultInterface execute() {
-		pack();
+		prep();
 		return execute(QueryExecutorInterface.getInstance());
 	}
 	
 	public Query pack() {
 		build();
 		return this;
+	}
+	
+	public Query append() {
+		appendLast.forEach(a -> query.append(" ").append(a));
+		return this;
+	}
+	
+	public Query prep() {
+		pack();
+		append();
+		return this;
+	}
+	
+	public TableInterface asTable(String alias) {
+		return () -> "(%s) %s".formatted(pack().sqlQuery(), alias);
 	}
 	
 	protected abstract void build();

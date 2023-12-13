@@ -17,4 +17,8 @@ public record ColumnSetPair(ColumnInterface column, Object value) implements Col
 		return pairTogether();
 	}
 	
+	public static ColumnSetPair of(ColumnInterface column, Object value) {
+		return new ColumnSetPair(column, value);
+	}
+	
 }

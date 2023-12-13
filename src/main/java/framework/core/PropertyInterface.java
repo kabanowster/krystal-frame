@@ -41,7 +41,7 @@ public interface PropertyInterface extends LoggingInterface {
 				}
 				properties.put(prop, value);
 			}
-		} catch (IOException ignored) {
+		} catch (IOException | IllegalArgumentException ignored) {
 		}
 	}
 	

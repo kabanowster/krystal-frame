@@ -5,15 +5,14 @@ import lombok.Getter;
 import lombok.NonNull;
 import lombok.Setter;
 
+@Setter
 @Getter
 @AllArgsConstructor
 class WhereClauseOuterBlock {
 	
-	@Setter
 	@NonNull
 	private WhereClauseDelimiter delimiter;
 	
-	@Setter
 	@NonNull
 	private WhereClauseInnerBlock whereClause;
 	

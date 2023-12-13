@@ -5,16 +5,15 @@ import framework.database.abstraction.TableInterface;
 
 public class DeleteStatement extends Query implements WhereClauseInterface {
 	
-	private TableInterface from;
+	private final TableInterface from;
 	
 	public DeleteStatement(TableInterface from) {
 		super(QueryType.DELETE);
-		from(from);
+		this.from = from;
 	}
 	
-	public DeleteStatement from(TableInterface from) {
-		this.from = from;
-		return this;
+	public static DeleteStatement from(TableInterface from) {
+		return new DeleteStatement(from);
 	}
 	
 	@Override

@@ -20,9 +20,9 @@ import tornadofx.control.DateTimePicker;
 @Log4j2
 @Getter
 @Setter
-// TODO use preloader instead?
-public class JavaFXApplication extends Application implements LoggingInterface {
+public class jfxApp extends Application implements LoggingInterface {
 	
+	private static @Setter Runnable runnableWithinStart;
 	private Stage primaryStage;
 	
 	public static void scrollToNode(ScrollPane scrollPane, Node node) {
@@ -80,12 +80,9 @@ public class JavaFXApplication extends Application implements LoggingInterface {
 	@Override
 	public void start(Stage primaryStage) {
 		
-		/*
-		 * Base Initialization
-		 */
-		
 		this.primaryStage = primaryStage;
-		KrystalFramework.setJavaFXApplication(this);
+		KrystalFramework.setJfxApplication(this);
+		if (runnableWithinStart != null) runnableWithinStart.run();
 	}
 	
 }
