@@ -11,14 +11,18 @@ import java.util.stream.Stream;
 @FunctionalInterface
 public interface TableInterface {
 	
-	/**
-	 * Code custom renaming (i.e. prefix/suffix, brackets) or return <b><i>.toString()</i></b>.
-	 */
-	String sqlName();
+	static TableInterface of(String name) {
+		return () -> name;
+	}
 	
 	/*
 	 * Basic queries wrappers.
 	 */
+	
+	/**
+	 * Code custom renaming (i.e. prefix/suffix, brackets) or return <b><i>.toString()</i></b>.
+	 */
+	String sqlName();
 	
 	default SelectStatement select(ColumnInterface... columns) {
 		return new SelectStatement(this, columns);

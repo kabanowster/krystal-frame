@@ -8,6 +8,10 @@ import framework.database.queryfactory.*;
 @FunctionalInterface
 public interface ColumnInterface {
 	
+	static ColumnInterface of(String name) {
+		return () -> name;
+	}
+	
 	String sqlName();
 	
 	default ColumnsPairingInterface is(Object... values) {
@@ -38,7 +42,7 @@ public interface ColumnInterface {
 		return () -> "%s %s".formatted(sqlName(), alias);
 	}
 	
-	default ColumnInterface of(String alias) {
+	default ColumnInterface from(String alias) {
 		return () -> "%s.%s".formatted(alias, sqlName());
 	}
 	

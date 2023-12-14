@@ -68,17 +68,17 @@ public class InsertStatement extends Query {
 	}
 	
 	@Override
-	public void build() {
+	public void build(StringBuilder query) {
 		if (values.isEmpty() || into == null)
-			return;
+			throw new IllegalArgumentException();
 		
-		query = new StringBuilder(String.format(
+		query.append(String.format(
 				"INSERT INTO %s %s",
 				into.sqlName(),
 				!columns.isEmpty() ? String.format("(%s)", Tools.concat(KrystalFramework.getDefaultDelimeter(), columns.stream())) : ""
 		));
 		
-		if (JDBCDrivers.sqlserver.equals(provider.jdbcDriver()))
+		if (JDBCDrivers.sqlserver.asProvider().equals(provider)) {
 			query.append(String.format(
 					" OUTPUT %s",
 					output.isEmpty() ? "INSERTED.*" :
@@ -86,17 +86,19 @@ public class InsertStatement extends Query {
 					      .map(c -> "INSERTED." + c.sqlName())
 					      .collect(Collectors.joining(KrystalFramework.getDefaultDelimeter()))
 			));
+		}
 		
 		query.append(String.format(
-				" VALUES %s",
+				"VALUES %s",
 				values.stream()
 				      .filter(v -> columns.isEmpty() || v.length == columns.size())
-				      .map(v -> String.format("\n    (%s)", Tools.concat(KrystalFramework.getDefaultDelimeter(), Stream.of(v))))
+				      .map(v -> String.format("(%s)", Tools.concat(KrystalFramework.getDefaultDelimeter(), Stream.of(v))))
 				      .collect(Collectors.joining(KrystalFramework.getDefaultDelimeter())))
 		);
 		
-		if (JDBCDrivers.as400.equals(provider.jdbcDriver()))
-			query = new StringBuilder(String.format("SELECT * FROM FINAL TABLE (%s)", query.toString()));
+		if (JDBCDrivers.as400.asProvider().equals(provider)) {
+			query.append(String.format("SELECT * FROM FINAL TABLE (%s)", query));
+		}
 	}
 	
 }

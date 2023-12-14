@@ -10,6 +10,7 @@ import java.sql.*;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Properties;
+import java.util.concurrent.atomic.AtomicReference;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
@@ -51,15 +52,13 @@ public interface QueryExecutorInterface extends LoggingInterface {
 				connectionProperties.put(provider, props);
 				
 				// TODO throw if mandatory missing?
-				connectionStrings.put(
-						provider,
-						provider.jdbcDriver().getConnectionStringBase()
-								+ props.entrySet().stream()
-								       .filter(e -> Stream.of(MandatoryProperties.values()).map(Enum::toString).anyMatch(m -> m.equals(e.getKey().toString())))
-								       .sorted((e1, e2) -> e2.getKey().toString().compareTo(e1.getKey().toString()))
-								       .map(e -> e.getValue().toString())
-								       .collect(Collectors.joining("/"))
-				);
+				connectionStrings.put(provider, provider.jdbcDriver().getConnectionStringBase() + props
+						.entrySet()
+						.stream()
+						.filter(e -> Stream.of(MandatoryProperties.values()).map(Enum::toString).anyMatch(m -> m.equals(e.getKey().toString())))
+						.sorted((e1, e2) -> e2.getKey().toString().compareTo(e1.getKey().toString()))
+						.map(e -> e.getValue().toString())
+						.collect(Collectors.joining("/")));
 				
 			} catch (IOException | IllegalArgumentException ex) {
 				log().fatal(String.format("!!! Exception while loading '%s' provider properties file. Skipping.", provider));
@@ -76,11 +75,14 @@ public interface QueryExecutorInterface extends LoggingInterface {
 	}
 	
 	default QueryResultInterface read(ProviderInterface provider, QueryInterface query) {
-		provider = Optional.ofNullable(query.getProvider()).orElse(provider);
-		log().trace("--> Loading from database: " + provider.toString());
+		var finalProvider = new AtomicReference<>(provider);
+		Optional.ofNullable(query.getProvider()).ifPresent(finalProvider::set);
+		
+		log().trace("--> Loading from database: " + finalProvider);
 		QueryResultInterface qr = null;
-		try (Connection conn = connectToProvider(provider)) {
+		try (Connection conn = connectToProvider(finalProvider.get())) {
 			log().trace("    Connected Successfully.");
+			query.setProvider(finalProvider.get());
 			
 			Statement sql = conn.createStatement();
 			log().trace("    Query: " + query.sqlQuery());
@@ -111,27 +113,23 @@ public interface QueryExecutorInterface extends LoggingInterface {
 	 * Uses given {@link ProviderInterface Provider} to execute writing with given {@link QueryInterface Queries} (if these queries don't specify particular provider).
 	 */
 	default Integer write(ProviderInterface provider, QueryInterface... query) {
-		return Stream.of(query)
-		             .collect(Collectors.groupingBy(q -> Optional.ofNullable(q.getProvider()).orElse(provider)))
-		             .entrySet()
-		             .stream()
-		             .mapToInt(
-				             e ->
-				             {
-					             log().trace("--> Writing to Database: " + e.getKey().toString());
-					             try (Connection conn = connectToProvider(e.getKey())) {
-						             log().trace("    Connected Successfully.");
-						             
-						             return e.getValue().stream().mapToInt(q -> execute(conn, q)).sum();
-						             
-					             } catch (SQLException ex) {
-						             log().fatal("!!! FATAL error during Database connection.");
-						             ex.printStackTrace();
-						             return 0;
-					             }
-				             }
-		             )
-		             .sum();
+		return Stream.of(query).collect(Collectors.groupingBy(q -> Optional.ofNullable(q.getProvider()).orElse(provider))).entrySet().stream().mapToInt(e -> {
+			val finalProvider = e.getKey();
+			log().trace("--> Writing to Database: " + finalProvider.toString());
+			try (Connection conn = connectToProvider(finalProvider)) {
+				log().trace("    Connected Successfully.");
+				
+				return e.getValue().stream().mapToInt(q -> {
+					q.setProvider(finalProvider);
+					return execute(conn, q);
+				}).sum();
+				
+			} catch (SQLException ex) {
+				log().fatal("!!! FATAL error during Database connection.");
+				ex.printStackTrace();
+				return 0;
+			}
+		}).sum();
 		
 	}
 	
@@ -150,10 +148,7 @@ public interface QueryExecutorInterface extends LoggingInterface {
 	}
 	
 	private Connection connectToProvider(ProviderInterface provider) throws SQLException {
-		return DriverManager.getConnection(
-				getConnectionStrings().get(provider),
-				getConnectionProperties().get(provider)
-		);
+		return DriverManager.getConnection(getConnectionStrings().get(provider), getConnectionProperties().get(provider));
 	}
 	
 	/**

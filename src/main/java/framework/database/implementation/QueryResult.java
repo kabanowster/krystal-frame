@@ -46,7 +46,7 @@ public record QueryResult(List<Map<ColumnInterface, Object>> rows, Map<ColumnInt
 				rows.add(valuesMap);
 			}
 			
-			log().trace("    Query loaded.");
+			log().trace("    Query loaded %s rows.".formatted(rows.size()));
 		} catch (SQLException ex) {
 			log().fatal("!!! Error processing the ResultSet.");
 			ex.printStackTrace();

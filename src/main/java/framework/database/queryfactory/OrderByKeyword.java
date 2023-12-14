@@ -35,11 +35,11 @@ public class OrderByKeyword extends Query {
 	}
 	
 	@Override
-	public void build() {
+	public void build(StringBuilder query) {
 		if (type != QueryType.SELECT || columns.isEmpty())
-			return;
+			throw new IllegalArgumentException();
 		
-		query.append(String.format("\nORDER BY %s%s",
+		query.append(String.format(" ORDER BY %s%s",
 		                           columns.stream().map(ColumnInterface::sqlName).collect(Collectors.joining(KrystalFramework.getDefaultDelimeter())),
 		                           order != null ? " " + order : ""));
 	}

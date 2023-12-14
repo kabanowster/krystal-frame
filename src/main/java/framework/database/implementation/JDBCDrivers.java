@@ -8,7 +8,8 @@ import lombok.extern.log4j.Log4j2;
 @Getter
 public enum JDBCDrivers implements JDBCDriverInterface {
 	sqlserver("jdbc:sqlserver://"),
-	as400("jdbc:as400://");
+	as400("jdbc:as400://"),
+	h2("jdbc:h2:");
 	
 	private final String connectionStringBase;
 	

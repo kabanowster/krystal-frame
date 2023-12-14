@@ -5,4 +5,8 @@ public interface JDBCDriverInterface {
 	
 	String getConnectionStringBase();
 	
+	default ProviderInterface asProvider() {
+		return () -> this;
+	}
+	
 }

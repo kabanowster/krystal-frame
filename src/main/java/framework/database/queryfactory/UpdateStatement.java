@@ -42,19 +42,17 @@ public class UpdateStatement extends Query implements WhereClauseInterface {
 	}
 	
 	@Override
-	public void build() {
+	public void build(StringBuilder query) {
 		if (table == null || columnSetPairs.isEmpty())
-			return;
+			throw new IllegalArgumentException();
 		
-		//@formatter:off
-		query = new StringBuilder(
+		query.append(
 				String.format(
 						"UPDATE %s SET %s",
 						table.sqlName(),
 						Tools.concat(KrystalFramework.getDefaultDelimeter(), columnSetPairs.stream())
-					)
-				);
-		//@formatter:on
+				)
+		);
 	}
 	
 	// TODO UPDATE from SELECT. Create "from" chain.

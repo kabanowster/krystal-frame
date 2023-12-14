@@ -23,11 +23,11 @@ public class DeleteStatement extends Query implements WhereClauseInterface {
 	}
 	
 	@Override
-	public void build() {
+	public void build(StringBuilder query) {
 		if (from == null)
-			return;
+			throw new IllegalArgumentException();
 		
-		query = new StringBuilder("DELETE FROM " + from.sqlName());
+		query.append("DELETE FROM ").append(from.sqlName());
 	}
 	
 }

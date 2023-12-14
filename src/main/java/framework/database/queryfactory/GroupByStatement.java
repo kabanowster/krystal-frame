@@ -24,11 +24,11 @@ public class GroupByStatement extends Query implements OrderByInterface {
 	}
 	
 	@Override
-	public void build() {
+	public void build(StringBuilder query) {
 		if (type != QueryType.SELECT || columns.isEmpty())
-			return;
+			throw new IllegalArgumentException();
 		
-		query.append(String.format("\nGROUP BY %s",
+		query.append(String.format(" GROUP BY %s",
 		                           columns.stream().map(ColumnInterface::sqlName).collect(Collectors.joining(KrystalFramework.getDefaultDelimeter()))));
 	}
 	

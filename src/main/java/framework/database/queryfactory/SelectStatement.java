@@ -66,22 +66,22 @@ public class SelectStatement extends Query implements WhereClauseInterface, Orde
 	}
 	
 	@Override
-	public void build() {
-		if (from == null || query != null)
-			return;
+	public void build(StringBuilder query) {
+		if (from == null)
+			throw new IllegalArgumentException();
 		
-		// TODO last if negative
+		// TODO LAST if negative
 		var limitString = "";
 		if (limit > 0) {
-			switch (provider.jdbcDriver()) {
-				case JDBCDrivers.sqlserver -> limitString = " TOP " + limit;
-				case JDBCDrivers.as400 -> appendLast.add("\nFETCH %s FIRST ROWS ONLY".formatted(limit));
-				default -> log().warn("  ! Unsupported LIMIT keyword in select statement for %s provider.".formatted(provider));
-			}
+			// switch only supports constants...
+			if (JDBCDrivers.sqlserver.asProvider().equals(provider))
+				limitString = " TOP " + limit;
+			else if (JDBCDrivers.as400.asProvider().equals(provider))
+				appendLast.add("FETCH %s FIRST ROWS ONLY".formatted(limit));
+			else log().warn("  ! Unsupported LIMIT keyword in select statement for %s provider.".formatted(provider));
 		}
 		
-		//@formatter:off
-		query = new StringBuilder(
+		query.append(
 				String.format(
 						"SELECT%s%s %s FROM %s",
 						distinct ? " DISTINCT" : "",
@@ -89,7 +89,6 @@ public class SelectStatement extends Query implements WhereClauseInterface, Orde
 						!columns.isEmpty() ? columns.stream().map(ColumnInterface::sqlName).collect(Collectors.joining(KrystalFramework.getDefaultDelimeter())) : "*",
 						from.sqlName()
 				));
-		//@formatter:on
 	}
 	
 }
