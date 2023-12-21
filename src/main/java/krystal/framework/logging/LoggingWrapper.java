@@ -9,6 +9,7 @@ import org.apache.logging.log4j.core.Logger;
 import org.apache.logging.log4j.core.appender.RollingFileAppender;
 import org.apache.logging.log4j.core.appender.rolling.DefaultRolloverStrategy;
 import org.apache.logging.log4j.core.appender.rolling.SizeBasedTriggeringPolicy;
+import org.apache.logging.log4j.core.config.Configurator;
 import org.apache.logging.log4j.core.layout.PatternLayout;
 import org.springframework.stereotype.Service;
 
@@ -31,7 +32,7 @@ public class LoggingWrapper {
 	private LoggingWrapper() {
 		
 		// Set level to given from command line or FATAL as default (also if level is not parsed correctly)
-		setLevel((String) PropertiesAndArguments.loglvl.value().orElse("fatal"));
+		setRootLevel((String) PropertiesAndArguments.loglvl.value().orElse("fatal"));
 		
 		// Start file appender if not suspended by cmdArgs
 		if ((Boolean) PropertiesAndArguments.logtofile.value().orElse(true))
@@ -50,8 +51,8 @@ public class LoggingWrapper {
 	/**
 	 * Set logger level with string parsing.
 	 */
-	public void setLevel(String level) {
-		ROOT_LOGGER.setLevel(parseLogLevel(level));
+	public void setRootLevel(String level) {
+		Configurator.setRootLevel(parseLogLevel(level));
 	}
 	
 	/**

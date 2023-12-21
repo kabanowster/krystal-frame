@@ -6,7 +6,7 @@ import java.lang.annotation.RetentionPolicy;
 import java.lang.annotation.Target;
 
 /**
- * Marks additional fields in class, which should not be taken to persistence. An additional, not marked fields will cause exceptions.
+ * Marks additional fields in class, which should not be taken to persistence (are not fields found in table). An additional, not marked fields will cause exceptions.
  */
 @Target(ElementType.FIELD)
 @Retention(RetentionPolicy.RUNTIME)

@@ -10,4 +10,8 @@ public interface Q {
 		return () -> name;
 	}
 	
+	static Query q(String sql) {
+		return Query.of(sql);
+	}
+	
 }

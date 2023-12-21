@@ -1,5 +1,6 @@
 package krystal.framework.database.abstraction;
 
+import krystal.framework.database.persistence.PersistenceInterface;
 import krystal.framework.database.queryfactory.*;
 import lombok.val;
 
@@ -7,6 +8,8 @@ import java.util.stream.Stream;
 
 /**
  * Represents the database table instance. Attach to enum to create a convenient query factory out of it.
+ *
+ * @see PersistenceInterface#getTable()
  */
 @FunctionalInterface
 public interface TableInterface {

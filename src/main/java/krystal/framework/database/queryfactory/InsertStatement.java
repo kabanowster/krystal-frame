@@ -6,7 +6,7 @@ import krystal.framework.database.abstraction.ColumnInterface;
 import krystal.framework.database.abstraction.ProviderInterface;
 import krystal.framework.database.abstraction.Query;
 import krystal.framework.database.abstraction.TableInterface;
-import krystal.framework.database.implementation.JDBCDrivers;
+import krystal.framework.database.implementation.DBCDrivers;
 
 import java.util.*;
 import java.util.stream.Collectors;
@@ -74,12 +74,12 @@ public class InsertStatement extends Query {
 			throw new IllegalArgumentException();
 		
 		query.append(String.format(
-				"INSERT INTO %s %s",
+				"INSERT INTO %s%s",
 				into.sqlName(),
-				!columns.isEmpty() ? String.format("(%s)", Tools.concat(KrystalFramework.getDefaultDelimeter(), columns.stream())) : ""
+				!columns.isEmpty() ? String.format(" (%s)", Tools.concat(KrystalFramework.getDefaultDelimeter(), columns.stream())) : ""
 		));
 		
-		if (JDBCDrivers.sqlserver.asProvider().equals(provider)) {
+		if (DBCDrivers.jdbcSQLServer.asProvider().equals(provider)) {
 			query.append(String.format(
 					" OUTPUT %s",
 					output.isEmpty() ? "INSERTED.*" :
@@ -90,14 +90,14 @@ public class InsertStatement extends Query {
 		}
 		
 		query.append(String.format(
-				"VALUES %s",
+				" VALUES %s",
 				values.stream()
 				      .filter(v -> columns.isEmpty() || v.length == columns.size())
 				      .map(v -> String.format("(%s)", Tools.concat(KrystalFramework.getDefaultDelimeter(), Stream.of(v))))
 				      .collect(Collectors.joining(KrystalFramework.getDefaultDelimeter())))
 		);
 		
-		if (JDBCDrivers.as400.asProvider().equals(provider)) {
+		if (DBCDrivers.jdbcAS400.asProvider().equals(provider)) {
 			query.append(String.format("SELECT * FROM FINAL TABLE (%s)", query));
 		}
 	}

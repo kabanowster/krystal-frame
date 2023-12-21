@@ -1,12 +1,12 @@
 package krystal.framework.database.abstraction;
 
 import krystal.framework.KrystalFramework;
-import krystal.framework.database.implementation.JDBCDrivers;
 import krystal.framework.database.queryfactory.QueryType;
 import krystal.framework.logging.LoggingInterface;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.val;
+import reactor.core.publisher.Mono;
 
 import java.time.LocalDate;
 import java.time.LocalDateTime;
@@ -46,11 +46,6 @@ public abstract class Query implements LoggingInterface {
 		};
 	}
 	
-	/**
-	 * Append stored string with current part's semantics.
-	 */
-	protected abstract void build(StringBuilder query, Set<String> appendLast);
-	
 	public static Stream<Object> parseValuesForSQL(Object... values) {
 		return Stream.of(values).map(Query::parseValueForSQL);
 	}
@@ -71,6 +66,11 @@ public abstract class Query implements LoggingInterface {
 		// else
 		return String.format(senq, value);
 	}
+	
+	/**
+	 * Append stored string with current part's semantics.
+	 */
+	protected abstract void build(StringBuilder query, Set<String> appendLast);
 	
 	public Query setProvider(ProviderInterface provider) {
 		this.provider = provider;
@@ -104,38 +104,23 @@ public abstract class Query implements LoggingInterface {
 		return () -> "(%s) %s".formatted(pack().sqlQuery(), alias);
 	}
 	
-	public QueryResultInterface execute() {
-		return execute(QueryExecutorInterface.getInstance());
+	public Mono<QueryResultInterface> query() {
+		return query(QueryExecutorInterface.getInstance());
 	}
 	
-	public QueryResultInterface execute(QueryExecutorInterface executor) {
-		
+	public Mono<QueryResultInterface> query(QueryExecutorInterface executor) {
 		pack();
-		
-		QueryType type = getType();
-		if (type == null) type = determineType(); // Optional.Else actually invokes method...
-		
-		switch (type) {
-			case SELECT -> {
-				return executor.read(this);
-			}
-			case INSERT -> {
-				// drivers which return inserted rows as result
-				if (List.of(
-						JDBCDrivers.as400.asProvider(),
-						JDBCDrivers.sqlserver.asProvider()
-				).contains(getProvider()))
-					return executor.read(this);
-			}
-		}
-		
-		return QueryResultInterface.singleton(() -> "#", executor.write(this));
+		return executor.execute(List.of(this)).single();
 	}
 	
-	private QueryType determineType() {
+	public QueryType determineType() {
+		QueryType type = getType();
+		if (type != null)
+			return type;
+		
 		String query = sqlQuery(); // unpacking!
-		for (QueryType type : QueryType.values())
-			if (query.matches(String.format("^%s[\\w\\W]*", type.toString()))) return type;
+		for (QueryType t : QueryType.values())
+			if (query.matches(String.format("^%s[\\w\\W]*", t.toString()))) return t;
 		
 		log().warn("  ! UNDEFINED QueryType.");
 		return QueryType.UNDEFINED;

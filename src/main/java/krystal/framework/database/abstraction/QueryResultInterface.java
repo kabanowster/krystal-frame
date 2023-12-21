@@ -27,6 +27,20 @@ public interface QueryResultInterface {
 		};
 	}
 	
+	static QueryResultInterface empty() {
+		return new QueryResultInterface() {
+			@Override
+			public List<Map<ColumnInterface, Object>> rows() {
+				return List.of();
+			}
+			
+			@Override
+			public Map<ColumnInterface, Class<?>> columns() {
+				return Map.of();
+			}
+		};
+	}
+	
 	List<Map<ColumnInterface, Object>> rows();
 	
 	Map<ColumnInterface, Class<?>> columns();

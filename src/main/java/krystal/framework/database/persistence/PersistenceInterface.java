@@ -8,11 +8,15 @@ import krystal.framework.database.queryfactory.ColumnOperators;
 import krystal.framework.database.queryfactory.ColumnSetPair;
 import krystal.framework.database.queryfactory.ColumnsPairingInterface;
 import krystal.framework.logging.LoggingInterface;
+import lombok.val;
+import reactor.core.publisher.Flux;
+import reactor.core.publisher.Mono;
 
 import java.lang.reflect.Constructor;
 import java.lang.reflect.Field;
 import java.lang.reflect.InvocationTargetException;
 import java.util.*;
+import java.util.Map.Entry;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
@@ -33,7 +37,10 @@ public interface PersistenceInterface extends LoggingInterface {
 		try {
 			Constructor<T> emptyConstructor = clazz.getDeclaredConstructor();
 			TableInterface table = emptyConstructor.newInstance().getTable();
-			return table.select().execute(queryExecutor).toStreamOf(clazz);
+			return table.select().query(queryExecutor)
+			            .flux()
+			            .flatMap(qr -> Flux.fromStream(qr.toStreamOf(clazz)))
+			            .toStream();
 		} catch (NoSuchMethodException | InstantiationException | IllegalAccessException | InvocationTargetException e) {
 			throw new RuntimeException(e);
 		}
@@ -87,23 +94,47 @@ public interface PersistenceInterface extends LoggingInterface {
 	 */
 	
 	/**
-	 * Table linked with object's persistence.
+	 * Table linked with object's persistence. Each row of table represents a single object. You can use Lombok to set a @Getter marked field - in that case also mark it with {@link Skip @Skip}.
 	 *
 	 * @see TableInterface
 	 */
 	TableInterface getTable();
 	
 	/**
-	 * Provider of the table, namely the database.
-	 *
-	 * @see ProviderInterface
+	 * Declared with {@link Provider @Provider}, or {@link QueryExecutorInterface#getDefaultProvider()} as default.
 	 */
-	ProviderInterface getProvider();
-	
-	/**
-	 * Mappings of fields names and writing methods to database, if other than plain values. Return null/empty map if n/a. If you plan to work with null fields - keep this as a method computing value on demand.
-	 */
-	Writers getWriters();
+	default ProviderInterface getProvider() {
+		val errMsg = "Provider declaration must return or extend the type of ProviderInterface.";
+		
+		return (ProviderInterface)
+				Stream.of(getClass().getDeclaredFields())
+				      .filter(f -> f.isAnnotationPresent(Provider.class))
+				      .map(f -> {
+					      f.setAccessible(true);
+					      if (!ProviderInterface.class.isAssignableFrom(f.getType()))
+						      throw new RuntimeException(errMsg);
+					      try {
+						      return f.get(this);
+					      } catch (IllegalAccessException e) {
+						      throw new RuntimeException(e);
+					      }
+				      })
+				      .findFirst()
+				      .or(() -> Stream.of(getClass().getDeclaredMethods())
+				                      .filter(m -> m.isAnnotationPresent(Provider.class))
+				                      .map(m -> {
+					                      m.setAccessible(true);
+					                      if (!ProviderInterface.class.isAssignableFrom(m.getReturnType()))
+						                      throw new RuntimeException(errMsg);
+					                      try {
+						                      return m.invoke(this);
+					                      } catch (IllegalAccessException | InvocationTargetException e) {
+						                      throw new RuntimeException(e);
+					                      }
+				                      })
+				                      .findFirst()
+				      ).orElse(null); // null passed to Query.setProvider causes to use defaultProvider
+	}
 	
 	/**
 	 * Mappings of fields names and corresponding columns in database, if other than plain names. Return null/empty map if n/a.
@@ -126,57 +157,50 @@ public interface PersistenceInterface extends LoggingInterface {
 	/**
 	 * Mapping of fields to database {@link ColumnInterface columns}, if different from fields names.
 	 */
-	private Map<Field, ColumnInterface> getFieldsColumns() {
+	default Map<Field, ColumnInterface> getFieldsColumns() {
 		return CompletablePresent
 				// read overwritten setup
 				.supply(() -> Optional.ofNullable(getFieldsToColumnsMap())
-				                      .orElse(ColumnsMap.empty())
-				                      .columns().entrySet().stream()
-				                      .collect(Collectors.toMap(
-						                      e -> {
-							                      try {
-								                      return getClass().getDeclaredField(e.getKey());
-							                      } catch (NoSuchFieldException ex) {
-								                      throw new RuntimeException(ex);
-							                      }
-						                      },
-						                      Map.Entry::getValue
-				                      )))
+				                      .orElse(ColumnsMap.empty()))
 				// collect for all fields, either mapping or name
 				.thenApply(m -> Stream.of(getClass().getDeclaredFields())
 				                      .filter(f -> !f.isAnnotationPresent(Skip.class))
 				                      .collect(Collectors.toMap(
 						                      f -> f,
-						                      f -> Optional.ofNullable(m.get(f)).orElse(() -> String.format("[%s]", f.getName()))
+						                      f -> Optional.ofNullable(m.columns().get(f)).orElse(() -> f.getName())
 				                      )))
-				.getResult().get();
+				.getResult().orElse(Map.of());
+	}
+	
+	default Map<Field, Object> getWriters() {
+		return Stream.of(getClass().getDeclaredMethods())
+		             .filter(m -> m.getName().toLowerCase().matches("^write.*?"))
+		             .collect(Collectors.toMap(
+				             m -> Arrays.stream(getClass().getDeclaredFields())
+				                        .filter(f -> m.getName().toLowerCase().replace("write", "").equalsIgnoreCase(f.getName()))
+				                        .findFirst().orElseThrow(),
+				             f -> {
+					             try {
+						             f.setAccessible(true);
+						             return Optional.ofNullable(f.invoke(this)).orElse("null");
+					             } catch (InvocationTargetException e) {
+						             return "null";
+					             } catch (IllegalAccessException e) {
+						             throw new RuntimeException(e);
+					             }
+				             }
+		             ));
 	}
 	
 	/**
-	 * Fields values computed with {@link #getWriters() writers} or plain, if no mappings are set.
+	 * Fields values computed with writers or plain values - if none are set.
+	 *
+	 * @see Writer @Writer
 	 */
-	private Map<Field, Optional<Object>> getFieldsValues() {
+	default Map<Field, Object> getFieldsValues() {
 		return CompletablePresent
 				// writers output
-				.supply(() -> Optional.ofNullable(getWriters())
-				                      .orElse(Writers.empty())
-				                      .writers().entrySet().stream()
-				                      .collect(Collectors.toMap(
-						                      e -> {
-							                      try {
-								                      return getClass().getDeclaredField(e.getKey());
-							                      } catch (NoSuchFieldException ex) {
-								                      throw new RuntimeException(ex);
-							                      }
-						                      },
-						                      e -> {
-							                      try {
-								                      return Optional.ofNullable(e.getValue().get());
-							                      } catch (NullPointerException ex) {
-								                      return Optional.empty();
-							                      }
-						                      }
-				                      )))
+				.supply(this::getWriters)
 				// collect for all fields, either mapping or field's value
 				.thenApply(m -> Stream.of(getClass().getDeclaredFields())
 				                      .filter(f -> !f.isAnnotationPresent(Skip.class))
@@ -186,7 +210,7 @@ public interface PersistenceInterface extends LoggingInterface {
 								                      () -> {
 									                      try {
 										                      f.setAccessible(true);
-										                      return Optional.ofNullable(f.get(this));
+										                      return Optional.ofNullable(f.get(this)).orElse("null");
 									                      } catch (IllegalAccessException e) {
 										                      throw new RuntimeException(e);
 									                      }
@@ -195,18 +219,18 @@ public interface PersistenceInterface extends LoggingInterface {
 						                      (f1, f2) -> f1,
 						                      LinkedHashMap::new
 				                      )))
-				.getResult().get();
+				.getResult().orElse(LinkedHashMap.newLinkedHashMap(0));
 	}
 	
-	private ColumnsPairingInterface[] getKeyPairs(Set<Field> keys, Map<Field, ColumnInterface> fieldsColumns, Map<Field, Optional<Object>> fieldsValues) {
+	private ColumnsPairingInterface[] getKeyPairs(Set<Field> keys, Map<Field, ColumnInterface> fieldsColumns, Map<Field, Object> fieldsValues) {
 		return keys.stream()
-		           .map(field -> new ColumnIsPair(fieldsColumns.get(field), ColumnOperators.In, fieldsValues.get(field).stream().toList()))
+		           .map(field -> new ColumnIsPair(fieldsColumns.get(field), ColumnOperators.In, List.of(fieldsValues.get(field))))
 		           .toArray(ColumnsPairingInterface[]::new);
 	}
 	
-	private boolean keysHaveNoValues(boolean nonIncrementalOnly, Set<Field> keys, Map<Field, Optional<Object>> fieldsValues) {
+	private boolean keysHaveNoValues(boolean nonIncrementalOnly, Set<Field> keys, Map<Field, Object> fieldsValues) {
 		for (Field f : keys.stream().filter(f -> !nonIncrementalOnly || !f.isAnnotationPresent(Incremental.class)).toList())
-			if (fieldsValues.get(f).isEmpty()) return true;
+			if (Optional.ofNullable(fieldsValues.get(f)).isEmpty()) return true;
 		return false;
 	}
 	
@@ -246,6 +270,7 @@ public interface PersistenceInterface extends LoggingInterface {
 	 * Only works with {@link Incremental auto-increment} fields present. Persist a copy of the object.
 	 */
 	default void copyAsNew() {
+		// TODO error handling when nulls (empty object)
 		execute(PersistenceExecutions.copyAsNew);
 	}
 	
@@ -278,7 +303,8 @@ public interface PersistenceInterface extends LoggingInterface {
 		var table = getTable();
 		
 		switch (execution) {
-			case load -> load(table, keysPairs).ifPresentOrElse(this::copyFrom, () -> log().trace(String.format("  ! No record found for persistence to load %s.class.", getClass().getSimpleName())));
+			case load -> load(table, keysPairs).blockOptional().ifPresentOrElse(this::copyFrom, () -> log().trace(String.format("  ! No record found for persistence to load %s.class.",
+			                                                                                                                    getClass().getSimpleName())));
 			case instantiate -> instantiate(table, keysPairs, fieldsValues);
 			case delete -> delete(table, keysPairs);
 			case save -> save(table, keysPairs, fieldsColumns, fieldsValues);
@@ -288,17 +314,18 @@ public interface PersistenceInterface extends LoggingInterface {
 	}
 	
 	/**
-	 * Load persistence object from database in form of Optional.
+	 * Load persistence object from database.
 	 */
-	private Optional<? extends PersistenceInterface> load(TableInterface table, ColumnsPairingInterface[] keysPairs) {
-		return table.select().where(keysPairs).setProvider(getProvider()).execute().toStreamOf(getClass()).findFirst();
+	private Mono<? extends PersistenceInterface> load(TableInterface table, ColumnsPairingInterface[] keysPairs) {
+		return table.select().where(keysPairs).setProvider(getProvider()).query()
+		            .map(qr -> qr.toStreamOf(getClass()).findFirst().orElse(null)).log();
 	}
 	
 	/**
 	 * Load persistence object or create a new record if none found.
 	 */
-	private void instantiate(TableInterface table, ColumnsPairingInterface[] keysPairs, Map<Field, Optional<Object>> fieldsValues) {
-		load(table, keysPairs).ifPresentOrElse(
+	private void instantiate(TableInterface table, ColumnsPairingInterface[] keysPairs, Map<Field, Object> fieldsValues) {
+		load(table, keysPairs).blockOptional().ifPresentOrElse(
 				this::copyFrom,
 				() -> {
 					log().trace(String.format("  ! No record found for persistence to load. Creating new %s.class persisted object.", getClass().getSimpleName()));
@@ -310,25 +337,18 @@ public interface PersistenceInterface extends LoggingInterface {
 	/**
 	 * Check if object is persisted and update its values, or create a new record.
 	 */
-	private void save(TableInterface table, ColumnsPairingInterface[] keysPairs, Map<Field, ColumnInterface> fieldsColumns, Map<Field, Optional<Object>> fieldsValues) {
-		
-		if (load(table, keysPairs).isEmpty()) {
-			insertAndConsumeSelf(table, fieldsValues);
-			return;
-		}
-		
-		table.update(fieldsValues.entrySet().stream()
-		                         .filter(e -> !e.getKey().isAnnotationPresent(Key.class))
-		                         .map(e -> {
-			                         if (e.getValue().isPresent())
-				                         return new ColumnSetPair(fieldsColumns.get(e.getKey()), e.getValue().get());
-			                         else return null;
-		                         })
-		                         .filter(Objects::nonNull)
-		                         .toArray(ColumnSetPair[]::new))
-		     .where(keysPairs)
-		     .setProvider(getProvider())
-		     .execute();
+	private void save(TableInterface table, ColumnsPairingInterface[] keysPairs, Map<Field, ColumnInterface> fieldsColumns, Map<Field, Object> fieldsValues) {
+		load(table, keysPairs).blockOptional().ifPresentOrElse(
+				o -> table.update(fieldsValues.entrySet().stream()
+				                              .filter(e -> !e.getKey().isAnnotationPresent(Key.class))
+				                              .map(e -> ColumnSetPair.of(fieldsColumns.get(e.getKey()), e.getValue()))
+				                              .toArray(ColumnSetPair[]::new))
+				          .where(keysPairs)
+				          .setProvider(getProvider())
+				          .query()
+				          .subscribe(),
+				() -> insertAndConsumeSelf(table, fieldsValues)
+		);
 	}
 	
 	/**
@@ -337,7 +357,7 @@ public interface PersistenceInterface extends LoggingInterface {
 	 * @see Incremental
 	 * @see Key
 	 */
-	private void copyAsNew(TableInterface table, Set<Field> keys, Map<Field, Optional<Object>> fieldsValues) {
+	private void copyAsNew(TableInterface table, Set<Field> keys, Map<Field, Object> fieldsValues) {
 		
 		if (keys.stream().noneMatch(f -> f.isAnnotationPresent(Incremental.class)))
 			throw new RuntimeException(String.format("  ! %s.class does not have @Incremental keys, thus copying amd saving would result in ambiguity.", getClass().getSimpleName()));
@@ -352,11 +372,15 @@ public interface PersistenceInterface extends LoggingInterface {
 	 * Delete persistence record from database.
 	 */
 	private void delete(TableInterface table, ColumnsPairingInterface[] keysPairs) {
-		int deleted = (int) table.delete().where(keysPairs).setProvider(getProvider()).execute().getResult().orElse(0);
-		if (deleted > 0)
-			log().trace("  ! Persisted object deleted from database. Deleted rows: " + deleted);
-		else
-			log().trace("  ! Persisted object not deleted from database.");
+		table.delete().where(keysPairs).setProvider(getProvider()).query().blockOptional().ifPresent(
+				qr -> {
+					val deleted = (int) qr.getResult().orElse(0);
+					if (deleted > 0)
+						log().trace("  ! Persisted object deleted from database. Deleted rows: " + deleted);
+					else
+						log().trace("  ! Persisted object not deleted from database.");
+				}
+		);
 	}
 	
 	/*
@@ -366,22 +390,16 @@ public interface PersistenceInterface extends LoggingInterface {
 	/**
 	 * Create persistence record and consume it.
 	 */
-	private void insertAndConsumeSelf(TableInterface table, Map<Field, Optional<Object>> fieldsValues) {
+	private void insertAndConsumeSelf(TableInterface table, Map<Field, Object> fieldsValues) {
 		table.insert()
 		     .values(fieldsValues.entrySet().stream()
 		                         .filter(e -> !e.getKey().isAnnotationPresent(Incremental.class))
-		                         .map(e -> e.getValue().orElse(null))
+		                         .map(Entry::getValue)
 		                         .toArray())
 		     .setProvider(getProvider())
-		     .execute()
-		     .toStreamOf(getClass())
-		     .findFirst()
-		     .ifPresentOrElse(
-				     this::copyFrom,
-				     () -> {
-					     throw new NoSuchElementException();
-				     }
-		     );
+		     .query()
+		     .map(qr -> qr.toStreamOf(getClass()).findFirst().orElseThrow())
+		     .blockOptional().ifPresent(this::copyFrom);
 	}
 	
 	/**
@@ -402,7 +420,25 @@ public interface PersistenceInterface extends LoggingInterface {
 				      log().trace(String.format("    Field %s not found in %s.class. Skipped.", f.getName(), another.getClass().getSimpleName()));
 			      }
 		      });
-		log().trace("    Copy successful.\n" + this);
+		log().trace("    Copy successful.");
+	}
+	
+	/**
+	 * Convenient way to return field from this class. Usage: <b><i>this.fld("fieldName")</i></b>.
+	 *
+	 * @see ColumnsMap
+	 */
+	default Field fld(String fieldName) {
+		return Arrays.stream(getClass().getDeclaredFields()).filter(f -> f.getName().equals(fieldName)).findFirst().orElseThrow();
+	}
+	
+	/**
+	 * Type in the format, that will be issued for each field name in a class (using <i>String.format()</i>). Use as return with {@link #getFieldsColumns()}. I.e. <b><i>this.formatAll("[%s]")</i></b> will format all fields as "<i>[fieldName]</i>"
+	 */
+	default ColumnsMap formatAll(String format) {
+		val map = ColumnsMap.define();
+		Arrays.stream(getClass().getDeclaredFields()).forEach(f -> map.column(f, () -> format.formatted(f.getName())));
+		return map.set();
 	}
 	
 }

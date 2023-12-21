@@ -1,16 +1,25 @@
 package krystal.framework.database.abstraction;
 
+import io.r2dbc.spi.ConnectionFactories;
+import io.r2dbc.spi.ConnectionFactoryOptions;
+import io.r2dbc.spi.Option;
+import io.r2dbc.spi.Result;
 import krystal.Tools;
 import krystal.framework.KrystalFramework;
+import krystal.framework.database.implementation.DBCDrivers;
+import krystal.framework.database.implementation.ExecutionType;
+import krystal.framework.database.implementation.QueryResult;
+import krystal.framework.database.implementation.QueryResultRow;
 import krystal.framework.logging.LoggingInterface;
 import lombok.val;
+import reactor.core.publisher.Flux;
+import reactor.core.publisher.Mono;
 
 import java.io.IOException;
-import java.sql.*;
-import java.util.Map;
-import java.util.Optional;
-import java.util.Properties;
-import java.util.concurrent.atomic.AtomicReference;
+import java.sql.Connection;
+import java.sql.DriverManager;
+import java.sql.SQLException;
+import java.util.*;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
@@ -23,8 +32,6 @@ public interface QueryExecutorInterface extends LoggingInterface {
 		return KrystalFramework.getSpringContext().getBean(QueryExecutorInterface.class);
 	}
 	
-	QueryResultInterface process(ResultSet rs);
-	
 	ProviderInterface getDefaultProvider();
 	
 	/**
@@ -33,7 +40,7 @@ public interface QueryExecutorInterface extends LoggingInterface {
 	Map<ProviderInterface, Properties> getConnectionProperties();
 	
 	/**
-	 * Connection string is <i>"jdbc:driver//server/database"</i>
+	 * Connection string is <i>"jdbc:driver://"</i>
 	 */
 	Map<ProviderInterface, String> getConnectionStrings();
 	
@@ -52,7 +59,7 @@ public interface QueryExecutorInterface extends LoggingInterface {
 				connectionProperties.put(provider, props);
 				
 				// TODO throw if mandatory missing?
-				connectionStrings.put(provider, provider.jdbcDriver().getConnectionStringBase() + props
+				connectionStrings.put(provider, provider.dbcDriver().getConnectionStringBase() + props
 						.entrySet()
 						.stream()
 						.filter(e -> Stream.of(MandatoryProperties.values()).map(Enum::toString).anyMatch(m -> m.equals(e.getKey().toString())))
@@ -67,95 +74,150 @@ public interface QueryExecutorInterface extends LoggingInterface {
 	}
 	
 	/*
-	 * Read
+	 * Execute
 	 */
 	
-	default QueryResultInterface read(Query query) {
-		return read(getDefaultProvider(), query);
-	}
-	
-	default QueryResultInterface read(ProviderInterface provider, Query query) {
-		var finalProvider = new AtomicReference<>(provider);
-		Optional.ofNullable(query.getProvider()).ifPresent(finalProvider::set);
-		
-		log().trace("--> Loading from database: " + finalProvider);
-		QueryResultInterface qr = null;
-		try (Connection conn = connectToProvider(finalProvider.get())) {
-			log().trace("    Connected Successfully.");
-			query.setProvidersPacked(finalProvider.get());
-			
-			Statement sql = conn.createStatement();
-			log().trace("    Query: " + query.sqlQuery());
-			
-			qr = process(sql.executeQuery(query.sqlQuery()));
-			
-		} catch (SQLException ex) {
-			log().fatal("!!! FATAL error during Database connection.");
-			ex.printStackTrace();
-		}
-		return qr;
+	default Flux<QueryResultInterface> execute(List<Query> queries) {
+		return Flux.fromStream(queries.stream().collect(Collectors.groupingBy(q -> Optional.ofNullable(q.getProvider()).orElse(getDefaultProvider()))).entrySet().stream())
+		           .concatMap(e -> {
+			           val provider = e.getKey();
+			           val driver = provider.dbcDriver();
+			           
+			           log().trace("--> Querying database: " + provider);
+			           
+			           return Flux.fromStream(
+					                      e.getValue().stream().collect(Collectors.groupingBy(q -> {
+						                      q.setProvidersPacked(provider);
+						                      val type = q.determineType();
+						                      
+						                      return switch (type) {
+							                      case SELECT -> ExecutionType.read;
+							                      case INSERT -> {
+								                      // drivers which return inserted rows as result
+								                      if (List.of(DBCDrivers.jdbcAS400, DBCDrivers.jdbcSQLServer).contains(driver)) yield ExecutionType.read;
+								                      else yield ExecutionType.write;
+							                      }
+							                      default -> ExecutionType.write;
+						                      };
+					                      })).entrySet().stream())
+			                      .concatMap(g -> switch (driver.getDriverType()) {
+				                      case jdbc -> executeJDBC(g.getKey(), provider, g.getValue());
+				                      case r2dbc -> executeR2DBC(g.getKey(), provider, g.getValue());
+			                      });
+		           });
 	}
 	
 	/*
-	 * Write
+	 * JDBC
 	 */
 	
-	/**
-	 * Uses default provider.
-	 *
-	 * @See {@link #write(ProviderInterface, Query...)}.
-	 */
-	default Integer write(Query... query) {
-		return write(getDefaultProvider(), query);
+	private Flux<QueryResultInterface> executeJDBC(ExecutionType exeType, ProviderInterface provider, List<Query> queries) {
+		return switch (exeType) {
+			case read -> readJDBC(provider, queries);
+			case write -> writeJDBC(provider, queries);
+		};
 	}
 	
-	/**
-	 * Uses given {@link ProviderInterface Provider} to execute writing with given {@link Query Queries} (if these queries don't specify particular provider).
-	 */
-	default Integer write(ProviderInterface provider, Query... query) {
-		return Stream.of(query).collect(Collectors.groupingBy(q -> Optional.ofNullable(q.getProvider()).orElse(provider))).entrySet().stream().mapToInt(e -> {
-			val finalProvider = e.getKey();
-			log().trace("--> Writing to Database: " + finalProvider.toString());
-			try (Connection conn = connectToProvider(finalProvider)) {
+	private Flux<QueryResultInterface> readJDBC(ProviderInterface provider, List<Query> queries) {
+		return Flux.fromStream(queries.stream().map(q -> {
+			try (Connection conn = connectToJDBCProvider(provider)) {
 				log().trace("    Connected Successfully.");
 				
-				return e.getValue().stream().mapToInt(q -> {
-					q.setProvidersPacked(finalProvider);
-					return execute(conn, q);
-				}).sum();
-				
-			} catch (SQLException ex) {
-				log().fatal("!!! FATAL error during Database connection.");
-				ex.printStackTrace();
-				return 0;
+				val sql = q.sqlQuery();
+				log().trace("    Query: " + sql);
+				try {
+					return new QueryResult(conn.createStatement().executeQuery(sql));
+				} catch (SQLException e) {
+					log().fatal("!!! Failed query execution.\n" + e.getMessage());
+					return null;
+				}
+			} catch (SQLException e) {
+				log().fatal("!!! FATAL error during Database connection.\n" + e.getMessage());
+				return null;
 			}
-		}).sum();
+		}));
 		
 	}
 	
-	private int execute(Connection conn, Query query) {
-		try {
-			PreparedStatement sql = conn.prepareStatement(query.sqlQuery());
-			log().trace("  > Query: " + query.sqlQuery());
-			int result = sql.executeUpdate();
-			log().trace("    Executed rows: " + result);
-			return result;
-		} catch (SQLException ex) {
-			log().fatal("!!! Failed query execution.");
-			ex.printStackTrace();
-			return 0;
+	private Flux<QueryResultInterface> writeJDBC(ProviderInterface provider, List<Query> queries) {
+		try (Connection conn = connectToJDBCProvider(provider)) {
+			log().trace("    Connected Successfully.");
+			val batch = conn.createStatement();
+			
+			queries.forEach(q -> {
+				val sql = q.sqlQuery();
+				log().trace("    Query: " + sql);
+				try {
+					batch.addBatch(sql);
+				} catch (SQLException e) {
+					log().fatal("!!! Failed adding query to the batch.\n" + e.getMessage());
+				}
+			});
+			
+			val result = batch.executeBatch();
+			
+			return Flux.fromStream(Arrays.stream(result).mapToObj(i -> QueryResult.of(QueryResultInterface.singleton(ColumnInterface.of("#"), i))));
+			
+		} catch (SQLException e) {
+			log().fatal("!!! FATAL error during Database connection.\n" + e.getMessage());
+			return Flux.empty();
 		}
 	}
 	
-	private Connection connectToProvider(ProviderInterface provider) throws SQLException {
+	/*
+	 * R2DBC
+	 */
+	
+	private Flux<QueryResultInterface> executeR2DBC(ExecutionType exeType, ProviderInterface provider, List<Query> queries) {
+		val execution = connectToR2DBCProvider(provider)
+				.flatMapMany(c -> {
+					log().trace("    Connected Successfully.");
+					val batch = c.createBatch();
+					
+					queries.forEach(q -> {
+						q.setProvidersPacked(provider);
+						val sql = q.sqlQuery();
+						log().trace("  > Query: " + sql);
+						batch.add(sql);
+					});
+					
+					return Flux.from(batch.execute()).doFinally(st -> c.close());
+				});
+		
+		return switch (exeType) {
+			case read -> execution
+					.flatMapSequential(r -> r.map((row, metadata) -> new QueryResultRow(row, metadata, r.hashCode())))
+					.groupBy(QueryResultRow::resultHash)
+					.flatMap(r -> r.collectList().map(QueryResult::new));
+			case write -> execution
+					.flatMap(Result::getRowsUpdated)
+					.map(l -> QueryResult.of(QueryResultInterface.singleton(ColumnInterface.of("#"), l)));
+		};
+		
+	}
+	
+	/*
+	 * Connectors
+	 */
+	
+	private Connection connectToJDBCProvider(ProviderInterface provider) throws SQLException {
+		
 		return DriverManager.getConnection(getConnectionStrings().get(provider), getConnectionProperties().get(provider));
+	}
+	
+	private Mono<? extends io.r2dbc.spi.Connection> connectToR2DBCProvider(ProviderInterface provider) {
+		val options = ConnectionFactoryOptions.builder();
+		options.option(Option.valueOf("driver"), provider.dbcDriver().getDriverName());
+		getConnectionProperties().get(provider).forEach((key, value) -> options.option(Option.valueOf(key.toString()), value));
+		
+		return Mono.from(ConnectionFactories.get(options.build()).create());
 	}
 	
 	/**
 	 * Mandatory properties to be set within <i><b>"provider_name.properties"</b></i>. Unlike other properties, their name may differ from common, driver-specific namings.
 	 */
 	enum MandatoryProperties {
-		server, database
+		host, database
 	}
 	
 }

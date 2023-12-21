@@ -26,6 +26,7 @@ public interface FlowControlInterface extends LoggingInterface {
 		log().debug("*** Initializing Tasks Manager.");
 		for (FlowInterface s : flows)
 			getFlowControls().put(s, new Phaser(1));
+		// TODO prevent overflow
 		getScheduledExecutor().scheduleWithFixedDelay(this::removeCompletedTasks, 3, 1, TimeUnit.SECONDS);
 	}
 	

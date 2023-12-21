@@ -2,6 +2,7 @@ package krystal.framework.core.flow;
 
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.Phaser;
+import java.util.stream.IntStream;
 
 @FunctionalInterface
 public interface FlowInterface {
@@ -18,6 +19,10 @@ public interface FlowInterface {
 	
 	default void register() {
 		controller().register();
+	}
+	
+	default void register(int times) {
+		IntStream.range(0, times).forEach(i -> controller().register());
 	}
 	
 	default void await(int phase) {

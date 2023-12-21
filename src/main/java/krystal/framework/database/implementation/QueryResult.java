@@ -22,9 +22,12 @@ import java.util.Map;
  */
 public record QueryResult(List<Map<ColumnInterface, Object>> rows, Map<ColumnInterface, Class<?>> columns) implements QueryResultInterface, LoggingInterface {
 	
-	@SuppressWarnings("CallToPrintStackTrace")
-	public QueryResult(ResultSet rs) {
+	public QueryResult() {
 		this(new LinkedList<>(), new LinkedHashMap<>());
+	}
+	
+	public QueryResult(ResultSet rs) {
+		this();
 		
 		try {
 			log().trace(" -> Loading QueryResult.");
@@ -44,9 +47,10 @@ public record QueryResult(List<Map<ColumnInterface, Object>> rows, Map<ColumnInt
 			
 			// Data
 			while (rs.next()) {
-				Map<ColumnInterface, Object> valuesMap = new LinkedHashMap<>();
+				Map<ColumnInterface, Object> row = LinkedHashMap.newLinkedHashMap(columns.size());
+				// classic for-loop to catch exception
 				for (Map.Entry<ColumnInterface, Class<?>> entry : columns.entrySet())
-					valuesMap.put(
+					row.put(
 							entry.getKey(),
 							CompletablePresent
 									.supply(rs.getObject(entry.getKey().sqlName()))
@@ -58,15 +62,31 @@ public record QueryResult(List<Map<ColumnInterface, Object>> rows, Map<ColumnInt
 										}
 									}).getResult().orElse(null)
 					);
-				rows.add(valuesMap);
+				rows.add(row);
 			}
 			
 			log().trace("    Query loaded %s rows.".formatted(rows.size()));
 		} catch (SQLException ex) {
-			log().fatal("!!! Error processing the ResultSet.");
-			ex.printStackTrace();
+			log().fatal("!!! Error processing the ResultSet.\n" + ex.getMessage());
 		}
 		
+	}
+	
+	public QueryResult(List<QueryResultRow> qRows) {
+		this();
+		columns.putAll(qRows.getFirst().columns());
+		rows.addAll(qRows.stream().map(QueryResultRow::row).toList());
+	}
+	
+	public QueryResult(QueryResultInterface qr) {
+		this();
+		
+		columns.putAll(qr.columns());
+		rows.addAll(qr.rows());
+	}
+	
+	public static QueryResultInterface of(QueryResultInterface qr) {
+		return new QueryResult(qr);
 	}
 	
 	@Override

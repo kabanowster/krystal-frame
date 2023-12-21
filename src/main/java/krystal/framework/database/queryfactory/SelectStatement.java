@@ -5,7 +5,7 @@ import krystal.framework.database.abstraction.ColumnInterface;
 import krystal.framework.database.abstraction.ProviderInterface;
 import krystal.framework.database.abstraction.Query;
 import krystal.framework.database.abstraction.TableInterface;
-import krystal.framework.database.implementation.JDBCDrivers;
+import krystal.framework.database.implementation.DBCDrivers;
 import krystal.framework.logging.LoggingInterface;
 
 import java.util.Collections;
@@ -74,10 +74,12 @@ public class SelectStatement extends Query implements WhereClauseInterface, Orde
 		// TODO LAST if negative
 		var limitString = "";
 		if (limit > 0) {
-			// switch only supports constants...
-			if (JDBCDrivers.sqlserver.asProvider().equals(provider))
+			// switch only supports constants, so...
+			if (DBCDrivers.jdbcSQLServer.asProvider().equals(provider)
+					|| DBCDrivers.r2dbcSQLServer.asProvider().equals(provider))
 				limitString = " TOP " + limit;
-			else if (JDBCDrivers.mysql.asProvider().equals(provider))
+			else if (DBCDrivers.jdbcMySQL.asProvider().equals(provider)
+					|| DBCDrivers.r2dbcMySQL.asProvider().equals(provider))
 				appendLast.add("LIMIT " + limit);
 			else appendLast.add("FETCH FIRST %s ROWS ONLY".formatted(limit));
 			// else log().warn("  ! Unsupported LIMIT keyword in select statement for %s provider.".formatted(provider));

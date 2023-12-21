@@ -5,5 +5,4 @@ package krystal.framework.core;
  */
 public enum PropertiesAndArguments implements PropertyInterface {
 	logtofile, logfile, loglvl, provider
-	
 }

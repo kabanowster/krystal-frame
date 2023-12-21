@@ -42,8 +42,8 @@ public interface ColumnInterface {
 		return () -> "%s %s".formatted(sqlName(), alias);
 	}
 	
-	default ColumnInterface from(String alias) {
-		return () -> "%s.%s".formatted(alias, sqlName());
+	default ColumnInterface from(String tableAlias) {
+		return () -> "%s.%s".formatted(tableAlias, sqlName());
 	}
 	
 	default ColumnInterface sum() {
