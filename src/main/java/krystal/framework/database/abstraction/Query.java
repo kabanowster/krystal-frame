@@ -10,10 +10,8 @@ import reactor.core.publisher.Mono;
 
 import java.time.LocalDate;
 import java.time.LocalDateTime;
-import java.util.LinkedHashSet;
-import java.util.LinkedList;
-import java.util.List;
-import java.util.Set;
+import java.util.*;
+import java.util.concurrent.CompletableFuture;
 import java.util.stream.Stream;
 
 @Getter
@@ -104,14 +102,26 @@ public abstract class Query implements LoggingInterface {
 		return () -> "(%s) %s".formatted(pack().sqlQuery(), alias);
 	}
 	
-	public Mono<QueryResultInterface> query() {
-		return query(QueryExecutorInterface.getInstance());
+	public CompletableFuture<Optional<QueryResultInterface>> future() {
+		return mono().singleOptional().toFuture();
 	}
 	
-	public Mono<QueryResultInterface> query(QueryExecutorInterface executor) {
-		pack();
-		return executor.execute(List.of(this)).single();
+	public CompletableFuture<Optional<QueryResultInterface>> future(QueryExecutorInterface executor) {
+		return mono(executor).singleOptional().toFuture();
 	}
+	
+	public Mono<QueryResultInterface> mono() {
+		return mono(QueryExecutorInterface.getInstance());
+	}
+	
+	public Mono<QueryResultInterface> mono(QueryExecutorInterface executor) {
+		pack();
+		return executor.execute(List.of(this)).singleOrEmpty();
+	}
+	
+	// public <T> T as(Class<T> clazz) {
+	// 	this.query().map(qr -> qr.toStreamOf(clazz));
+	// }
 	
 	public QueryType determineType() {
 		QueryType type = getType();

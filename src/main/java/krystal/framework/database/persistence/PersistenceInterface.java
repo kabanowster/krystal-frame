@@ -9,8 +9,6 @@ import krystal.framework.database.queryfactory.ColumnSetPair;
 import krystal.framework.database.queryfactory.ColumnsPairingInterface;
 import krystal.framework.logging.LoggingInterface;
 import lombok.val;
-import reactor.core.publisher.Flux;
-import reactor.core.publisher.Mono;
 
 import java.lang.reflect.Constructor;
 import java.lang.reflect.Field;
@@ -37,10 +35,9 @@ public interface PersistenceInterface extends LoggingInterface {
 		try {
 			Constructor<T> emptyConstructor = clazz.getDeclaredConstructor();
 			TableInterface table = emptyConstructor.newInstance().getTable();
-			return table.select().query(queryExecutor)
-			            .flux()
-			            .flatMap(qr -> Flux.fromStream(qr.toStreamOf(clazz)))
-			            .toStream();
+			return table.select().future(queryExecutor)
+			            .thenApply(qr -> qr.map(r -> r.toStreamOf(clazz)).orElse(Stream.empty()))
+			            .join();
 		} catch (NoSuchMethodException | InstantiationException | IllegalAccessException | InvocationTargetException e) {
 			throw new RuntimeException(e);
 		}
@@ -84,7 +81,7 @@ public interface PersistenceInterface extends LoggingInterface {
 				constructor.setAccessible(true);
 				return constructor.newInstance(row.values().toArray());
 			} catch (InvocationTargetException | IllegalAccessException | InstantiationException | NoSuchElementException e) {
-				throw new RuntimeException(e);
+				throw new RuntimeException("Exception during QueryResult Persistence Constructor mapping.", e);
 			}
 		});
 	}
@@ -303,8 +300,7 @@ public interface PersistenceInterface extends LoggingInterface {
 		var table = getTable();
 		
 		switch (execution) {
-			case load -> load(table, keysPairs).blockOptional().ifPresentOrElse(this::copyFrom, () -> log().trace(String.format("  ! No record found for persistence to load %s.class.",
-			                                                                                                                    getClass().getSimpleName())));
+			case load -> load(table, keysPairs).ifPresentOrElse(this::copyFrom, () -> log().trace(String.format("  ! No record found for persistence to load %s.class.", getClass().getSimpleName())));
 			case instantiate -> instantiate(table, keysPairs, fieldsValues);
 			case delete -> delete(table, keysPairs);
 			case save -> save(table, keysPairs, fieldsColumns, fieldsValues);
@@ -316,39 +312,45 @@ public interface PersistenceInterface extends LoggingInterface {
 	/**
 	 * Load persistence object from database.
 	 */
-	private Mono<? extends PersistenceInterface> load(TableInterface table, ColumnsPairingInterface[] keysPairs) {
-		return table.select().where(keysPairs).setProvider(getProvider()).query()
-		            .map(qr -> qr.toStreamOf(getClass()).findFirst().orElse(null)).log();
+	private Optional<? extends PersistenceInterface> load(TableInterface table, ColumnsPairingInterface[] keysPairs) {
+		return table.select().where(keysPairs).setProvider(getProvider()).future()
+		            .join()
+		            .map(qr -> qr.toStreamOf(getClass()))
+		            .orElse(Stream.empty())
+		            .findFirst();
 	}
 	
 	/**
 	 * Load persistence object or create a new record if none found.
 	 */
 	private void instantiate(TableInterface table, ColumnsPairingInterface[] keysPairs, Map<Field, Object> fieldsValues) {
-		load(table, keysPairs).blockOptional().ifPresentOrElse(
-				this::copyFrom,
-				() -> {
-					log().trace(String.format("  ! No record found for persistence to load. Creating new %s.class persisted object.", getClass().getSimpleName()));
-					insertAndConsumeSelf(table, fieldsValues);
-				}
-		);
+		load(table, keysPairs)
+				.ifPresentOrElse(
+						this::copyFrom,
+						() -> {
+							log().trace(String.format("  ! No record found for persistence to load. Creating new %s.class persisted object.", getClass().getSimpleName()));
+							insertAndConsumeSelf(table, fieldsValues);
+						}
+				);
 	}
 	
 	/**
 	 * Check if object is persisted and update its values, or create a new record.
 	 */
 	private void save(TableInterface table, ColumnsPairingInterface[] keysPairs, Map<Field, ColumnInterface> fieldsColumns, Map<Field, Object> fieldsValues) {
-		load(table, keysPairs).blockOptional().ifPresentOrElse(
-				o -> table.update(fieldsValues.entrySet().stream()
-				                              .filter(e -> !e.getKey().isAnnotationPresent(Key.class))
-				                              .map(e -> ColumnSetPair.of(fieldsColumns.get(e.getKey()), e.getValue()))
-				                              .toArray(ColumnSetPair[]::new))
-				          .where(keysPairs)
-				          .setProvider(getProvider())
-				          .query()
-				          .subscribe(),
-				() -> insertAndConsumeSelf(table, fieldsValues)
-		);
+		load(table, keysPairs)
+				.ifPresentOrElse(
+						l -> table.update(fieldsValues.entrySet().stream()
+						                              .filter(e -> !e.getKey().isAnnotationPresent(Key.class))
+						                              .map(e -> ColumnSetPair.of(fieldsColumns.get(e.getKey()), e.getValue()))
+						                              .toArray(ColumnSetPair[]::new))
+						          .where(keysPairs)
+						          .setProvider(getProvider())
+						          .future()
+						          .thenRun(() -> log().trace("    Record updated."))
+						          .join(),
+						() -> insertAndConsumeSelf(table, fieldsValues)
+				);
 	}
 	
 	/**
@@ -358,7 +360,6 @@ public interface PersistenceInterface extends LoggingInterface {
 	 * @see Key
 	 */
 	private void copyAsNew(TableInterface table, Set<Field> keys, Map<Field, Object> fieldsValues) {
-		
 		if (keys.stream().noneMatch(f -> f.isAnnotationPresent(Incremental.class)))
 			throw new RuntimeException(String.format("  ! %s.class does not have @Incremental keys, thus copying amd saving would result in ambiguity.", getClass().getSimpleName()));
 		
@@ -372,15 +373,14 @@ public interface PersistenceInterface extends LoggingInterface {
 	 * Delete persistence record from database.
 	 */
 	private void delete(TableInterface table, ColumnsPairingInterface[] keysPairs) {
-		table.delete().where(keysPairs).setProvider(getProvider()).query().blockOptional().ifPresent(
-				qr -> {
-					val deleted = (int) qr.getResult().orElse(0);
-					if (deleted > 0)
-						log().trace("  ! Persisted object deleted from database. Deleted rows: " + deleted);
-					else
-						log().trace("  ! Persisted object not deleted from database.");
-				}
-		);
+		val deleted = (long) table.delete().where(keysPairs).setProvider(getProvider()).future()
+		                          .join()
+		                          .flatMap(QueryResultInterface::getResult)
+		                          .orElse(0);
+		if (deleted > 0)
+			log().trace("  ! Persisted object deleted from database. Deleted rows: " + deleted);
+		else
+			log().trace("  ! Persisted object not deleted from database.");
 	}
 	
 	/*
@@ -397,9 +397,10 @@ public interface PersistenceInterface extends LoggingInterface {
 		                         .map(Entry::getValue)
 		                         .toArray())
 		     .setProvider(getProvider())
-		     .query()
-		     .map(qr -> qr.toStreamOf(getClass()).findFirst().orElseThrow())
-		     .blockOptional().ifPresent(this::copyFrom);
+		     .future()
+		     .thenApply(qr -> qr.map(r -> r.toStreamOf(getClass())).orElse(Stream.empty()).findFirst())
+		     .thenAccept(r -> r.ifPresent(this::copyFrom))
+		     .join();
 	}
 	
 	/**

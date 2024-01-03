@@ -9,12 +9,19 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import java.util.concurrent.atomic.AtomicInteger;
 import java.util.stream.Collectors;
 
-public record QueryResultRow(Map<ColumnInterface, Object> row, Map<ColumnInterface, Class<?>> columns, int resultHash) {
+public record QueryResultRow(Map<ColumnInterface, Object> row, Map<ColumnInterface, Class<?>> columns, AtomicInteger resultHash) {
+	
+	public QueryResultRow() {
+		this(new LinkedHashMap<>(), new LinkedHashMap<>(), new AtomicInteger());
+	}
 	
 	public QueryResultRow(Row row, RowMetadata metadata, int resultHash) {
-		this(LinkedHashMap.newLinkedHashMap(metadata.getColumnMetadatas().size()), LinkedHashMap.newLinkedHashMap(metadata.getColumnMetadatas().size()), resultHash);
+		this();
+		
+		this.resultHash.set(resultHash);
 		
 		columns.putAll(metadata.getColumnMetadatas().stream().collect(Collectors.toMap(
 				m -> ColumnInterface.of(m.getName()),

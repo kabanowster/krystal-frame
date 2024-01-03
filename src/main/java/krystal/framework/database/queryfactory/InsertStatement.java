@@ -79,7 +79,8 @@ public class InsertStatement extends Query {
 				!columns.isEmpty() ? String.format(" (%s)", Tools.concat(KrystalFramework.getDefaultDelimeter(), columns.stream())) : ""
 		));
 		
-		if (DBCDrivers.jdbcSQLServer.asProvider().equals(provider)) {
+		if (DBCDrivers.jdbcSQLServer.asProvider().equals(provider)
+				|| DBCDrivers.r2dbcSQLServer.asProvider().equals(provider)) {
 			query.append(String.format(
 					" OUTPUT %s",
 					output.isEmpty() ? "INSERTED.*" :

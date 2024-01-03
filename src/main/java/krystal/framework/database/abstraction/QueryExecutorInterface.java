@@ -94,7 +94,11 @@ public interface QueryExecutorInterface extends LoggingInterface {
 							                      case SELECT -> ExecutionType.read;
 							                      case INSERT -> {
 								                      // drivers which return inserted rows as result
-								                      if (List.of(DBCDrivers.jdbcAS400, DBCDrivers.jdbcSQLServer).contains(driver)) yield ExecutionType.read;
+								                      if (List.of(
+										                      DBCDrivers.jdbcAS400,
+										                      DBCDrivers.jdbcSQLServer,
+										                      DBCDrivers.r2dbcSQLServer
+								                      ).contains(driver)) yield ExecutionType.read;
 								                      else yield ExecutionType.write;
 							                      }
 							                      default -> ExecutionType.write;
@@ -181,13 +185,14 @@ public interface QueryExecutorInterface extends LoggingInterface {
 						batch.add(sql);
 					});
 					
-					return Flux.from(batch.execute()).doFinally(st -> c.close());
+					return Flux.from(batch.execute())
+					           .doFinally(st -> c.close());
 				});
 		
 		return switch (exeType) {
 			case read -> execution
-					.flatMapSequential(r -> r.map((row, metadata) -> new QueryResultRow(row, metadata, r.hashCode())))
-					.groupBy(QueryResultRow::resultHash)
+					.flatMap(r -> r.map((row, metadata) -> new QueryResultRow(row, metadata, r.hashCode())))
+					.groupBy(queryResultRow -> queryResultRow.resultHash().get())
 					.flatMap(r -> r.collectList().map(QueryResult::new));
 			case write -> execution
 					.flatMap(Result::getRowsUpdated)
