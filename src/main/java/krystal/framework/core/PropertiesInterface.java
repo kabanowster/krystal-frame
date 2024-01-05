@@ -13,7 +13,7 @@ import java.util.Properties;
 import java.util.stream.Stream;
 
 @FunctionalInterface
-public interface PropertyInterface extends LoggingInterface {
+public interface PropertiesInterface extends LoggingInterface {
 	
 	Map<String, Object> properties = new HashMap<>();
 	
