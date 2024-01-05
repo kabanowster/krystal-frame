@@ -24,7 +24,7 @@ import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
 /**
- * Doing the dirty job of connecting through JDBC and processing the ResultSet into maintainable {@link QueryResultInterface}.
+ * Doing the dirty job of connecting through database drivers and processing the ResultSet into maintainable {@link QueryResultInterface}.
  */
 public interface QueryExecutorInterface extends LoggingInterface {
 	
@@ -49,13 +49,16 @@ public interface QueryExecutorInterface extends LoggingInterface {
 	 */
 	
 	default void loadProviderProperties(ProviderInterface... providers) {
+		log().debug("*** Loading Provider Properties.");
 		val connectionProperties = getConnectionProperties();
 		val connectionStrings = getConnectionStrings();
 		
 		Stream.of(providers).forEach(provider -> {
 			val props = new Properties();
+			val path = Tools.getResource(KrystalFramework.getProvidersPropertiesDir(), provider.toString() + ".properties");
+			log().trace("    Path: " + path.getPath());
 			try {
-				props.load(Tools.getResource(KrystalFramework.getProvidersPropertiesDir(), provider.toString() + ".properties").openStream());
+				props.load(path.openStream());
 				connectionProperties.put(provider, props);
 				
 				// TODO throw if mandatory missing?
@@ -68,7 +71,7 @@ public interface QueryExecutorInterface extends LoggingInterface {
 						.collect(Collectors.joining("/")));
 				
 			} catch (IOException | IllegalArgumentException ex) {
-				log().fatal(String.format("!!! Exception while loading '%s' provider properties file. Skipping.", provider));
+				log().fatal(String.format("!!! Exception while loading '%s' provider properties file at '%s'. Skipping.", provider, path.getPath()));
 			}
 		});
 	}
@@ -125,7 +128,7 @@ public interface QueryExecutorInterface extends LoggingInterface {
 	private Flux<QueryResultInterface> readJDBC(ProviderInterface provider, List<Query> queries) {
 		return Flux.fromStream(queries.stream().map(q -> {
 			try (Connection conn = connectToJDBCProvider(provider)) {
-				log().trace("    Connected Successfully.");
+				log().trace("  - Connected Successfully.");
 				
 				val sql = q.sqlQuery();
 				log().trace("    Query: " + sql);
@@ -191,11 +194,11 @@ public interface QueryExecutorInterface extends LoggingInterface {
 		
 		return switch (exeType) {
 			case read -> execution
-					.flatMap(r -> r.map((row, metadata) -> new QueryResultRow(row, metadata, r.hashCode())))
+					.flatMapSequential(r -> r.map((row, metadata) -> new QueryResultRow(row, metadata, r.hashCode())))
 					.groupBy(queryResultRow -> queryResultRow.resultHash().get())
-					.flatMap(r -> r.collectList().map(QueryResult::new));
+					.flatMapSequential(r -> r.collectList().map(QueryResult::new));
 			case write -> execution
-					.flatMap(Result::getRowsUpdated)
+					.flatMapSequential(Result::getRowsUpdated)
 					.map(l -> QueryResult.of(QueryResultInterface.singleton(ColumnInterface.of("#"), l)));
 		};
 		

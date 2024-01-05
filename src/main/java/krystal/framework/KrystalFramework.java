@@ -1,7 +1,7 @@
 package krystal.framework;
 
 import javafx.application.Application;
-import krystal.framework.core.PropertyInterface;
+import krystal.framework.core.PropertiesInterface;
 import krystal.framework.core.jfxApp;
 import lombok.Getter;
 import lombok.Setter;
@@ -52,7 +52,7 @@ public class KrystalFramework {
 	 */
 	private static @Getter @Setter DateTimeFormatter dateFormat = DateTimeFormatter.ofPattern("yyyy-MM-dd");
 	
-	private static @Getter @Setter String loggingPattern = "%highlight{%d{yyyy.MM.dd HH:mm:ss.SSS} %-5level: %msg [%t]%n}{STYLE=Logback}";
+	private static @Getter @Setter String loggingPattern = "%d{yyyy.MM.dd HH:mm:ss} %-5level: %msg%n";
 	
 	private static @Getter ApplicationContext springContext;
 	private static @Getter @Setter jfxApp jfxApplication;
@@ -66,8 +66,8 @@ public class KrystalFramework {
 		if (cssCustomFile == null) cssCustomFile = exposedDirPath + "/style.css";
 		if (providersPropertiesDir == null) providersPropertiesDir = exposedDirPath;
 		
-		PropertyInterface.load(appPropertiesFile, args);
-		log.fatal("=== App started" + (PropertyInterface.areAny() ? " with properties: " + PropertyInterface.printAll() : ""));
+		PropertiesInterface.load(appPropertiesFile, args);
+		log.fatal("=== App started" + (PropertiesInterface.areAny() ? " with properties: " + PropertiesInterface.printAll() : "."));
 	}
 	
 	/**

@@ -75,6 +75,9 @@ public abstract class Query implements LoggingInterface {
 		return this;
 	}
 	
+	/**
+	 * This method is used by {@link QueryExecutorInterface} to unify provider for the internal steps of the Query. To set provider use {@link #setProvider(ProviderInterface)}.
+	 */
 	public void setProvidersPacked(ProviderInterface provider) {
 		packedSteps.forEach(q -> q.setProvider(provider));
 	}
