@@ -38,9 +38,8 @@ public class jfxApp extends Application implements LoggingInterface {
 	}
 	
 	/**
-	 * Resets the input and output components (empties them). Some only if they have names. Children included. for which all inner containers and components will get reset.
+	 * Resets the input and output nodes (empties them). Some only if they don't have id. Pane nodes descendants included.
 	 */
-	// TODO change instanceof to assignablefrom
 	public static void resetNodes(Pane pane) {
 		
 		pane.getChildren().forEach(n -> {
@@ -48,30 +47,31 @@ public class jfxApp extends Application implements LoggingInterface {
 			
 			if (Pane.class.isAssignableFrom(clazz))
 				resetNodes((Pane) n);
-			else if (n instanceof ComboBox<?> node)
-				node.getSelectionModel().clearSelection();
-			else if (n instanceof ChoiceBox<?> node)
-				node.getSelectionModel().clearSelection();
-			else if (n instanceof TextField node)
-				node.setText(null);
-			else if (n instanceof TextArea node)
-				node.setText(null);
-			else if (n instanceof ListView<?> node)
-				node.getItems().clear();
-			else if (n instanceof Label node) {
-				if (node.getId() == null)
-					node.setText(null);
-			} else if (n instanceof CheckBox node)
-				node.setSelected(false);
-			else if (n instanceof RadioButton node)
-				node.setSelected(false);
-			else if (n instanceof DateTimePicker node)
-				node.setDateTimeValue(null);
-			else if (n instanceof DatePicker node)
-				node.setValue(null);
-			else if (n instanceof ScrollPane node) ;// skip
-			else if (n instanceof Button node) ;// skip
-			else if (n instanceof ProgressIndicator node) ;// skip
+			else if (ComboBox.class.isAssignableFrom(clazz))
+				((ComboBox<?>) n).getSelectionModel().clearSelection();
+			else if (ChoiceBox.class.isAssignableFrom(clazz))
+				((ChoiceBox<?>) n).getSelectionModel().clearSelection();
+			else if (TextField.class.isAssignableFrom(clazz))
+				((TextField) n).setText(null);
+			else if (TextArea.class.isAssignableFrom(clazz))
+				((TextArea) n).setText(null);
+			else if (ListView.class.isAssignableFrom(clazz))
+				((ListView<?>) n).getItems().clear();
+			else if (Label.class.isAssignableFrom(clazz)) {
+				Label l = (Label) n;
+				if (l.getId() == null)
+					l.setText(null);
+			} else if (CheckBox.class.isAssignableFrom(clazz))
+				((CheckBox) n).setSelected(false);
+			else if (RadioButton.class.isAssignableFrom(clazz))
+				((RadioButton) n).setSelected(false);
+			else if (DateTimePicker.class.isAssignableFrom(clazz))
+				((DateTimePicker) n).setDateTimeValue(null);
+			else if (DatePicker.class.isAssignableFrom(clazz))
+				((DatePicker) n).setValue(null);
+			else if (ScrollPane.class.isAssignableFrom(clazz)) ;// skip
+			else if (Button.class.isAssignableFrom(clazz)) ;// skip
+			else if (ProgressIndicator.class.isAssignableFrom(clazz)) ;// skip
 			else
 				log.warn(String.format("!!! resetNodes(%s): Class not supported: %s", pane.getClass().getSimpleName(), clazz.getSimpleName()));
 		});

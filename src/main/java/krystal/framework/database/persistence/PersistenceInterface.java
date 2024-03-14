@@ -9,6 +9,7 @@ import krystal.framework.database.queryfactory.ColumnSetPair;
 import krystal.framework.database.queryfactory.ColumnsPairingInterface;
 import krystal.framework.logging.LoggingInterface;
 import lombok.val;
+import reactor.core.publisher.Flux;
 
 import java.lang.reflect.Constructor;
 import java.lang.reflect.Field;
@@ -28,10 +29,10 @@ public interface PersistenceInterface extends LoggingInterface {
 	 */
 	
 	/**
-	 * Get all persisted objects from the database of particular type. The class must support empty (no arguments) constructor. {@link QueryExecutorInterface} here is present for initial Spring injections support. You can use {@link #getAll(Class)} in
+	 * Get all persisted objects from the database of particular type. The class must support empty (no arguments) constructor. {@link QueryExecutorInterface} here is present for initial Spring injections support. You can use {@link #streamAll(Class)} in
 	 * cases following after.
 	 */
-	static <T extends PersistenceInterface> Stream<T> getAll(Class<T> clazz, QueryExecutorInterface queryExecutor) {
+	static <T extends PersistenceInterface> Stream<T> streamAll(Class<T> clazz, QueryExecutorInterface queryExecutor) {
 		try {
 			Constructor<T> emptyConstructor = clazz.getDeclaredConstructor();
 			TableInterface table = emptyConstructor.newInstance().getTable();
@@ -46,10 +47,31 @@ public interface PersistenceInterface extends LoggingInterface {
 	/**
 	 * To be utilised after initial Spring injections (after {@link QueryExecutorInterface} is initialised).
 	 *
-	 * @see #getAll(Class, QueryExecutorInterface)
+	 * @see #streamAll(Class, QueryExecutorInterface)
 	 */
-	static <T extends PersistenceInterface> Stream<T> getAll(Class<T> clazz) {
-		return getAll(clazz, QueryExecutorInterface.getInstance());
+	static <T extends PersistenceInterface> Stream<T> streamAll(Class<T> clazz) {
+		return streamAll(clazz, QueryExecutorInterface.getInstance());
+	}
+	
+	/**
+	 * Flux version of {@link #streamAll(Class, QueryExecutorInterface)}.
+	 */
+	static <T extends PersistenceInterface> Flux<T> fluxAll(Class<T> clazz, QueryExecutorInterface queryExecutor) {
+		try {
+			Constructor<T> emptyConstructor = clazz.getDeclaredConstructor();
+			TableInterface table = emptyConstructor.newInstance().getTable();
+			return table.select().mono(queryExecutor)
+			            .flatMapMany(qr -> Flux.fromStream(qr.toStreamOf(clazz)));
+		} catch (NoSuchMethodException | InstantiationException | IllegalAccessException | InvocationTargetException e) {
+			throw new RuntimeException(e);
+		}
+	}
+	
+	/**
+	 * Flux version of {@link #streamAll(Class)}.
+	 */
+	static <T extends PersistenceInterface> Flux<T> fluxAll(Class<T> clazz) {
+		return fluxAll(clazz, QueryExecutorInterface.getInstance());
 	}
 	
 	/**

@@ -4,6 +4,7 @@ import krystal.Tools;
 import krystal.framework.KrystalFramework;
 import krystal.framework.core.PropertiesAndArguments;
 import krystal.framework.core.PropertiesInterface;
+import lombok.experimental.UtilityClass;
 import org.apache.logging.log4j.Level;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.core.Logger;
@@ -12,19 +13,30 @@ import org.apache.logging.log4j.core.appender.rolling.DefaultRolloverStrategy;
 import org.apache.logging.log4j.core.appender.rolling.SizeBasedTriggeringPolicy;
 import org.apache.logging.log4j.core.config.Configurator;
 import org.apache.logging.log4j.core.layout.PatternLayout;
-import org.springframework.stereotype.Service;
 
 /**
- * Simple logging wrapper around log4j. Use LoggingInterface to attach log() method to classes.
+ * Simple logging wrapper around log4j. Use {@link LoggingInterface} to attach {@link LoggingInterface#log() log()} method to classes. Call {@link #initialize()} to load properties from {@link PropertiesInterface} and start start file appender.
+ * <p>Use properties:</p>
+ * <dl>
+ *     <dt><b><i>logtofile</i></b></dt>
+ *     <dd>Determines if the file appender should be loaded during {@link #initialize()};</dd>
+ *     <dt><b><i>logfile</i></b></dt>
+ *     <dd>Sets the name of the file. You can set this property dynamically via accessing {@link PropertiesInterface#properties} directly;</dd>
+ *     <dt><b><i>logdir</i></b></dt>
+ *     <dd>Sets the path to where the logfiles should be saved. Can also be set programmatically.</dd>
+ * </dl>
  *
  * @see LoggingInterface
+ * @see #startFileAppender()
  */
-@Service
+@UtilityClass
 public class LoggingWrapper {
 	
 	// logger instance
 	public static final Logger ROOT_LOGGER = (Logger) LogManager.getRootLogger();
-	// custom test level
+	/**
+	 * Custom TEST level. Use by invoking {@link LoggingInterface#logTest(String)}.
+	 */
 	public static final Level TEST = Level.forName("TEST", 700);
 	
 	// set the default logfile name
@@ -33,7 +45,9 @@ public class LoggingWrapper {
 	private static final String DEFAULT_LOGDIR =
 			Tools.concatAsURIPath(KrystalFramework.getExposedDirPath(), "logs");
 	
-	private LoggingWrapper() {
+	public static RollingFileAppender fileAppender;
+	
+	public void initialize() {
 		
 		// Set level to given from command line or FATAL as default (also if level is not parsed correctly)
 		setRootLevel((String) PropertiesAndArguments.loglvl.value().orElse("all"));
@@ -46,10 +60,6 @@ public class LoggingWrapper {
 				ROOT_LOGGER.fatal("=== Logging to file - failed initiation. Check directory access.");
 			}
 		
-	}
-	
-	public static LoggingWrapper getInstance() {
-		return KrystalFramework.getSpringContext().getBean(LoggingWrapper.class);
 	}
 	
 	/**
@@ -70,14 +80,23 @@ public class LoggingWrapper {
 		}
 	}
 	
+	/**
+	 * Builds and (re)starts default {@link RollingFileAppender} including loaded {@link PropertiesAndArguments} - <i>logfile</i> and <i>logdir</i>.
+	 */
 	private void startFileAppender() {
+		if (fileAppender != null) {
+			fileAppender.stop();
+			ROOT_LOGGER.removeAppender(fileAppender);
+			ROOT_LOGGER.fatal("=== File logs appender will be replaced.");
+		}
+		
 		String logfile =
 				Tools.concatAsURIPath(
 						(String) PropertiesAndArguments.logdir.value().orElse(DEFAULT_LOGDIR),
 						(String) PropertiesAndArguments.logfile.value().orElse(DEFAULT_LOGFILE)
 				);
 		
-		var rfa = RollingFileAppender
+		fileAppender = RollingFileAppender
 				.newBuilder()
 				.setFileName(logfile + ".log")
 				.setName("RollingFile")
@@ -94,8 +113,8 @@ public class LoggingWrapper {
 						                       .build())
 				.build();
 		
-		ROOT_LOGGER.addAppender(rfa);
-		rfa.start();
+		ROOT_LOGGER.addAppender(fileAppender);
+		fileAppender.start();
 		ROOT_LOGGER.fatal("=== Logging to file started at level " + ROOT_LOGGER.getLevel() + (PropertiesInterface.areAny() ? ", with App properties: " + PropertiesInterface.printAll() : "."));
 	}
 	

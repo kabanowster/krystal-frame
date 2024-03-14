@@ -7,6 +7,7 @@ import lombok.val;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.*;
+import java.util.concurrent.atomic.AtomicReference;
 
 public interface FlowControlInterface extends LoggingInterface {
 	
@@ -20,29 +21,37 @@ public interface FlowControlInterface extends LoggingInterface {
 	
 	ExecutorService getCachedExecutor();
 	
+	AtomicReference<ScheduledFuture<?>> getTaskManager();
+	
 	List<Task> getTasksList();
 	
-	default void initializeTaskManager(FlowInterface... flows) {
-		log().debug("*** Initializing Tasks Manager.");
+	default void initialize(boolean withTaskManager, FlowInterface... flows) {
+		log().debug("*** Initializing Tasks Manager and Flows.");
 		for (FlowInterface s : flows)
 			getFlowControls().put(s, new Phaser(1));
-		// TODO prevent overflow
-		getScheduledExecutor().scheduleWithFixedDelay(this::removeCompletedTasks, 3, 1, TimeUnit.SECONDS);
+		val taskManager = getTaskManager();
+		if (withTaskManager) {
+			if (taskManager.get() == null)
+				taskManager.set(getScheduledExecutor().scheduleWithFixedDelay(this::removeCompletedTasks, 3, 1, TimeUnit.SECONDS));
+			else log().debug("    Task Manager is currently running. No need to create another.");
+		}
 	}
 	
 	/**
-	 * Use to synchronise tasks execution between different, unrelated objects / threads, through {@link FlowInterface}.
+	 * Use to synchronise tasks execution between different, unrelated objects / threads, through {@link FlowInterface}. Tasks are being cleared by watching thread upon completion.
 	 */
-	default void registerTask(String name, CompletableFuture<?> task, FlowInterface flow) {
-		val toRegister = new Task(name, task, flow);
-		
+	default void registerTask(Task toRegister) {
 		// prevent overflow
 		if (getTasksList().contains(toRegister))
 			return;
 		
-		getFlowControls().get(flow).register();
+		getFlowControls().get(toRegister.flow()).register();
 		getTasksList().add(toRegister);
 		log().debug(String.format("*** [Task Manager] Registered %s Total: %s", toRegister, getTasksList().size()));
+	}
+	
+	default void registerTask(String name, CompletableFuture<?> task, FlowInterface flow) {
+		registerTask(new Task(name, task, flow));
 	}
 	
 	default void deregisterTask(String name) {

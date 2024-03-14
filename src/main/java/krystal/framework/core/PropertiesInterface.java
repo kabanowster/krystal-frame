@@ -12,11 +12,22 @@ import java.util.Optional;
 import java.util.Properties;
 import java.util.stream.Stream;
 
+/**
+ * Interface to manage properties and cmd-line arguments. Access static {@link #properties} map or implement this with Enum for convenience.
+ *
+ * @see PropertiesAndArguments
+ */
 @FunctionalInterface
 public interface PropertiesInterface extends LoggingInterface {
 	
+	/**
+	 * Simple map of String names and values, keeping their type by applying {@link #properlyCast(String)} method.
+	 */
 	Map<String, Object> properties = new HashMap<>();
 	
+	/**
+	 * Loads given arguments to {@link #properties} map. Each argument must begin with "--", and values can be pointed either by "=" or single space (i.e. --argument=value or --argument value).
+	 */
 	static void loadCmdLnArgs(String... args) {
 		Stream.of(String.join(" ", args).split("--")).skip(1).forEach(s -> {
 			String[] parts = s.trim().split("[\\s=]", 2);
@@ -29,6 +40,9 @@ public interface PropertiesInterface extends LoggingInterface {
 		});
 	}
 	
+	/**
+	 * Loads properties from given path. Uses {@link Properties} to parse.
+	 */
 	static void loadAppProperties(String propertiesPath) {
 		try (InputStream source = Tools.getResource(propertiesPath).openStream()) {
 			Properties props = new Properties();
@@ -45,14 +59,28 @@ public interface PropertiesInterface extends LoggingInterface {
 		}
 	}
 	
+	/**
+	 * Loads cmd-line args and app properties together.
+	 *
+	 * @see #loadCmdLnArgs(String...)
+	 * @see #loadAppProperties(String)
+	 */
 	static void load(String propertiesPath, String... args) {
 		loadCmdLnArgs(args);
 		loadAppProperties(propertiesPath);
 	}
 	
+	/**
+	 * Tries to cast the String to Integer, Long, Double or Boolean
+	 */
 	private static Object properlyCast(String arg) {
 		try {
 			return Integer.parseInt(arg);
+		} catch (Exception ignored) {
+		}
+		
+		try {
+			return Long.parseLong(arg);
 		} catch (Exception ignored) {
 		}
 		
@@ -62,7 +90,7 @@ public interface PropertiesInterface extends LoggingInterface {
 		}
 		
 		return switch (arg) {
-			case "yes", "no", "true", "false" -> Boolean.parseBoolean(arg);
+			case "y", "n", "yes", "no", "true", "false" -> Boolean.parseBoolean(arg);
 			default -> arg;
 		};
 	}
@@ -78,7 +106,7 @@ public interface PropertiesInterface extends LoggingInterface {
 	String name();
 	
 	/**
-	 * @return Optional command's value.
+	 * @return Optional property's value.
 	 */
 	default Optional<Object> value() {
 		return Optional.ofNullable(properties.get(name()));

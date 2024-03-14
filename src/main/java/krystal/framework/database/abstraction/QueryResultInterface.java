@@ -10,6 +10,8 @@ import java.util.stream.Stream;
 
 /**
  * Rows and columns loaded from database.
+ *
+ * @see PersistenceInterface
  */
 public interface QueryResultInterface {
 	

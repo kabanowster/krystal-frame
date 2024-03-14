@@ -9,7 +9,7 @@ import java.lang.annotation.RetentionPolicy;
 import java.lang.annotation.Target;
 
 /**
- * Mark Class that is read-only which basically restricts all saving operations, but can use some of the {@link PersistenceInterface PersistenceInterface} methods like {@link PersistenceInterface#getAll(Class, QueryExecutorInterface) getAll()}.
+ * Mark Class that is read-only which basically restricts all saving operations, but can use some of the {@link PersistenceInterface PersistenceInterface} methods like {@link PersistenceInterface#streamAll(Class, QueryExecutorInterface) getAll()}.
  */
 @Target(ElementType.TYPE)
 @Retention(RetentionPolicy.RUNTIME)
