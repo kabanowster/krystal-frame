@@ -66,8 +66,8 @@ public interface PropertiesInterface extends LoggingInterface {
 	 * @see #loadAppProperties(String)
 	 */
 	static void load(String propertiesPath, String... args) {
-		loadCmdLnArgs(args);
 		loadAppProperties(propertiesPath);
+		loadCmdLnArgs(args);
 	}
 	
 	/**
