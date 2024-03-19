@@ -1,6 +1,7 @@
 package krystal.framework;
 
 import javafx.application.Application;
+import krystal.framework.core.ConsoleViewer;
 import krystal.framework.core.PropertiesInterface;
 import krystal.framework.core.jfxApp;
 import krystal.framework.database.abstraction.ProviderInterface;
@@ -174,12 +175,22 @@ public class KrystalFramework {
 		}
 	}
 	
+	public static void startConsole() {
+		val console = new ConsoleViewer();
+	}
+	
 	/**
 	 * <p>Frame JavaFX application backed by Spring annotation context.</p>
 	 */
 	public static void frameSpringJavaFX(List<Class<?>> springContextRootClasses, String... args) {
 		primaryInitialization(args);
 		startJavaFX(args);
+		startSpringCore(springContextRootClasses);
+	}
+	
+	public static void frameSpringConsole(List<Class<?>> springContextRootClasses, String... args) {
+		startConsole();
+		primaryInitialization(args);
 		startSpringCore(springContextRootClasses);
 	}
 	
