@@ -2,7 +2,9 @@ package krystal.framework.core.flow;
 
 import krystal.framework.KrystalFramework;
 import krystal.framework.logging.LoggingInterface;
+import krystal.framework.logging.LoggingWrapper;
 import lombok.val;
+import org.springframework.beans.factory.NoSuchBeanDefinitionException;
 
 import java.util.List;
 import java.util.Map;
@@ -12,7 +14,14 @@ import java.util.concurrent.atomic.AtomicReference;
 public interface FlowControlInterface extends LoggingInterface {
 	
 	static FlowControlInterface getInstance() {
-		return KrystalFramework.getSpringContext().getBean(FlowControlInterface.class);
+		try {
+			return KrystalFramework.getSpringContext().getBean(FlowControlInterface.class);
+		} catch (NullPointerException e) {
+			return null;
+		} catch (NoSuchBeanDefinitionException e) {
+			LoggingWrapper.ROOT_LOGGER.fatal(e.getMessage());
+			return null;
+		}
 	}
 	
 	Map<FlowInterface, Phaser> getFlowControls();

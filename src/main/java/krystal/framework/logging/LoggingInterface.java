@@ -26,4 +26,11 @@ public interface LoggingInterface {
 		LoggingWrapper.ROOT_LOGGER.log(LoggingWrapper.TEST, message);
 	}
 	
+	/**
+	 * Uses custom CONSOLE level of 800.
+	 */
+	default void logConsole(String message) {
+		LoggingWrapper.ROOT_LOGGER.log(LoggingWrapper.CONSOLE, message);
+	}
+	
 }

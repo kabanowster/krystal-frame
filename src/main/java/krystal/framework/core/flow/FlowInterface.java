@@ -5,7 +5,7 @@ import java.util.concurrent.Phaser;
 import java.util.stream.IntStream;
 
 /**
- * Access point for {@link FlowControlInterface}. Implement with Enum for convenience and pass it to {@link FlowControlInterface#initialize(FlowInterface...)} to create Phasers. Use interface's wrapper methods to control these Phasers.
+ * Access point for {@link FlowControlInterface}. Implement with Enum for convenience and pass it to {@link FlowControlInterface#initialize(boolean, FlowInterface...)} to create Phasers. Use interface's wrapper methods to control these Phasers.
  */
 @FunctionalInterface
 public interface FlowInterface {

@@ -11,7 +11,9 @@ import krystal.framework.database.implementation.ExecutionType;
 import krystal.framework.database.implementation.QueryResult;
 import krystal.framework.database.implementation.QueryResultRow;
 import krystal.framework.logging.LoggingInterface;
+import krystal.framework.logging.LoggingWrapper;
 import lombok.val;
+import org.springframework.beans.factory.NoSuchBeanDefinitionException;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 
@@ -29,7 +31,14 @@ import java.util.stream.Stream;
 public interface QueryExecutorInterface extends LoggingInterface {
 	
 	static QueryExecutorInterface getInstance() {
-		return KrystalFramework.getSpringContext().getBean(QueryExecutorInterface.class);
+		try {
+			return KrystalFramework.getSpringContext().getBean(QueryExecutorInterface.class);
+		} catch (NullPointerException e) {
+			return null;
+		} catch (NoSuchBeanDefinitionException e) {
+			LoggingWrapper.ROOT_LOGGER.fatal(e.getMessage());
+			return null;
+		}
 	}
 	
 	ProviderInterface getDefaultProvider();
@@ -48,6 +57,9 @@ public interface QueryExecutorInterface extends LoggingInterface {
 	 * Initialization
 	 */
 	
+	/**
+	 * Initialize connections properties for listed database Providers from <code>provider_name.properties</code> files within {@link KrystalFramework#providersPropertiesDir providersPropertiesDir} directory.
+	 */
 	default void loadProviderProperties(ProviderInterface... providers) {
 		log().debug("*** Loading Provider Properties.");
 		val connectionProperties = getConnectionProperties();

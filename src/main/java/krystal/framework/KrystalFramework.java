@@ -1,29 +1,27 @@
 package krystal.framework;
 
 import javafx.application.Application;
-import krystal.framework.core.ConsoleViewer;
+import krystal.JSON;
+import krystal.framework.core.ConsoleView;
 import krystal.framework.core.PropertiesInterface;
 import krystal.framework.core.jfxApp;
 import krystal.framework.database.abstraction.ProviderInterface;
 import krystal.framework.logging.LoggingWrapper;
 import lombok.Getter;
 import lombok.Setter;
+import lombok.experimental.UtilityClass;
 import lombok.extern.log4j.Log4j2;
 import lombok.val;
 import org.apache.catalina.LifecycleException;
 import org.apache.catalina.startup.Tomcat;
 import org.springframework.context.ApplicationContext;
 import org.springframework.context.annotation.AnnotationConfigApplicationContext;
-import org.springframework.context.annotation.ComponentScan;
-import org.springframework.context.annotation.Configuration;
 import org.springframework.http.server.reactive.TomcatHttpHandlerAdapter;
 import org.springframework.web.server.adapter.WebHttpHandlerBuilder;
 
-import java.io.Console;
 import java.nio.file.Path;
 import java.time.format.DateTimeFormatter;
-import java.util.ArrayList;
-import java.util.List;
+import java.util.*;
 import java.util.concurrent.CompletableFuture;
 
 /**
@@ -36,78 +34,82 @@ import java.util.concurrent.CompletableFuture;
  *
  * @see #primaryInitialization(String...)
  */
-@ComponentScan
-@Configuration
 @Log4j2
+@UtilityClass
 public class KrystalFramework {
 	
 	/**
 	 * <p>Root folder to search for external resources. Address folder outside, i.e. next to the jar.</p> <br>
 	 * <p>Default: empty String</p>
 	 */
-	private static @Getter @Setter String exposedDirPath = "";
+	private @Getter @Setter String exposedDirPath = "";
 	/**
 	 * <p>Path and name of the <i>.properties</i> file used as the source of application properties.</p> <br>
 	 * <p>Default: {@code application.properties}</p>
 	 *
 	 * @see PropertiesInterface
 	 */
-	private static @Getter @Setter String appPropertiesFile;
+	private @Getter @Setter String appPropertiesFile;
 	/**
 	 * <p>Dir path for database {@link ProviderInterface Providers} <i>.properties</i> files.</p> <br>
 	 * <p>Default: {@link #exposedDirPath}</p>
 	 */
-	private static @Getter @Setter String providersPropertiesDir;
+	private @Getter @Setter String providersPropertiesDir;
 	/**
 	 * <p>Path and name of the text file used as the source of external commands.</p> <br>
 	 * <p>Default: {@code exposedDirPath/commander.txt}</p>
 	 *
 	 * @see krystal.framework.commander.CommanderInterface CommanderInterface
 	 */
-	private static @Getter @Setter String commanderFile;
+	private @Getter @Setter String commanderFile;
 	/**
 	 * <p>Custom css styling. Use as pleased.</p> <br>
 	 * <p>Default: {@code style.css}</p>
 	 */
-	private static @Getter @Setter String cssCustomFile;
+	private @Getter @Setter String cssCustomFile;
 	
 	/**
 	 * <p>Default delimiter to concatenate various Strings.</p> <br>
 	 * <p>Default: {@code ", "}</p>
 	 */
-	private static @Getter @Setter String defaultDelimeter = ", ";
+	private @Getter @Setter String defaultDelimeter = ", ";
 	/**
 	 * <p>Default format to use i.e. when storing <i>LocalDateTime</i>.</p> <br>
 	 * <p>Default: {@code yyyy-MM-dd HH:mm:ss}</p>
 	 */
-	private static @Getter @Setter DateTimeFormatter datetimeFormat = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss");
+	private @Getter @Setter DateTimeFormatter datetimeFormat = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss");
 	/**
 	 * <p>Default format to use i.e. when storing <i>LocalDate</i>.</p> <br>
 	 * <p>Default: {@code yyyy-MM-dd}</p>
 	 */
-	private static @Getter @Setter DateTimeFormatter dateFormat = DateTimeFormatter.ofPattern("yyyy-MM-dd");
+	private @Getter @Setter DateTimeFormatter dateFormat = DateTimeFormatter.ofPattern("yyyy-MM-dd");
 	/**
 	 * <p>Default logging pattern to use with logs file appender (Log4j2).</p> <br>
 	 * <p>Default: {@code %d{yyyy.MM.dd HH:mm:ss} %-5level: %msg%n}</p>
 	 *
 	 * @see LoggingWrapper
 	 */
-	private static @Getter @Setter String loggingPattern = "%d{yyyy.MM.dd HH:mm:ss} %-5level: %msg%n";
+	private @Getter @Setter String loggingPattern = "%d{yyyy.MM.dd HH:mm:ss} %-7level: %msg%n";
 	/**
 	 * Access Spring context here if created.
 	 *
 	 * @see #startSpringCore(List)
 	 */
-	private static @Getter ApplicationContext springContext;
+	private @Getter ApplicationContext springContext;
 	/**
 	 * Access JavaFX application context here if created ({@link jfxApp}). Also holds convenient utilities.
 	 *
 	 * @see jfxApp
 	 * @see #startJavaFX(String...)
 	 */
-	private static @Getter @Setter jfxApp jfxApplication;
+	private @Getter @Setter jfxApp jfxApplication;
 	
-	private static @Getter Console console;
+	/**
+	 * @see #selectDefaultImplementations(DefaultImplementation...)
+	 */
+	private @Getter Set<DefaultImplementation> selectedDefaultImplementations;
+	
+	private @Getter ConsoleView console;
 	
 	/**
 	 * Loads default values (if not specified), app properties and args.
@@ -124,7 +126,7 @@ public class KrystalFramework {
 	 * @see #springContext
 	 * @see #jfxApplication
 	 */
-	public static void primaryInitialization(String... args) {
+	public void primaryInitialization(String... args) {
 		
 		if (appPropertiesFile == null) appPropertiesFile = exposedDirPath + "/application.properties";
 		if (commanderFile == null) commanderFile = exposedDirPath + "/commander.txt";
@@ -139,7 +141,7 @@ public class KrystalFramework {
 	/**
 	 * Launches JavaFX application, using basic framework implementation {@link jfxApp}. Follow-up with {@link javafx.application.Platform#runLater(Runnable) Platform.runLater()}.
 	 */
-	public static void startJavaFX(String... args) {
+	public void startJavaFX(String... args) {
 		CompletableFuture.runAsync(() -> Application.launch(jfxApp.class, args));
 	}
 	
@@ -148,13 +150,14 @@ public class KrystalFramework {
 	 *
 	 * @see #springContext
 	 */
-	public static void startSpringCore(List<Class<?>> contextRootClasses) {
+	public void startSpringCore(List<Class<?>> contextRootClasses) {
 		val classes = new ArrayList<>(contextRootClasses);
-		classes.addFirst(KrystalFramework.class);
+		// classes.addFirst(KrystalFramework.class);
+		classes.addAll(selectedDefaultImplementations.stream().map(i -> i.implementation).toList());
 		springContext = new AnnotationConfigApplicationContext(classes.toArray(Class[]::new));
 	}
 	
-	public static void startTomcatServer(int port) {
+	public void startTomcatServer(int port) {
 		val baseDir = System.getProperty("java.io.tmpdir");
 		val handler = WebHttpHandlerBuilder.applicationContext(springContext).build();
 		val servlet = new TomcatHttpHandlerAdapter(handler);
@@ -175,28 +178,89 @@ public class KrystalFramework {
 		}
 	}
 	
-	public static void startConsole() {
-		val console = new ConsoleViewer();
+	public void startConsole() {
+		disposeConsole();
+		console = new ConsoleView();
+	}
+	
+	public void disposeConsole() {
+		if (console != null)
+			console.dispose();
+		console = null;
 	}
 	
 	/**
 	 * <p>Frame JavaFX application backed by Spring annotation context.</p>
 	 */
-	public static void frameSpringJavaFX(List<Class<?>> springContextRootClasses, String... args) {
+	public void frameSpringJavaFX(List<Class<?>> springContextRootClasses, String... args) {
 		primaryInitialization(args);
 		startJavaFX(args);
 		startSpringCore(springContextRootClasses);
 	}
 	
-	public static void frameSpringConsole(List<Class<?>> springContextRootClasses, String... args) {
+	public void frameSpringConsole(List<Class<?>> springContextRootClasses, String... args) {
 		startConsole();
 		primaryInitialization(args);
 		startSpringCore(springContextRootClasses);
 	}
 	
-	public static void quit() {
+	public void quit() {
 		log.fatal("=== Clean Exit");
 		System.exit(0);
+	}
+	
+	/**
+	 * Choose the default implementations of core framework components, to be loaded during Spring component scan.
+	 *
+	 * @param selectedImplementations
+	 * 		If Null, all default implementations will be loaded.
+	 */
+	public void selectDefaultImplementations(DefaultImplementation... selectedImplementations) {
+		selectedDefaultImplementations = new HashSet<>(Set.of(selectedImplementations.length == 0 ? DefaultImplementation.values() : selectedImplementations));
+	}
+	
+	/**
+	 * Choose all default implementations of core framework components, except selected, to be loaded during Spring component scan.
+	 *
+	 * @param excludedImplementations
+	 * 		If Null, all default implementations will be loaded.
+	 */
+	public void selectAllDefaultImplementationsExcept(DefaultImplementation... excludedImplementations) {
+		selectedDefaultImplementations = new HashSet<>(Set.of(DefaultImplementation.values()));
+		if (excludedImplementations.length > 0)
+			selectedDefaultImplementations.removeAll(Set.of(excludedImplementations));
+	}
+	
+	public enum DefaultImplementation {
+		FlowControl(krystal.framework.core.flow.implementation.FlowControl.class),
+		QueryExecutor(krystal.framework.database.implementation.QueryExecutor.class),
+		BaseCommander(krystal.framework.commander.implementation.BaseCommander.class);
+		
+		public final Class<?> implementation;
+		
+		DefaultImplementation(Class<?> clazz) {
+			implementation = clazz;
+		}
+	}
+	
+	public String frameworkStatus() {
+		val map = new HashMap<>();
+		
+		map.put("exposedDirPath", exposedDirPath);
+		map.put("appPropertiesFile", appPropertiesFile);
+		map.put("providersPropertiesDir", providersPropertiesDir);
+		map.put("commanderFile", commanderFile);
+		map.put("cssCustomFile", cssCustomFile);
+		map.put("defaultDelimeter", defaultDelimeter);
+		map.put("datetimeFormat", datetimeFormat.toString());
+		map.put("dateFormat", dateFormat.toString());
+		map.put("loggingPattern", loggingPattern);
+		map.put("springContext", springContext != null ? "established" : "n/a");
+		map.put("jfxApplication", jfxApplication != null ? "established" : "n/a");
+		map.put("console", console != null ? "established" : "n/a");
+		map.put("selectedDefaultImplementations", selectedDefaultImplementations.stream().map(Enum::toString).toList());
+		
+		return JSON.from(map).toString(4);
 	}
 	
 }

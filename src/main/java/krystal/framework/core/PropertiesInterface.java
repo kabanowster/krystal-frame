@@ -3,6 +3,7 @@ package krystal.framework.core;
 import krystal.Tools;
 import krystal.framework.KrystalFramework;
 import krystal.framework.logging.LoggingInterface;
+import lombok.val;
 
 import java.io.IOException;
 import java.io.InputStream;
@@ -30,7 +31,7 @@ public interface PropertiesInterface extends LoggingInterface {
 	 */
 	static void loadCmdLnArgs(String... args) {
 		Stream.of(String.join(" ", args).split("--")).skip(1).forEach(s -> {
-			String[] parts = s.trim().split("[\\s=]", 2);
+			val parts = s.strip().split("[\\s=]", 2);
 			Object value = null;
 			try {
 				value = properlyCast(parts[1]);

@@ -3,54 +3,90 @@ package krystal.framework.commander;
 import com.google.common.io.Files;
 import krystal.framework.KrystalFramework;
 import krystal.framework.logging.LoggingInterface;
+import krystal.framework.logging.LoggingWrapper;
+import lombok.val;
+import org.springframework.beans.factory.NoSuchBeanDefinitionException;
 
 import java.io.File;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.util.List;
+import java.util.Optional;
 import java.util.stream.Stream;
 
 /**
- * To read external commands, provide a source text file, where each line will be parsed - first word as command and following as arguments, separated with space character. Attach {@link CommandInterface} to enum and parse it through
- * {@link #executeCommand(CommandInterface, List)} for clarity.
+ * To read external commands, use {@link #readCommandsFromTextFile(File)}, which can be scheduled with your flow manager. Commands can be defined with {@link CommandInterface} as enums and parsed through {@link #executeCommand(CommandInterface, List)} for
+ * clarity or use {@link #parseCommand(String)}. First word in line is a command and arguments delimiter is "--". The split-part before first "--" is skipped. Further parse argument with {@link #getValueIfArgumentIs(String, String...)}.
  */
 public interface CommanderInterface extends LoggingInterface {
 	
 	static CommanderInterface getInstance() {
-		return KrystalFramework.getSpringContext().getBean(CommanderInterface.class);
+		try {
+			return KrystalFramework.getSpringContext().getBean(CommanderInterface.class);
+		} catch (NullPointerException e) {
+			return null;
+		} catch (NoSuchBeanDefinitionException e) {
+			LoggingWrapper.ROOT_LOGGER.fatal(e.getMessage());
+			return null;
+		}
 	}
 	
 	/**
 	 * Implement the execution of given command and arguments. Using switch with enum implementing {@link CommandInterface} is advised.
 	 */
-	void executeCommand(CommandInterface command, List<String> arguments);
+	boolean executeCommand(CommandInterface command, List<String> arguments);
 	
 	/**
-	 * Put the file to read here.
+	 * Read file lines passed and perform {@link #executeCommand(CommandInterface, List)} on each.
 	 */
-	File getCommanderFile();
-	
-	/**
-	 * Read file lines passed with {@link #getCommanderFile()} and perform {@link #executeCommand(CommandInterface, List)} on each.
-	 */
-	default void readCommandsFromTextFile() {
+	default void readCommandsFromTextFile(File commandsFile) {
 		try {
-			Files.readLines(getCommanderFile(), StandardCharsets.UTF_8)
-			     .forEach(lineString -> {
-				     log().fatal("*** EXTERNAL COMMAND PARSING: " + lineString);
-				     String[] arguments = lineString.split(" ");
-				     executeCommand(
-						     () -> Stream.of(arguments)
-						                 .findFirst()
-						                 .orElseThrow()
-						                 .trim()
-						                 .toLowerCase(),
-						     Stream.of(arguments).skip(1).toList()
-				     );
+			Files.readLines(commandsFile, StandardCharsets.UTF_8)
+			     .forEach(line -> {
+				     log().fatal("*** EXTERNAL COMMAND PARSING: " + line);
+				     parseCommand(line);
 			     });
 		} catch (IOException ex) {
 			// log().fatal("!!! External commands file not responding.");
 		}
+	}
+	
+	/**
+	 * First trimmed word is a command, case-insensitive, followed by arguments with "--" or "-".
+	 */
+	default boolean parseCommand(String command) {
+		val line = command.split(" ", 2);
+		return executeCommand(
+				() -> line[0].strip().toLowerCase(),
+				// line.length > 1 ? (line[1].transform((a) -> a.matches(".*?--.+?") ? Stream.of(a.split("--")).map(String::strip).filter(s -> !s.isEmpty()).toList() : List.of(a))) : List.of()
+				line.length > 1 ? Stream.of(line[1].split("--|\\s(?=-[a-zA-Z])")).map(String::strip).filter(s -> !s.isEmpty()).toList() : List.of()
+		);
+	}
+	
+	/**
+	 * If provided argument (String) matches pattern and any of the name variants, returns its value.
+	 */
+	default Optional<String> getValueIfArgumentIs(String argument, String... variants) {
+		if (argumentMatches(argument, variants)) {
+			return Optional.ofNullable(getArgumetnValue(argument));
+		} else {
+			return Optional.empty();
+		}
+	}
+	
+	/**
+	 * Checks if argument fits the valid pattern, and if it's name is one of the variants.
+	 */
+	default boolean argumentMatches(String argument, String... variants) {
+		val regex = "^(%s)([\\s=]\\w[\\w\\W]*?)?$".formatted(String.join("|", variants));
+		return argument.matches(regex);
+	}
+	
+	/**
+	 * Gets the value of the argument, issued with either " " or "=".
+	 */
+	default String getArgumetnValue(String argument) {
+		return argument.split("[\\s=]", 2)[1].strip().transform(s -> s.isEmpty() ? null : s);
 	}
 	
 }

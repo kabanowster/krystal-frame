@@ -34,10 +34,16 @@ public class LoggingWrapper {
 	
 	// logger instance
 	public static final Logger ROOT_LOGGER = (Logger) LogManager.getRootLogger();
+	
 	/**
 	 * Custom TEST level. Use by invoking {@link LoggingInterface#logTest(String)}.
 	 */
 	public static final Level TEST = Level.forName("TEST", 700);
+	
+	/**
+	 * Custom CONSOLE level. Use by invoking {@link LoggingInterface#logConsole(String)}.
+	 */
+	public static final Level CONSOLE = Level.forName("CONSOLE", 1);
 	
 	// set the default logfile name
 	private static final String DEFAULT_LOGFILE = "logfile";
@@ -70,13 +76,15 @@ public class LoggingWrapper {
 	}
 	
 	/**
-	 * Use this method to get logger level from String values (i.e. cmdLineArgs) (Implements try-catch)
+	 * Use this method to get log4j2 {@link Level} from String values.
+	 *
+	 * @return {@link Level} or {@link Level#ALL} if fails parsing.
 	 */
-	private Level parseLogLevel(String level) {
+	public static Level parseLogLevel(String level) {
 		try {
 			return Level.valueOf(level);
 		} catch (NullPointerException | IllegalArgumentException ex) {
-			return Level.FATAL;
+			return Level.ALL;
 		}
 	}
 	
