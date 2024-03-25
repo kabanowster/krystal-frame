@@ -15,7 +15,8 @@ import org.apache.logging.log4j.core.config.Configurator;
 import org.apache.logging.log4j.core.layout.PatternLayout;
 
 /**
- * Simple logging wrapper around log4j. Use {@link LoggingInterface} to attach {@link LoggingInterface#log() log()} method to classes. Call {@link #initialize()} to load properties from {@link PropertiesInterface} and start start file appender.
+ * Simple logging wrapper around log4j. Use {@link LoggingInterface} to attach {@link LoggingInterface#log() log()} method to classes. Call {@link #initialize()} to load properties from {@link PropertiesInterface} and start start file appender if the
+ * {@link PropertiesAndArguments#logtofile logtofile} property is true.
  * <p>Use properties:</p>
  * <dl>
  *     <dt><b><i>logtofile</i></b></dt>
@@ -59,7 +60,7 @@ public class LoggingWrapper {
 		setRootLevel((String) PropertiesAndArguments.loglvl.value().orElse("all"));
 		
 		// Start file appender if not suspended by cmdArgs
-		if ((Boolean) PropertiesAndArguments.logtofile.value().orElse(true))
+		if ((Boolean) PropertiesAndArguments.logtofile.value().orElse(false))
 			try {
 				startFileAppender();
 			} catch (IllegalStateException ex) {

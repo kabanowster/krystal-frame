@@ -7,6 +7,8 @@ import krystal.framework.core.PropertiesInterface;
 import krystal.framework.core.jfxApp;
 import krystal.framework.database.abstraction.ProviderInterface;
 import krystal.framework.logging.LoggingWrapper;
+import krystal.framework.tomcat.TomcatFactory;
+import krystal.framework.tomcat.TomcatProperties;
 import lombok.Getter;
 import lombok.Setter;
 import lombok.experimental.UtilityClass;
@@ -16,10 +18,7 @@ import org.apache.catalina.LifecycleException;
 import org.apache.catalina.startup.Tomcat;
 import org.springframework.context.ApplicationContext;
 import org.springframework.context.annotation.AnnotationConfigApplicationContext;
-import org.springframework.http.server.reactive.TomcatHttpHandlerAdapter;
-import org.springframework.web.server.adapter.WebHttpHandlerBuilder;
 
-import java.nio.file.Path;
 import java.time.format.DateTimeFormatter;
 import java.util.*;
 import java.util.concurrent.CompletableFuture;
@@ -37,6 +36,10 @@ import java.util.concurrent.CompletableFuture;
 @Log4j2
 @UtilityClass
 public class KrystalFramework {
+	
+	/*
+	 * Settings variables
+	 */
 	
 	/**
 	 * <p>Root folder to search for external resources. Address folder outside, i.e. next to the jar.</p> <br>
@@ -111,6 +114,12 @@ public class KrystalFramework {
 	
 	private @Getter ConsoleView console;
 	
+	private @Getter Tomcat tomcat;
+	
+	/*
+	 * Launch modules
+	 */
+	
 	/**
 	 * Loads default values (if not specified), app properties and args.
 	 *
@@ -157,25 +166,22 @@ public class KrystalFramework {
 		springContext = new AnnotationConfigApplicationContext(classes.toArray(Class[]::new));
 	}
 	
-	public void startTomcatServer(int port) {
-		val baseDir = System.getProperty("java.io.tmpdir");
-		val handler = WebHttpHandlerBuilder.applicationContext(springContext).build();
-		val servlet = new TomcatHttpHandlerAdapter(handler);
-		val tomcat = new Tomcat();
-		
-		val rootContext = tomcat.addContext("", Path.of(baseDir).toAbsolutePath().toString());
-		Tomcat.addServlet(rootContext, "main", servlet).setAsyncSupported(true);
-		rootContext.addServletMappingDecoded("/", "main");
-		
-		tomcat.setHostname("localhost");
-		tomcat.setPort(port);
-		tomcat.setBaseDir(baseDir);
-		
+	/**
+	 * Starts new embedded {@link Tomcat} server with provided {@link TomcatProperties}.
+	 *
+	 * @see TomcatFactory
+	 * @see TomcatProperties
+	 */
+	public void startTomcatServer(TomcatProperties properties) {
+		log.fatal("=== Initializing Tomcat Server...");
 		try {
+			tomcat = TomcatFactory.buildServer(properties);
 			tomcat.start();
+			tomcat.getConnector();
 		} catch (LifecycleException e) {
-			throw new RuntimeException(e);
+			log.fatal("!!! Tomcat broke with exception:\n" + e.getMessage());
 		}
+		log.fatal("  > Tomcat is running on: %1$s:%2$s".formatted(properties.getHostName(), properties.getPort()));
 	}
 	
 	public void startConsole() {
@@ -189,8 +195,12 @@ public class KrystalFramework {
 		console = null;
 	}
 	
+	/*
+	 * Launch templates
+	 */
+	
 	/**
-	 * <p>Frame JavaFX application backed by Spring annotation context.</p>
+	 * Frame JavaFX application backed by Spring annotation context.
 	 */
 	public void frameSpringJavaFX(List<Class<?>> springContextRootClasses, String... args) {
 		primaryInitialization(args);
@@ -203,6 +213,17 @@ public class KrystalFramework {
 		primaryInitialization(args);
 		startSpringCore(springContextRootClasses);
 	}
+	
+	// public void frameSpringWebConsole(Class<?> mainClass, String... args) {
+	// 	startConsole();
+	// 	primaryInitialization(args);
+	// 	startSpringWebCore(List.of(mainClass));
+	// 	startTomcatServer(null, 8082, mainClass);
+	// }
+	
+	/*
+	 * Utilities
+	 */
 	
 	public void quit() {
 		log.fatal("=== Clean Exit");
@@ -257,6 +278,7 @@ public class KrystalFramework {
 		map.put("loggingPattern", loggingPattern);
 		map.put("springContext", springContext != null ? "established" : "n/a");
 		map.put("jfxApplication", jfxApplication != null ? "established" : "n/a");
+		map.put("tomcat", tomcat != null ? "established" : "n/a");
 		map.put("console", console != null ? "established" : "n/a");
 		map.put("selectedDefaultImplementations", selectedDefaultImplementations.stream().map(Enum::toString).toList());
 		

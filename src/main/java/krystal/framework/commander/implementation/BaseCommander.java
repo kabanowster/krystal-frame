@@ -1,6 +1,7 @@
 package krystal.framework.commander.implementation;
 
 import krystal.JSON;
+import krystal.Tools;
 import krystal.framework.KrystalFramework;
 import krystal.framework.commander.CommandInterface;
 import krystal.framework.commander.CommanderInterface;
@@ -8,8 +9,10 @@ import krystal.framework.core.ConsoleView;
 import krystal.framework.core.PropertiesInterface;
 import krystal.framework.database.abstraction.QueryExecutorInterface;
 import krystal.framework.logging.LoggingWrapper;
+import krystal.framework.tomcat.TomcatFactory;
 import lombok.NoArgsConstructor;
 import lombok.val;
+import org.apache.catalina.LifecycleException;
 
 import java.util.Arrays;
 import java.util.List;
@@ -150,6 +153,64 @@ public class BaseCommander implements CommanderInterface {
 			}
 			case krystal -> {
 				logConsole(">>> KrystalFramework status:\n%s".formatted(KrystalFramework.frameworkStatus()));
+				return true;
+			}
+			case tomcat -> {
+				val tomcat = KrystalFramework.getTomcat();
+				if (tomcat == null) {
+					logConsole(">>> Tomcat server is not running.");
+					return true;
+				}
+				
+				try {
+					for (var arg : arguments) {
+						if (argumentMatches(arg, "-s", "stop")) {
+							tomcat.stop();
+							logConsole(">>> Tomcat stopped.");
+							return true;
+						}
+						
+						if (argumentMatches(arg, "-i", "start")) {
+							tomcat.start();
+							tomcat.getConnector();
+							logConsole(">>> Tomcat started.");
+							return true;
+						}
+						
+						if (argumentMatches(arg, "-r", "restart")) {
+							tomcat.stop();
+							tomcat.start();
+							tomcat.getConnector();
+							logConsole(">>> Tomcat restarted.");
+							return true;
+						}
+						
+						if (argumentMatches(arg, "-a", "app")) {
+							var app = getArgumetnValue(arg).split("\\s", 2);
+							if (app.length != 2) {
+								logConsole(">>> Tomcat --app command takes exactly 2 arguments separated with space: appName and appSrc.");
+								return false;
+							}
+							
+							for (var a : app) {
+								if (a.isEmpty()) {
+									logConsole(">>> Tomcat --app arguments must not be empty.");
+									return false;
+								}
+							}
+							
+							if (Tools.getResource(app[1]).isEmpty()) {
+								logConsole(">>> Provided appSrc not found.");
+								return false;
+							}
+							
+							TomcatFactory.addApp(tomcat, app[0], app[1]);
+						}
+					}
+				} catch (LifecycleException e) {
+					log().fatal("!!! Tomcat broke with exception:\n" + e.getMessage());
+				}
+				
 				return true;
 			}
 			default -> {

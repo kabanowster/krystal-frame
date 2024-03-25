@@ -67,24 +67,27 @@ public interface QueryExecutorInterface extends LoggingInterface {
 		
 		Stream.of(providers).forEach(provider -> {
 			val props = new Properties();
-			val path = Tools.getResource(KrystalFramework.getProvidersPropertiesDir(), provider.toString() + ".properties");
-			log().trace("    Path: " + path.getPath());
-			try {
-				props.load(path.openStream());
-				connectionProperties.put(provider, props);
-				
-				// TODO throw if mandatory missing?
-				connectionStrings.put(provider, provider.dbcDriver().getConnectionStringBase() + props
-						.entrySet()
-						.stream()
-						.filter(e -> Stream.of(MandatoryProperties.values()).map(Enum::toString).anyMatch(m -> m.equals(e.getKey().toString())))
-						.sorted((e1, e2) -> e2.getKey().toString().compareTo(e1.getKey().toString()))
-						.map(e -> e.getValue().toString())
-						.collect(Collectors.joining("/")));
-				
-			} catch (IOException | IllegalArgumentException ex) {
-				log().fatal(String.format("!!! Exception while loading '%s' provider properties file at '%s'. Skipping.", provider, path.getPath()));
-			}
+			Tools.getResource(KrystalFramework.getProvidersPropertiesDir(), provider.toString() + ".properties").ifPresent(
+					path -> {
+						log().trace("    Path: " + path.getPath());
+						try {
+							props.load(path.openStream());
+							connectionProperties.put(provider, props);
+							
+							// TODO throw if mandatory missing?
+							connectionStrings.put(provider, provider.dbcDriver().getConnectionStringBase() + props
+									.entrySet()
+									.stream()
+									.filter(e -> Stream.of(MandatoryProperties.values()).map(Enum::toString).anyMatch(m -> m.equals(e.getKey().toString())))
+									.sorted((e1, e2) -> e2.getKey().toString().compareTo(e1.getKey().toString()))
+									.map(e -> e.getValue().toString())
+									.collect(Collectors.joining("/")));
+							
+						} catch (IOException | IllegalArgumentException ex) {
+							log().fatal(String.format("!!! Exception while loading '%s' provider properties file at '%s'. Skipping.", provider, path.getPath()));
+						}
+					}
+			);
 		});
 	}
 	

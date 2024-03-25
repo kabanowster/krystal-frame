@@ -45,19 +45,23 @@ public interface PropertiesInterface extends LoggingInterface {
 	 * Loads properties from given path. Uses {@link Properties} to parse.
 	 */
 	static void loadAppProperties(String propertiesPath) {
-		try (InputStream source = Tools.getResource(propertiesPath).openStream()) {
-			Properties props = new Properties();
-			props.load(source);
-			for (var prop : props.stringPropertyNames()) {
-				Object value = null;
-				try {
-					value = properlyCast(props.getProperty(prop));
-				} catch (NullPointerException ignored) {
+		Tools.getResource(propertiesPath).ifPresent(
+				src -> {
+					try (InputStream source = src.openStream()) {
+						Properties props = new Properties();
+						props.load(source);
+						for (var prop : props.stringPropertyNames()) {
+							Object value = null;
+							try {
+								value = properlyCast(props.getProperty(prop));
+							} catch (NullPointerException ignored) {
+							}
+							properties.put(prop, value);
+						}
+					} catch (IOException | IllegalArgumentException ignored) {
+					}
 				}
-				properties.put(prop, value);
-			}
-		} catch (IOException | IllegalArgumentException ignored) {
-		}
+		);
 	}
 	
 	/**
