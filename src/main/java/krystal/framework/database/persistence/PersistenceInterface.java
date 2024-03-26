@@ -1,6 +1,7 @@
 package krystal.framework.database.persistence;
 
 import krystal.CompletablePresent;
+import krystal.JSON;
 import krystal.framework.database.abstraction.*;
 import krystal.framework.database.persistence.annotations.*;
 import krystal.framework.database.queryfactory.ColumnIsPair;
@@ -9,6 +10,7 @@ import krystal.framework.database.queryfactory.ColumnSetPair;
 import krystal.framework.database.queryfactory.ColumnsPairingInterface;
 import krystal.framework.logging.LoggingInterface;
 import lombok.val;
+import org.json.JSONObject;
 import reactor.core.publisher.Flux;
 
 import java.lang.reflect.Constructor;
@@ -22,6 +24,7 @@ import java.util.stream.Stream;
 /**
  * TODO JDoc :)
  */
+@FunctionalInterface
 public interface PersistenceInterface extends LoggingInterface {
 	
 	/*
@@ -156,9 +159,21 @@ public interface PersistenceInterface extends LoggingInterface {
 	}
 	
 	/**
-	 * Mappings of fields names and corresponding columns in database, if other than plain names. Return null/empty map if n/a.
+	 * Mappings of fields names and corresponding columns in database, if other than plain names.
 	 */
-	ColumnsMap getFieldsToColumnsMap();
+	private ColumnsMap getFieldsToColumnsMap() {
+		return Stream.of(getClass().getDeclaredMethods())
+		             .filter(m -> m.getReturnType() == ColumnsMap.class && m.trySetAccessible())
+		             .map(m -> {
+			             try {
+				             return (ColumnsMap) m.invoke(this);
+			             } catch (IllegalAccessException | InvocationTargetException e) {
+				             return ColumnsMap.empty();
+			             }
+		             })
+		             .filter(cm -> !cm.columns().isEmpty())
+		             .findAny().orElse(null);
+	}
 	
 	/*
 	 * Collecting data
@@ -462,6 +477,10 @@ public interface PersistenceInterface extends LoggingInterface {
 		val map = ColumnsMap.define();
 		Arrays.stream(getClass().getDeclaredFields()).forEach(f -> map.column(f, () -> format.formatted(f.getName())));
 		return map.set();
+	}
+	
+	default JSONObject toJSON() {
+		return JSON.from(this);
 	}
 	
 }

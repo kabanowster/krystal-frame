@@ -123,17 +123,17 @@ public class KrystalFramework {
 	/**
 	 * Loads default values (if not specified), app properties and args.
 	 *
-	 * @see #exposedDirPath
-	 * @see #appPropertiesFile
-	 * @see #providersPropertiesDir
-	 * @see #commanderFile
-	 * @see #cssCustomFile
-	 * @see #defaultDelimeter
-	 * @see #dateFormat
-	 * @see #datetimeFormat
-	 * @see #loggingPattern
-	 * @see #springContext
-	 * @see #jfxApplication
+	 * @see #setExposedDirPath(String)
+	 * @see #setAppPropertiesFile(String)
+	 * @see #setProvidersPropertiesDir(String)
+	 * @see #setCommanderFile(String)
+	 * @see #setCssCustomFile(String)
+	 * @see #setDefaultDelimeter(String)
+	 * @see #setDateFormat(DateTimeFormatter)
+	 * @see #setDatetimeFormat(DateTimeFormatter)
+	 * @see #setLoggingPattern(String)
+	 * @see #getSpringContext()
+	 * @see #getJfxApplication()
 	 */
 	public void primaryInitialization(String... args) {
 		

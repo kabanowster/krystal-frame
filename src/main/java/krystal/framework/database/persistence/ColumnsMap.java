@@ -11,6 +11,7 @@ import java.util.Map;
 
 /**
  * Use this builder to create a map of fields to columns if they have different names. Get a field using <b><i>this.fld(fieldName)</i></b> method.
+ * Implement as method returning this type, within {@link PersistenceInterface} class.
  *
  * @see PersistenceInterface#formatAll(String)
  * @see PersistenceInterface#fld(String)
