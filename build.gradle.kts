@@ -1,13 +1,8 @@
-import java.net.URI
-
 plugins {
     `java-library`
-    `maven-publish`
-    id("net.linguica.maven-settings") version "0.5"
+    id("setup")
+    id("publish")
     id("myJavaFx")
-    id("coreTools")
-    id("springCore")
-    id("springWebflux")
 }
 
 group = "io.krystal"
@@ -15,11 +10,20 @@ version = "1.0.2"
 
 java {
     withJavadocJar()
-    withSourcesJar()
 }
 
 dependencies {
+    // impl
+    jdbc()
+    r2dbc()
+
+    // api
     api(project(":tools"))
+    jfxVisuals(Config.api)
+    coreTools(Config.api)
+    springCore(Config.api)
+    springWebflux(Config.api)
+    tomcatServer(Config.api)
 }
 
 publishing {
@@ -53,20 +57,5 @@ publishing {
                 }
             }
         }
-    }
-    repositories {
-        maven {
-            name = "BDE-Development"
-            url = URI("https://dgd365o.pkgs.visualstudio.com/aa703476-5cc4-43ae-82af-8acbab9dab87/_packaging/BDE-Development/maven/v1")
-            authentication {
-                create<BasicAuthentication>("basic")
-            }
-        }
-    }
-}
-
-tasks.javadoc {
-    if (JavaVersion.current().isJava9Compatible) {
-        (options as StandardJavadocDocletOptions).addBooleanOption("html5", true)
     }
 }
