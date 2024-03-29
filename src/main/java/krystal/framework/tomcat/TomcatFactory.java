@@ -48,7 +48,7 @@ public class TomcatFactory {
 		webAppsDir = Tools.concatAsURIPath(baseDir.getAbsolutePath(), webAppsDir);
 		val webApps = new File(webAppsDir);
 		if (webApps.mkdirs()) {
-			log.trace("    New Tomcat web-apps root directory created: " + webAppsDir);
+			log.trace("    New Tomcat web-apps root directory created: " + webApps.getAbsolutePath());
 		} else {
 			log.trace("    Loading web-apps from current root...");
 			/*

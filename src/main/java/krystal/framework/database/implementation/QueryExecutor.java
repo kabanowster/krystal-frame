@@ -1,10 +1,9 @@
 package krystal.framework.database.implementation;
 
-import krystal.framework.core.PropertiesAndArguments;
+import krystal.framework.KrystalFramework;
 import krystal.framework.database.abstraction.ProviderInterface;
 import krystal.framework.database.abstraction.QueryExecutorInterface;
 import lombok.Getter;
-import lombok.Setter;
 
 import java.util.*;
 
@@ -15,7 +14,6 @@ import java.util.*;
 @Getter
 public final class QueryExecutor implements QueryExecutorInterface {
 	
-	private static @Setter Providers defaultProvider;
 	private final Map<ProviderInterface, Properties> connectionProperties;
 	private final Map<ProviderInterface, String> connectionStrings;
 	
@@ -24,14 +22,14 @@ public final class QueryExecutor implements QueryExecutorInterface {
 		connectionStrings = Collections.synchronizedMap(new HashMap<>());
 		
 		// load props and urls
-		loadProviderProperties(Providers.values());
+		this.loadProviders(KrystalFramework.getProvidersPool());
 	}
 	
-	@Override
-	public ProviderInterface getDefaultProvider() {
-		return PropertiesAndArguments.provider.value().map(p -> Providers.valueOf((String) p))
-		                                      .or(() -> Optional.ofNullable(defaultProvider))
-		                                      .orElse(Providers.sqlserver);
+	/**
+	 * Static overload for {@link QueryExecutorInterface#loadProviders(List)}.
+	 */
+	public static void loadProviders(ProviderInterface... providers) {
+		Objects.requireNonNull(QueryExecutorInterface.getInstance()).loadProviders(Arrays.asList(providers));
 	}
 	
 }

@@ -1,7 +1,6 @@
 package krystal.framework.database.queryfactory;
 
 import krystal.Tools;
-import krystal.framework.KrystalFramework;
 import krystal.framework.database.abstraction.ProviderInterface;
 import krystal.framework.database.abstraction.Query;
 import krystal.framework.database.abstraction.TableInterface;
@@ -51,7 +50,7 @@ public class UpdateStatement extends Query implements WhereClauseInterface {
 				String.format(
 						"UPDATE %s SET %s",
 						table.sqlName(),
-						Tools.concat(KrystalFramework.getDefaultDelimeter(), columnSetPairs.stream())
+						Tools.concat(", ", columnSetPairs.stream())
 				)
 		);
 	}

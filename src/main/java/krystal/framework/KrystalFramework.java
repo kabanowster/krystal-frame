@@ -3,9 +3,11 @@ package krystal.framework;
 import javafx.application.Application;
 import krystal.JSON;
 import krystal.framework.core.ConsoleView;
+import krystal.framework.core.PropertiesAndArguments;
 import krystal.framework.core.PropertiesInterface;
 import krystal.framework.core.jfxApp;
 import krystal.framework.database.abstraction.ProviderInterface;
+import krystal.framework.database.implementation.DefaultProviders;
 import krystal.framework.logging.LoggingWrapper;
 import krystal.framework.tomcat.TomcatFactory;
 import krystal.framework.tomcat.TomcatProperties;
@@ -22,6 +24,7 @@ import org.springframework.context.annotation.AnnotationConfigApplicationContext
 import java.time.format.DateTimeFormatter;
 import java.util.*;
 import java.util.concurrent.CompletableFuture;
+import java.util.stream.Collectors;
 
 /**
  * Launching from {@code main()} proposed flow:
@@ -54,7 +57,7 @@ public class KrystalFramework {
 	 */
 	private @Getter @Setter String appPropertiesFile;
 	/**
-	 * <p>Dir path for database {@link ProviderInterface Providers} <i>.properties</i> files.</p> <br>
+	 * <p>Dir path for database {@link ProviderInterface DefaultProviders} <i>.properties</i> files.</p> <br>
 	 * <p>Default: {@link #exposedDirPath}</p>
 	 */
 	private @Getter @Setter String providersPropertiesDir;
@@ -70,7 +73,6 @@ public class KrystalFramework {
 	 * <p>Default: {@code style.css}</p>
 	 */
 	private @Getter @Setter String cssCustomFile;
-	
 	/**
 	 * <p>Default delimiter to concatenate various Strings.</p> <br>
 	 * <p>Default: {@code ", "}</p>
@@ -100,20 +102,40 @@ public class KrystalFramework {
 	 */
 	private @Getter ApplicationContext springContext;
 	/**
+	 * Select default database {@link ProviderInterface Provider}. If not set, the {@link DefaultProviders#sqlserver} will be used.
+	 * Add your own providers to the pool setting or modifying {@link #setProvidersPool(List)}.
+	 */
+	private @Getter @Setter ProviderInterface defaultProvider = DefaultProviders.sqlserver;
+	/**
+	 * The pool of database providers used to load them with default {@link krystal.framework.database.implementation.QueryExecutor QueryExecutor} or by name references (i.e. app properties or args).
+	 */
+	private @Getter @Setter List<ProviderInterface> providersPool = Arrays.stream(DefaultProviders.values()).collect(Collectors.toCollection(ArrayList::new));
+	/**
 	 * Access JavaFX application context here if created ({@link jfxApp}). Also holds convenient utilities.
 	 *
 	 * @see jfxApp
 	 * @see #startJavaFX(String...)
 	 */
 	private @Getter @Setter jfxApp jfxApplication;
-	
 	/**
 	 * @see #selectDefaultImplementations(DefaultImplementation...)
 	 */
 	private @Getter Set<DefaultImplementation> selectedDefaultImplementations;
-	
+	/**
+	 * Simple Swing console-log view.
+	 *
+	 * @see #startConsole()
+	 * @see #disposeConsole()
+	 * @see ConsoleView
+	 */
 	private @Getter ConsoleView console;
-	
+	/**
+	 * Accessor for framework's Tomcat running implementation.
+	 *
+	 * @see #startTomcatServer(TomcatProperties)
+	 * @see TomcatProperties
+	 * @see TomcatFactory
+	 */
 	private @Getter Tomcat tomcat;
 	
 	/*
@@ -121,7 +143,8 @@ public class KrystalFramework {
 	 */
 	
 	/**
-	 * Loads default values (if not specified), app properties and args.
+	 * Loads default framework settings values (if not specified), app properties and args.
+	 * Establish their values before invoking this method.
 	 *
 	 * @see #setExposedDirPath(String)
 	 * @see #setAppPropertiesFile(String)
@@ -132,8 +155,13 @@ public class KrystalFramework {
 	 * @see #setDateFormat(DateTimeFormatter)
 	 * @see #setDatetimeFormat(DateTimeFormatter)
 	 * @see #setLoggingPattern(String)
+	 * @see #setDefaultProvider(ProviderInterface)
+	 * @see #setProvidersPool(List)
+	 * @see #selectDefaultImplementations(DefaultImplementation...)
+	 * @see #selectAllDefaultImplementationsExcept(DefaultImplementation...)
 	 * @see #getSpringContext()
 	 * @see #getJfxApplication()
+	 * @see #getTomcat()
 	 */
 	public void primaryInitialization(String... args) {
 		
@@ -144,6 +172,17 @@ public class KrystalFramework {
 		
 		PropertiesInterface.load(appPropertiesFile, args);
 		LoggingWrapper.initialize();
+		
+		// default provider from properties / args
+		PropertiesAndArguments
+				.provider.value()
+				         .flatMap(
+						         p -> providersPool
+								         .stream()
+								         .filter(pp -> p.equals(pp.name()))
+								         .findFirst())
+				         .ifPresent(dp -> defaultProvider = dp);
+		
 		log.fatal("=== App started" + (PropertiesInterface.areAny() ? " with properties: " + PropertiesInterface.printAll() : "."));
 	}
 	
@@ -184,11 +223,21 @@ public class KrystalFramework {
 		log.fatal("  > Tomcat is running on: %1$s:%2$s".formatted(properties.getHostName(), properties.getPort()));
 	}
 	
+	/**
+	 * (Re)starts the Swing console-log view.
+	 *
+	 * @see ConsoleView
+	 */
 	public void startConsole() {
 		disposeConsole();
 		console = new ConsoleView();
 	}
 	
+	/**
+	 * Destroys the Swing console-log view.
+	 *
+	 * @see ConsoleView
+	 */
 	public void disposeConsole() {
 		if (console != null)
 			console.dispose();
@@ -200,7 +249,7 @@ public class KrystalFramework {
 	 */
 	
 	/**
-	 * Frame JavaFX application backed by Spring annotation context.
+	 * Frame JavaFX application, backed by Spring annotation context.
 	 */
 	public void frameSpringJavaFX(List<Class<?>> springContextRootClasses, String... args) {
 		primaryInitialization(args);
@@ -208,6 +257,9 @@ public class KrystalFramework {
 		startSpringCore(springContextRootClasses);
 	}
 	
+	/**
+	 * Frame simple Swing console-log output, backed by Spring annotation context.
+	 */
 	public void frameSpringConsole(List<Class<?>> springContextRootClasses, String... args) {
 		startConsole();
 		primaryInitialization(args);
@@ -252,6 +304,15 @@ public class KrystalFramework {
 			selectedDefaultImplementations.removeAll(Set.of(excludedImplementations));
 	}
 	
+	/**
+	 * List of default implementations available for core interfaces in the framework.
+	 *
+	 * @see #selectDefaultImplementations(DefaultImplementation...)
+	 * @see #selectAllDefaultImplementationsExcept(DefaultImplementation...)
+	 * @see krystal.framework.database.abstraction.QueryExecutorInterface QueryExecutorInterface
+	 * @see krystal.framework.core.flow.FlowControlInterface FlowControlInterface
+	 * @see krystal.framework.commander.CommanderInterface CommanderInterface
+	 */
 	public enum DefaultImplementation {
 		FlowControl(krystal.framework.core.flow.implementation.FlowControl.class),
 		QueryExecutor(krystal.framework.database.implementation.QueryExecutor.class),
@@ -264,6 +325,9 @@ public class KrystalFramework {
 		}
 	}
 	
+	/**
+	 * Output framework settings variables values in JSON format.
+	 */
 	public String frameworkStatus() {
 		val map = new HashMap<>();
 		

@@ -10,8 +10,9 @@ import krystal.framework.database.implementation.DBCDrivers;
  * @see QueryExecutorInterface.MandatoryProperties
  * @see DBCDriverInterface
  */
-@FunctionalInterface
 public interface ProviderInterface {
+	
+	String name();
 	
 	DBCDriverInterface dbcDriver();
 	

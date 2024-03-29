@@ -5,6 +5,9 @@ import krystal.framework.database.abstraction.Query;
 import krystal.framework.database.abstraction.TableInterface;
 import lombok.experimental.UtilityClass;
 
+/**
+ * Quick factory for basic {@link Query} abstractions.
+ */
 @UtilityClass
 public class Q {
 	

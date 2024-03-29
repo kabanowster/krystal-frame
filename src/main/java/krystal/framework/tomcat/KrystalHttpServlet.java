@@ -18,7 +18,7 @@ import java.util.function.BiConsumer;
 @Builder
 public class KrystalHttpServlet extends HttpServlet {
 	
-	/** Servlet context mappings in pattern of <code>/foo/bar</code> */
+	/** Servlet context mappings in pattern of {@code /foo/bar} */
 	@Singular private @Getter List<String> mappings;
 	private @Getter String servletName;
 	

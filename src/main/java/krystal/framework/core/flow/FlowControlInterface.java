@@ -28,7 +28,7 @@ public interface FlowControlInterface extends LoggingInterface {
 	
 	ScheduledExecutorService getScheduledExecutor();
 	
-	ExecutorService getCachedExecutor();
+	ExecutorService getExecutor();
 	
 	AtomicReference<ScheduledFuture<?>> getTaskManager();
 	

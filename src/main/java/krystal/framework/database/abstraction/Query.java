@@ -1,6 +1,7 @@
 package krystal.framework.database.abstraction;
 
 import krystal.framework.KrystalFramework;
+import krystal.framework.database.implementation.Q;
 import krystal.framework.database.queryfactory.QueryType;
 import krystal.framework.logging.LoggingInterface;
 import lombok.Getter;
@@ -14,6 +15,15 @@ import java.util.*;
 import java.util.concurrent.CompletableFuture;
 import java.util.stream.Stream;
 
+/**
+ * Base for all SQL related operations.
+ * Use factory classes accessible from {@link TableInterface}s:
+ * {@link krystal.framework.database.queryfactory.SelectStatement SelectStatement},
+ * {@link krystal.framework.database.queryfactory.UpdateStatement UpdateStatement},
+ * {@link krystal.framework.database.queryfactory.InsertStatement InsertStatement},
+ * {@link krystal.framework.database.queryfactory.DeleteStatement DeleteStatement},
+ * or manually type with {@link Q} factory class.
+ */
 @Getter
 @NoArgsConstructor
 public abstract class Query implements LoggingInterface {
@@ -76,7 +86,7 @@ public abstract class Query implements LoggingInterface {
 	}
 	
 	/**
-	 * This method is used by {@link QueryExecutorInterface} to unify provider for the internal steps of the Query. To set provider use {@link #setProvider(ProviderInterface)}.
+	 * This method is used by {@link QueryExecutorInterface} to unify provider for the internal steps of the Loader. To set provider use {@link #setProvider(ProviderInterface)}.
 	 */
 	public void setProvidersPacked(ProviderInterface provider) {
 		packedSteps.forEach(q -> q.setProvider(provider));

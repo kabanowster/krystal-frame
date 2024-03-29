@@ -132,7 +132,7 @@ public class BaseCommander implements CommanderInterface {
 			}
 			case providers -> {
 				Optional.ofNullable(QueryExecutorInterface.getInstance()).ifPresent(q -> {
-					logConsole(">>> Loaded Providers properties:\n%s".formatted(JSON.from(q.getConnectionProperties()).toString(4)));
+					logConsole(">>> Loaded DefaultProviders properties:\n%s".formatted(JSON.from(q.getConnectionProperties()).toString(4)));
 				});
 				return true;
 			}

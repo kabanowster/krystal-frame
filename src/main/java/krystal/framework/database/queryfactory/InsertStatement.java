@@ -1,12 +1,12 @@
 package krystal.framework.database.queryfactory;
 
 import krystal.Tools;
-import krystal.framework.KrystalFramework;
 import krystal.framework.database.abstraction.ColumnInterface;
 import krystal.framework.database.abstraction.ProviderInterface;
 import krystal.framework.database.abstraction.Query;
 import krystal.framework.database.abstraction.TableInterface;
 import krystal.framework.database.implementation.DBCDrivers;
+import lombok.val;
 
 import java.util.*;
 import java.util.stream.Collectors;
@@ -54,6 +54,11 @@ public class InsertStatement extends Query {
 		return this;
 	}
 	
+	public InsertStatement into(ColumnInterface... columns) {
+		this.columns.addAll(Arrays.asList(columns));
+		return this;
+	}
+	
 	/**
 	 * Can be chained for multiple rows inserts.
 	 */
@@ -76,17 +81,18 @@ public class InsertStatement extends Query {
 		query.append(String.format(
 				"INSERT INTO %s%s",
 				into.sqlName(),
-				!columns.isEmpty() ? String.format(" (%s)", Tools.concat(KrystalFramework.getDefaultDelimeter(), columns.stream())) : ""
+				!columns.isEmpty() ? String.format(" (%s)", Tools.concat(", ", columns.stream().map(ColumnInterface::sqlName))) : ""
 		));
 		
-		if (DBCDrivers.jdbcSQLServer.asProvider().equals(provider)
-				|| DBCDrivers.r2dbcSQLServer.asProvider().equals(provider)) {
+		val drv = provider.dbcDriver();
+		if (DBCDrivers.jdbcSQLServer.equals(drv)
+				|| DBCDrivers.r2dbcSQLServer.equals(drv)) {
 			query.append(String.format(
 					" OUTPUT %s",
 					output.isEmpty() ? "INSERTED.*" :
 					output.stream()
 					      .map(c -> "INSERTED." + c.sqlName())
-					      .collect(Collectors.joining(KrystalFramework.getDefaultDelimeter()))
+					      .collect(Collectors.joining(", "))
 			));
 		}
 		
@@ -94,11 +100,11 @@ public class InsertStatement extends Query {
 				" VALUES %s",
 				values.stream()
 				      .filter(v -> columns.isEmpty() || v.length == columns.size())
-				      .map(v -> String.format("(%s)", Tools.concat(KrystalFramework.getDefaultDelimeter(), Stream.of(v))))
-				      .collect(Collectors.joining(KrystalFramework.getDefaultDelimeter())))
+				      .map(v -> String.format("(%s)", Tools.concat(", ", Stream.of(v))))
+				      .collect(Collectors.joining(", ")))
 		);
 		
-		if (DBCDrivers.jdbcAS400.asProvider().equals(provider)) {
+		if (DBCDrivers.jdbcAS400.equals(provider.dbcDriver())) {
 			query.append(String.format("SELECT * FROM FINAL TABLE (%s)", query));
 		}
 	}

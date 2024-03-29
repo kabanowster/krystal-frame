@@ -41,7 +41,11 @@ public interface QueryExecutorInterface extends LoggingInterface {
 		}
 	}
 	
-	ProviderInterface getDefaultProvider();
+	// default ProviderInterface getDefaultProvider() {
+	// 	return PropertiesAndArguments.provider.value().map(p -> (ProviderInterface) DefaultProviders.valueOf((String) p))
+	// 	                                      .or(() -> Optional.ofNullable(KrystalFramework.getDefaultProvider()))
+	// 	                                      .orElse(DefaultProviders.sqlserver);
+	// }
 	
 	/**
 	 * Set of properties applied to the connection, including user and password, loaded from <i>provider.properties</i>.
@@ -58,16 +62,15 @@ public interface QueryExecutorInterface extends LoggingInterface {
 	 */
 	
 	/**
-	 * Initialize connections properties for listed database Providers from <code>provider_name.properties</code> files within {@link KrystalFramework#providersPropertiesDir providersPropertiesDir} directory.
+	 * Initialize connections properties for listed database DefaultProviders from {@code provider_name.properties} files within {@link KrystalFramework#getProvidersPropertiesDir()} providersPropertiesDir} directory.
 	 */
-	default void loadProviderProperties(ProviderInterface... providers) {
+	default void loadProviders(List<ProviderInterface> providers) {
 		log().debug("*** Loading Provider Properties.");
 		val connectionProperties = getConnectionProperties();
 		val connectionStrings = getConnectionStrings();
-		
-		Stream.of(providers).forEach(provider -> {
+		providers.forEach(provider -> {
 			val props = new Properties();
-			Tools.getResource(KrystalFramework.getProvidersPropertiesDir(), provider.toString() + ".properties").ifPresent(
+			Tools.getResource(KrystalFramework.getProvidersPropertiesDir(), provider.name() + ".properties").ifPresent(
 					path -> {
 						log().trace("    Path: " + path.getPath());
 						try {
@@ -96,12 +99,12 @@ public interface QueryExecutorInterface extends LoggingInterface {
 	 */
 	
 	default Flux<QueryResultInterface> execute(List<Query> queries) {
-		return Flux.fromStream(queries.stream().collect(Collectors.groupingBy(q -> Optional.ofNullable(q.getProvider()).orElse(getDefaultProvider()))).entrySet().stream())
+		return Flux.fromStream(queries.stream().collect(Collectors.groupingBy(q -> Optional.ofNullable(q.getProvider()).orElse(KrystalFramework.getDefaultProvider()))).entrySet().stream())
 		           .concatMap(e -> {
 			           val provider = e.getKey();
 			           val driver = provider.dbcDriver();
 			           
-			           log().trace("--> Querying database: " + provider);
+			           log().trace("--> Querying database: " + provider.name());
 			           
 			           return Flux.fromStream(
 					                      e.getValue().stream().collect(Collectors.groupingBy(q -> {
@@ -146,7 +149,7 @@ public interface QueryExecutorInterface extends LoggingInterface {
 				log().trace("  - Connected Successfully.");
 				
 				val sql = q.sqlQuery();
-				log().trace("    Query: " + sql);
+				log().trace("    Loader: " + sql);
 				try {
 					return new QueryResult(conn.createStatement().executeQuery(sql));
 				} catch (SQLException e) {
@@ -168,7 +171,7 @@ public interface QueryExecutorInterface extends LoggingInterface {
 			
 			queries.forEach(q -> {
 				val sql = q.sqlQuery();
-				log().trace("    Query: " + sql);
+				log().trace("    Loader: " + sql);
 				try {
 					batch.addBatch(sql);
 				} catch (SQLException e) {
@@ -199,7 +202,7 @@ public interface QueryExecutorInterface extends LoggingInterface {
 					queries.forEach(q -> {
 						q.setProvidersPacked(provider);
 						val sql = q.sqlQuery();
-						log().trace("  > Query: " + sql);
+						log().trace("  > Loader: " + sql);
 						batch.add(sql);
 					});
 					

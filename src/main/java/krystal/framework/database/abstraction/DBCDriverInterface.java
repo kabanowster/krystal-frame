@@ -7,10 +7,6 @@ public interface DBCDriverInterface {
 	
 	String getConnectionStringBase();
 	
-	default ProviderInterface asProvider() {
-		return () -> this;
-	}
-	
 	default DriverType getDriverType() {
 		for (val type : DriverType.values())
 			if (getConnectionStringBase().contains(type.name())) return type;

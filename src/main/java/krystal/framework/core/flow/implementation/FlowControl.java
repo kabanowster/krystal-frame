@@ -14,14 +14,14 @@ import java.util.concurrent.atomic.AtomicReference;
 public class FlowControl implements FlowControlInterface {
 	
 	private final ScheduledExecutorService scheduledExecutor;
-	private final ExecutorService cachedExecutor;
+	private final ExecutorService executor;
 	private final List<Task> tasksList;
 	private final Map<FlowInterface, Phaser> flowControls;
 	private final AtomicReference<ScheduledFuture<?>> taskManager;
 	
 	private FlowControl() {
 		scheduledExecutor = Executors.newScheduledThreadPool(3);
-		cachedExecutor = Executors.newCachedThreadPool();
+		executor = Executors.newVirtualThreadPerTaskExecutor();
 		tasksList = Collections.synchronizedList(new ArrayList<>());
 		flowControls = Collections.synchronizedMap(new HashMap<>());
 		taskManager = new AtomicReference<>();

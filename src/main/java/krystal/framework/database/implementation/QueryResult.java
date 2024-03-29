@@ -65,7 +65,7 @@ public record QueryResult(List<Map<ColumnInterface, Object>> rows, Map<ColumnInt
 				rows.add(row);
 			}
 			
-			log().trace("    Query loaded %s rows.".formatted(rows.size()));
+			log().trace("    Loader loaded %s rows.".formatted(rows.size()));
 		} catch (SQLException ex) {
 			log().fatal("!!! Error processing the ResultSet.\n" + ex.getMessage());
 		}

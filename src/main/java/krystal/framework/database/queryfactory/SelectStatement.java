@@ -1,6 +1,5 @@
 package krystal.framework.database.queryfactory;
 
-import krystal.framework.KrystalFramework;
 import krystal.framework.database.abstraction.ColumnInterface;
 import krystal.framework.database.abstraction.ProviderInterface;
 import krystal.framework.database.abstraction.Query;
@@ -74,14 +73,21 @@ public class SelectStatement extends Query implements WhereClauseInterface, Orde
 		// TODO LAST if negative
 		var limitString = "";
 		if (limit > 0) {
-			// switch only supports constants, so...
-			if (DBCDrivers.jdbcSQLServer.asProvider().equals(provider)
-					|| DBCDrivers.r2dbcSQLServer.asProvider().equals(provider))
-				limitString = " TOP " + limit;
-			else if (DBCDrivers.jdbcMySQL.asProvider().equals(provider)
-					|| DBCDrivers.r2dbcMySQL.asProvider().equals(provider))
-				appendLast.add("LIMIT " + limit);
-			else appendLast.add("FETCH FIRST %s ROWS ONLY".formatted(limit));
+			// val drv = provider.dbcDriver();
+			switch (provider.dbcDriver()) {
+				case DBCDrivers.jdbcSQLServer, DBCDrivers.r2dbcSQLServer -> limitString = " TOP " + limit;
+				case DBCDrivers.jdbcMySQL, DBCDrivers.r2dbcMySQL -> appendLast.add("LIMIT " + limit);
+				default -> appendLast.add("FETCH FIRST %s ROWS ONLY".formatted(limit));
+			}
+			//
+			//
+			// if (DBCDrivers.jdbcSQLServer.equals(drv)
+			// 		|| DBCDrivers.r2dbcSQLServer.equals(drv))
+			// 	limitString = " TOP " + limit;
+			// else if (DBCDrivers.jdbcMySQL.asProvider().equals(provider)
+			// 		|| DBCDrivers.r2dbcMySQL.asProvider().equals(provider))
+			// 	appendLast.add("LIMIT " + limit);
+			// else appendLast.add("FETCH FIRST %s ROWS ONLY".formatted(limit));
 			// else log().warn("  ! Unsupported LIMIT keyword in select statement for %s provider.".formatted(provider));
 		}
 		
@@ -90,7 +96,7 @@ public class SelectStatement extends Query implements WhereClauseInterface, Orde
 						"SELECT%s%s %s FROM %s",
 						distinct ? " DISTINCT" : "",
 						limitString,
-						!columns.isEmpty() ? columns.stream().map(ColumnInterface::sqlName).collect(Collectors.joining(KrystalFramework.getDefaultDelimeter())) : "*",
+						!columns.isEmpty() ? columns.stream().map(ColumnInterface::sqlName).collect(Collectors.joining(", ")) : "*",
 						from.sqlName()
 				));
 	}

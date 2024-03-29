@@ -1,6 +1,5 @@
 package krystal.framework.database.queryfactory;
 
-import krystal.framework.KrystalFramework;
 import krystal.framework.database.abstraction.ColumnInterface;
 import krystal.framework.database.abstraction.Query;
 
@@ -30,7 +29,7 @@ public class GroupByStatement extends Query implements OrderByInterface {
 			throw new IllegalArgumentException();
 		
 		query.append(String.format(" GROUP BY %s",
-		                           columns.stream().map(ColumnInterface::sqlName).collect(Collectors.joining(KrystalFramework.getDefaultDelimeter()))));
+		                           columns.stream().map(ColumnInterface::sqlName).collect(Collectors.joining(", "))));
 	}
 	
 }

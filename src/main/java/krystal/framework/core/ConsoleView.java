@@ -160,18 +160,27 @@ public class ConsoleView implements LoggingInterface {
 		if (l > 0) messages.delete(0, l);
 	}
 	
+	/**
+	 * Scroll down to last message and focus on input field.
+	 */
 	public void scrollToBottom() {
 		val bar = scroll.getVerticalScrollBar();
 		bar.setValue(bar.getMaximum());
 		commandPrompt.requestFocus();
 	}
 	
+	/**
+	 * Clear log messages from the view.
+	 */
 	public void clear() {
 		messages = new StringBuilder();
 		logConsole(">>> Clear");
 		renderMessages();
 	}
 	
+	/**
+	 * @see JFrame#dispose()
+	 */
 	public void dispose() {
 		frame.dispose();
 	}
