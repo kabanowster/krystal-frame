@@ -2,6 +2,7 @@ package krystal.framework;
 
 import javafx.application.Application;
 import krystal.JSON;
+import krystal.VirtualFuture;
 import krystal.framework.core.ConsoleView;
 import krystal.framework.core.PropertiesAndArguments;
 import krystal.framework.core.PropertiesInterface;
@@ -23,7 +24,6 @@ import org.springframework.context.annotation.AnnotationConfigApplicationContext
 
 import java.time.format.DateTimeFormatter;
 import java.util.*;
-import java.util.concurrent.CompletableFuture;
 import java.util.stream.Collectors;
 
 /**
@@ -190,7 +190,7 @@ public class KrystalFramework {
 	 * Launches JavaFX application, using basic framework implementation {@link jfxApp}. Follow-up with {@link javafx.application.Platform#runLater(Runnable) Platform.runLater()}.
 	 */
 	public void startJavaFX(String... args) {
-		CompletableFuture.runAsync(() -> Application.launch(jfxApp.class, args));
+		VirtualFuture.run(() -> Application.launch(jfxApp.class, args));
 	}
 	
 	/**

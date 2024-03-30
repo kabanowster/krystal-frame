@@ -1,6 +1,5 @@
 package krystal.framework.database.implementation;
 
-import krystal.CompletablePresent;
 import krystal.StringRenderer;
 import krystal.framework.database.abstraction.ColumnInterface;
 import krystal.framework.database.abstraction.QueryResultInterface;
@@ -49,19 +48,16 @@ public record QueryResult(List<Map<ColumnInterface, Object>> rows, Map<ColumnInt
 			while (rs.next()) {
 				Map<ColumnInterface, Object> row = LinkedHashMap.newLinkedHashMap(columns.size());
 				// classic for-loop to catch exception
-				for (Map.Entry<ColumnInterface, Class<?>> entry : columns.entrySet())
-					row.put(
-							entry.getKey(),
-							CompletablePresent
-									.supply(rs.getObject(entry.getKey().sqlName()))
-									.thenApply(o -> {
-										try {
-											return entry.getValue().cast(o);
-										} catch (ClassCastException ex) {
-											return String.valueOf(o);
-										}
-									}).getResult().orElse(null)
-					);
+				for (Map.Entry<ColumnInterface, Class<?>> entry : columns.entrySet()) {
+					val value = rs.getObject(entry.getKey().sqlName());
+					Object cast;
+					try {
+						cast = entry.getValue().cast(value);
+					} catch (ClassCastException ex) {
+						cast = String.valueOf(value);
+					}
+					row.put(entry.getKey(), cast);
+				}
 				rows.add(row);
 			}
 			

@@ -1,6 +1,5 @@
 package krystal.framework.database.persistence;
 
-import krystal.CompletablePresent;
 import krystal.JSON;
 import krystal.Tools;
 import krystal.framework.database.abstraction.*;
@@ -11,6 +10,7 @@ import lombok.val;
 import org.json.JSONObject;
 import reactor.core.publisher.Flux;
 
+import javax.annotation.Nullable;
 import java.lang.reflect.Constructor;
 import java.lang.reflect.Field;
 import java.lang.reflect.InvocationTargetException;
@@ -33,38 +33,55 @@ public interface PersistenceInterface extends LoggingInterface {
 	 * Get all persisted objects from the database of particular type. The class must declare empty (no arguments) constructor. {@link QueryExecutorInterface} here is present for initial Spring injections support. You can use {@link #streamAll(Class)} in
 	 * cases following after.
 	 *
+	 * @param optionalDummyType
+	 * 		If provided, instead of constructing object with {@link lombok.NoArgsConstructor NoArgsConstructor}, method will take the dummy as source of invoked methods. With additional {@link Skip} fields as parameters, you can set up conditional outputs
+	 * 		for key methods, like {@link #getTable()} or {@link #getQuery()}.
 	 * @see Loader
 	 * @see Reader
 	 * @see ReadOnly
 	 */
-	static <T> Stream<T> streamAll(Class<T> clazz, QueryExecutorInterface queryExecutor) {
-		return getQuery(clazz).future(queryExecutor)
-		                      .thenApply(qr -> qr.map(r -> r.toStreamOf(clazz)).orElse(Stream.empty()))
-		                      .join();
+	static <T> Stream<T> streamAll(Class<T> clazz, QueryExecutorInterface queryExecutor, @Nullable T optionalDummyType) {
+		return getQuery(clazz, optionalDummyType).future(queryExecutor)
+		                                         .thenApply(qr -> qr.map(r -> r.toStreamOf(clazz)).orElse(Stream.empty()))
+		                                         .join();
 	}
 	
 	/**
 	 * To be utilised after initial Spring injections (after {@link QueryExecutorInterface} is initialised).
 	 *
-	 * @see #streamAll(Class, QueryExecutorInterface)
+	 * @see #streamAll(Class, QueryExecutorInterface, Object)
 	 */
 	static <T> Stream<T> streamAll(Class<T> clazz) {
-		return streamAll(clazz, QueryExecutorInterface.getInstance());
+		return streamAll(clazz, QueryExecutorInterface.getInstance(), null);
 	}
 	
 	/**
-	 * Flux version of {@link #streamAll(Class, QueryExecutorInterface)}.
+	 * @see #streamAll(Class, QueryExecutorInterface, Object)
 	 */
-	static <T> Flux<T> fluxAll(Class<T> clazz, QueryExecutorInterface queryExecutor) {
-		return getQuery(clazz).mono(queryExecutor)
-		                      .flatMapMany(qr -> Flux.fromStream(qr.toStreamOf(clazz)));
+	static <T> Stream<T> streamAll(Class<T> clazz, @Nullable T optionalDummyType) {
+		return streamAll(clazz, QueryExecutorInterface.getInstance(), optionalDummyType);
+	}
+	
+	/**
+	 * Flux version of {@link #streamAll(Class, QueryExecutorInterface, Object)}.
+	 */
+	static <T> Flux<T> fluxAll(Class<T> clazz, QueryExecutorInterface queryExecutor, @Nullable T optionalDummyType) {
+		return getQuery(clazz, null).mono(queryExecutor)
+		                            .flatMapMany(qr -> Flux.fromStream(qr.toStreamOf(clazz)));
 	}
 	
 	/**
 	 * Flux version of {@link #streamAll(Class)}.
 	 */
 	static <T> Flux<T> fluxAll(Class<T> clazz) {
-		return fluxAll(clazz, QueryExecutorInterface.getInstance());
+		return fluxAll(clazz, QueryExecutorInterface.getInstance(), null);
+	}
+	
+	/**
+	 * Flux version of {@link #streamAll(Class, Object)}.
+	 */
+	static <T> Flux<T> fluxAll(Class<T> clazz, @Nullable T optionalDummyType) {
+		return fluxAll(clazz, QueryExecutorInterface.getInstance(), null);
 	}
 	
 	/**
@@ -72,10 +89,16 @@ public interface PersistenceInterface extends LoggingInterface {
 	 *
 	 * @see Loader
 	 */
-	static <T> SelectStatement getQuery(Class<T> clazz) {
+	static <T> SelectStatement getQuery(Class<T> clazz, @Nullable T optionalDummyType) {
 		try {
-			Constructor<T> emptyConstructor = clazz.getDeclaredConstructor();
-			val instance = emptyConstructor.newInstance();
+			T instance;
+			if (optionalDummyType != null) {
+				instance = optionalDummyType;
+			} else {
+				Constructor<T> emptyConstructor = clazz.getDeclaredConstructor();
+				instance = emptyConstructor.newInstance();
+			}
+			
 			var query = Tools.getFirstAnnotadedValue(Loader.class, SelectStatement.class, instance);
 			if (query == null) {
 				if (PersistenceInterface.class.isAssignableFrom(clazz)) {
@@ -93,7 +116,7 @@ public interface PersistenceInterface extends LoggingInterface {
 	/**
 	 * Returns first custom {@link Loader} query used to load this class or {@code null} if missing.
 	 *
-	 * @see #getQuery(Class)
+	 * @see #getQuery(Class, Object) )
 	 */
 	default SelectStatement getQuery() {
 		return Tools.getFirstAnnotadedValue(Loader.class, SelectStatement.class, this);
@@ -138,6 +161,7 @@ public interface PersistenceInterface extends LoggingInterface {
 	
 	/**
 	 * Table linked with object's persistence. Each row of table represents a single object. You can use Lombok to set a @Getter marked field - in that case also mark it with {@link Skip @Skip}.
+	 * As being a method, you can condition its output on values of other fields that can be {@link Skip Skipped}.
 	 *
 	 * @see TableInterface
 	 */
@@ -214,18 +238,16 @@ public interface PersistenceInterface extends LoggingInterface {
 	 * Mapping of fields to database {@link ColumnInterface columns}, including defined in {@link ColumnsMap} if different from fields names.
 	 */
 	default Map<Field, ColumnInterface> getFieldsColumns() {
-		return CompletablePresent
-				// read overwritten setup
-				.supply(() -> Optional.ofNullable(getFieldsToColumnsMap())
-				                      .orElse(ColumnsMap.empty()))
-				// collect for all fields, either mapping or name
-				.thenApply(m -> Stream.of(getClass().getDeclaredFields())
-				                      .filter(f -> !f.isAnnotationPresent(Skip.class))
-				                      .collect(Collectors.toMap(
-						                      f -> f,
-						                      f -> Optional.ofNullable(m.columns().get(f)).orElse(f::getName)
-				                      )))
-				.getResult().orElse(Map.of());
+		// read overwritten setup
+		val m = Optional.ofNullable(getFieldsToColumnsMap())
+		                .orElse(ColumnsMap.empty());
+		// collect for all fields, either mapping or name
+		return Stream.of(getClass().getDeclaredFields())
+		             .filter(f -> !f.isAnnotationPresent(Skip.class))
+		             .collect(Collectors.toMap(
+				             f -> f,
+				             f -> Optional.ofNullable(m.columns().get(f)).orElse(f::getName)
+		             ));
 	}
 	
 	default Map<Field, Object> getWriters() {
@@ -254,28 +276,24 @@ public interface PersistenceInterface extends LoggingInterface {
 	 * @see Writer @Writer
 	 */
 	default Map<Field, Object> getFieldsValues() {
-		return CompletablePresent
-				// writers output
-				.supply(this::getWriters)
-				// collect for all fields, either mapping or field's value
-				.thenApply(m -> Stream.of(getClass().getDeclaredFields())
-				                      .filter(f -> !f.isAnnotationPresent(Skip.class))
-				                      .collect(Collectors.toMap(
-						                      f -> f,
-						                      f -> Optional.ofNullable(m.get(f)).orElseGet(
-								                      () -> {
-									                      try {
-										                      f.setAccessible(true);
-										                      return Optional.ofNullable(f.get(this)).orElse("null");
-									                      } catch (IllegalAccessException e) {
-										                      throw new RuntimeException(e);
-									                      }
-								                      }
-						                      ),
-						                      (f1, f2) -> f1,
-						                      LinkedHashMap::new
-				                      )))
-				.getResult().orElse(LinkedHashMap.newLinkedHashMap(0));
+		val m = getWriters();
+		return Stream.of(getClass().getDeclaredFields())
+		             .filter(f -> !f.isAnnotationPresent(Skip.class))
+		             .collect(Collectors.toMap(
+				             f -> f,
+				             f -> Optional.ofNullable(m.get(f)).orElseGet(
+						             () -> {
+							             try {
+								             f.setAccessible(true);
+								             return Optional.ofNullable(f.get(this)).orElse("null");
+							             } catch (IllegalAccessException e) {
+								             throw new RuntimeException(e);
+							             }
+						             }
+				             ),
+				             (f1, f2) -> f1,
+				             LinkedHashMap::new
+		             ));
 	}
 	
 	private ColumnsPairingInterface[] getKeyPairs(Set<Field> keys, Map<Field, ColumnInterface> fieldsColumns, Map<Field, Object> fieldsValues) {
