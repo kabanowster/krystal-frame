@@ -1,5 +1,6 @@
 package krystal.framework.database.abstraction;
 
+import krystal.VirtualPromise;
 import krystal.framework.KrystalFramework;
 import krystal.framework.database.implementation.Q;
 import krystal.framework.database.queryfactory.QueryType;
@@ -11,8 +12,10 @@ import reactor.core.publisher.Mono;
 
 import java.time.LocalDate;
 import java.time.LocalDateTime;
-import java.util.*;
-import java.util.concurrent.CompletableFuture;
+import java.util.LinkedHashSet;
+import java.util.LinkedList;
+import java.util.List;
+import java.util.Set;
 import java.util.stream.Stream;
 
 /**
@@ -115,12 +118,20 @@ public abstract class Query implements LoggingInterface {
 		return () -> "(%s) %s".formatted(pack().sqlQuery(), alias);
 	}
 	
-	public CompletableFuture<Optional<QueryResultInterface>> future() {
-		return mono().singleOptional().toFuture();
+	// public CompletableFuture<Optional<QueryResultInterface>> future() {
+	// 	return mono().singleOptional().toFuture();
+	// }
+	//
+	// public CompletableFuture<Optional<QueryResultInterface>> future(QueryExecutorInterface executor) {
+	// 	return mono(executor).singleOptional().toFuture();
+	// }
+	//
+	public VirtualPromise<QueryResultInterface> promise() {
+		return promise(QueryExecutorInterface.getInstance());
 	}
 	
-	public CompletableFuture<Optional<QueryResultInterface>> future(QueryExecutorInterface executor) {
-		return mono(executor).singleOptional().toFuture();
+	public VirtualPromise<QueryResultInterface> promise(QueryExecutorInterface executor) {
+		return VirtualPromise.supply(() -> mono(executor).blockOptional().orElse(QueryResultInterface.empty()), "QueryExecutor");
 	}
 	
 	public Mono<QueryResultInterface> mono() {

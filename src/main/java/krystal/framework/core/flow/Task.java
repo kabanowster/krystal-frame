@@ -1,24 +1,24 @@
 package krystal.framework.core.flow;
 
-import java.util.Objects;
-import java.util.concurrent.CompletableFuture;
+import krystal.VirtualPromise;
 
-public record Task(String name, CompletableFuture<?> task, FlowInterface flow) {
+import java.util.Objects;
+
+public record Task(String name, VirtualPromise<?> task, FlowInterface flow) {
 	
 	public String report() {
 		return String.format("Task [%s], flow: [%s] status: %s.", name, flow, getStatus());
 	}
 	
 	public String getStatus() {
-		if (task.isCompletedExceptionally()) return "Done with exceptions";
-		if (task.isDone()) return "Done";
-		if (task.isCompletedExceptionally()) return "Cancelled with exceptions";
-		if (task.isCancelled()) return "Cancelled";
+		if (task.isComplete() && task.getException() != null) return "Done with exceptions";
+		if (task.isComplete()) return "Done";
+		if (task.getHoldState().get()) return "On hold.";
 		return "Ongoing";
 	}
 	
 	public boolean isDone() {
-		return task.isDone();
+		return task.isComplete();
 	}
 	
 	@Override

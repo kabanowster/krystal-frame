@@ -2,7 +2,6 @@ package krystal.framework;
 
 import javafx.application.Application;
 import krystal.JSON;
-import krystal.VirtualFuture;
 import krystal.framework.core.ConsoleView;
 import krystal.framework.core.PropertiesAndArguments;
 import krystal.framework.core.PropertiesInterface;
@@ -190,7 +189,8 @@ public class KrystalFramework {
 	 * Launches JavaFX application, using basic framework implementation {@link jfxApp}. Follow-up with {@link javafx.application.Platform#runLater(Runnable) Platform.runLater()}.
 	 */
 	public void startJavaFX(String... args) {
-		VirtualFuture.run(() -> Application.launch(jfxApp.class, args));
+		// only platform thread, not virtual
+		Thread.ofPlatform().start(() -> Application.launch(jfxApp.class, args));
 	}
 	
 	/**

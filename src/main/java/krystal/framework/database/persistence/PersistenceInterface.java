@@ -41,9 +41,10 @@ public interface PersistenceInterface extends LoggingInterface {
 	 * @see ReadOnly
 	 */
 	static <T> Stream<T> streamAll(Class<T> clazz, QueryExecutorInterface queryExecutor, @Nullable T optionalDummyType) {
-		return getQuery(clazz, optionalDummyType).future(queryExecutor)
-		                                         .thenApply(qr -> qr.map(r -> r.toStreamOf(clazz)).orElse(Stream.empty()))
-		                                         .join();
+		return getQuery(clazz, optionalDummyType).promise(queryExecutor)
+		                                         .thenApply(qr -> qr.toStreamOf(clazz))
+		                                         .join()
+		                                         .orElse(Stream.empty());
 	}
 	
 	/**
@@ -392,7 +393,7 @@ public interface PersistenceInterface extends LoggingInterface {
 	private Optional<? extends PersistenceInterface> load(TableInterface table, ColumnsPairingInterface[] keysPairs, Map<Field, ColumnInterface> fieldsColumns) {
 		var query = getQuery();
 		if (query == null) query = table.select(fieldsColumns.values().toArray(ColumnInterface[]::new));
-		return query.where(keysPairs).setProvider(getProvider()).future()
+		return query.where(keysPairs).setProvider(getProvider()).promise()
 		            .join()
 		            .map(qr -> qr.toStreamOf(getClass()))
 		            .orElse(Stream.empty())
@@ -425,7 +426,7 @@ public interface PersistenceInterface extends LoggingInterface {
 						                              .toArray(ColumnSetPair[]::new))
 						          .where(keysPairs)
 						          .setProvider(getProvider())
-						          .future()
+						          .promise()
 						          .thenRun(() -> log().trace("    Record updated."))
 						          .join(),
 						() -> insertAndConsumeSelf(table, fieldsColumns, fieldsValues)
@@ -453,7 +454,7 @@ public interface PersistenceInterface extends LoggingInterface {
 	 */
 	private void delete(TableInterface table, ColumnsPairingInterface[] keysPairs) {
 		val deleted = Long.parseLong(String.valueOf(
-				table.delete().where(keysPairs).setProvider(getProvider()).future()
+				table.delete().where(keysPairs).setProvider(getProvider()).promise()
 				     .join()
 				     .flatMap(QueryResultInterface::getResult)
 				     .orElse(0L)));
@@ -476,10 +477,10 @@ public interface PersistenceInterface extends LoggingInterface {
 		     .into(colval.keySet().toArray(ColumnInterface[]::new))
 		     .values(colval.values().toArray())
 		     .setProvider(getProvider())
-		     .future()
-		     .thenApply(qr -> qr.map(r -> r.toStreamOf(getClass())).orElse(Stream.empty()).findFirst())
-		     .thenAccept(r -> r.ifPresent(this::copyFrom))
-		     .join();
+		     .promise()
+		     .thenApply(qr -> qr.toStreamOf(getClass()))
+		     .join()
+		     .ifPresent(this::copyFrom);
 	}
 	
 	private Map<ColumnInterface, Object> columnsToValues(Map<Field, ColumnInterface> fieldsColumns, Map<Field, Object> fieldsValues) {
