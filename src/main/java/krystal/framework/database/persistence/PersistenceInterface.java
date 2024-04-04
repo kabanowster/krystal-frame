@@ -16,6 +16,7 @@ import java.lang.reflect.Field;
 import java.lang.reflect.InvocationTargetException;
 import java.util.*;
 import java.util.Map.Entry;
+import java.util.function.Function;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
@@ -40,31 +41,47 @@ public interface PersistenceInterface extends LoggingInterface {
 	 * @see Reader
 	 * @see ReadOnly
 	 */
-	static <T> Stream<T> streamAll(Class<T> clazz, QueryExecutorInterface queryExecutor, @Nullable T optionalDummyType) {
-		return getQuery(clazz, optionalDummyType).promise(queryExecutor)
-		                                         .thenApply(qr -> qr.toStreamOf(clazz))
-		                                         .join()
-		                                         .orElse(Stream.empty());
+	static <T> Stream<T> streamAll(Class<T> clazz, QueryExecutorInterface queryExecutor, @Nullable Function<SelectStatement, WhereClause> filter, @Nullable T optionalDummyType) {
+		val query = getQuery(clazz, optionalDummyType);
+		return (filter == null ? query : filter.apply(query))
+				.promise(queryExecutor)
+				.thenApply(qr -> qr.toStreamOf(clazz))
+				.join()
+				.orElse(Stream.empty());
 	}
 	
 	/**
 	 * To be utilised after initial Spring injections (after {@link QueryExecutorInterface} is initialised).
 	 *
-	 * @see #streamAll(Class, QueryExecutorInterface, Object)
+	 * @see #streamAll(Class, QueryExecutorInterface, Function, Object)
 	 */
 	static <T> Stream<T> streamAll(Class<T> clazz) {
-		return streamAll(clazz, QueryExecutorInterface.getInstance(), null);
+		return streamAll(clazz, QueryExecutorInterface.getInstance(), null, null);
 	}
 	
 	/**
-	 * @see #streamAll(Class, QueryExecutorInterface, Object)
+	 * @see #streamAll(Class, QueryExecutorInterface, Function, Object)
+	 */
+	static <T> Stream<T> streamAll(Class<T> clazz, QueryExecutorInterface queryExecutor) {
+		return streamAll(clazz, queryExecutor, null, null);
+	}
+	
+	/**
+	 * @see #streamAll(Class, QueryExecutorInterface, Function, Object)
+	 */
+	static <T> Stream<T> streamAll(Class<T> clazz, Function<SelectStatement, WhereClause> filter) {
+		return streamAll(clazz, QueryExecutorInterface.getInstance(), filter, null);
+	}
+	
+	/**
+	 * @see #streamAll(Class, QueryExecutorInterface, Function, Object)
 	 */
 	static <T> Stream<T> streamAll(Class<T> clazz, @Nullable T optionalDummyType) {
-		return streamAll(clazz, QueryExecutorInterface.getInstance(), optionalDummyType);
+		return streamAll(clazz, QueryExecutorInterface.getInstance(), null, optionalDummyType);
 	}
 	
 	/**
-	 * Flux version of {@link #streamAll(Class, QueryExecutorInterface, Object)}.
+	 * Flux version of {@link #streamAll(Class, QueryExecutorInterface, Function, Object))}.
 	 */
 	@Deprecated
 	static <T> Flux<T> fluxAll(Class<T> clazz, QueryExecutorInterface queryExecutor) {
