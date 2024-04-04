@@ -212,17 +212,7 @@ public interface PersistenceInterface extends LoggingInterface {
 	 * Mappings of fields names and corresponding columns in database, if other than plain names.
 	 */
 	private ColumnsMap getFieldsToColumnsMap() {
-		return Stream.of(getClass().getDeclaredMethods())
-		             .filter(m -> m.getReturnType() == ColumnsMap.class && m.trySetAccessible())
-		             .map(m -> {
-			             try {
-				             return (ColumnsMap) m.invoke(this);
-			             } catch (IllegalAccessException | InvocationTargetException e) {
-				             return ColumnsMap.empty();
-			             }
-		             })
-		             .filter(cm -> !cm.columns().isEmpty())
-		             .findAny().orElse(null);
+		return Tools.getFirstAnnotadedValue(ColumnsMapping.class, ColumnsMap.class, this);
 	}
 	
 	/*

@@ -10,7 +10,7 @@ import java.lang.annotation.Target;
 
 /**
  * Mark Class that is read-only, which basically restricts all saving operations, but allows some of the {@link PersistenceInterface PersistenceInterface} loading methods like
- * {@link PersistenceInterface#streamAll(Class, QueryExecutorInterface) streamAll()}.
+ * {@link PersistenceInterface#streamAll(Class, QueryExecutorInterface, Object) streamAll()}.
  */
 @Target(ElementType.TYPE)
 @Retention(RetentionPolicy.RUNTIME)
