@@ -131,16 +131,19 @@ public abstract class Query implements LoggingInterface {
 	}
 	
 	public VirtualPromise<QueryResultInterface> promise(QueryExecutorInterface executor) {
-		return VirtualPromise.supply(() -> mono(executor).blockOptional().orElse(QueryResultInterface.empty()), "QueryExecutor");
+		pack();
+		return VirtualPromise.supply(() -> executor.execute(List.of(this)).findFirst().orElse(QueryResultInterface.empty()), "QueryExecutor");
 	}
 	
+	@Deprecated
 	public Mono<QueryResultInterface> mono() {
 		return mono(QueryExecutorInterface.getInstance());
 	}
 	
+	@Deprecated
 	public Mono<QueryResultInterface> mono(QueryExecutorInterface executor) {
 		pack();
-		return executor.execute(List.of(this)).singleOrEmpty();
+		return executor.executeFlux(List.of(this)).singleOrEmpty();
 	}
 	
 	// public <T> T as(Class<T> clazz) {

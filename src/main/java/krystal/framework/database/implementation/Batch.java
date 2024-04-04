@@ -1,5 +1,6 @@
 package krystal.framework.database.implementation;
 
+import krystal.VirtualPromise;
 import krystal.framework.database.abstraction.ProviderInterface;
 import krystal.framework.database.abstraction.Query;
 import krystal.framework.database.abstraction.QueryExecutorInterface;
@@ -14,6 +15,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
 import java.util.stream.IntStream;
+import java.util.stream.Stream;
 
 @Builder(builderMethodName = "create", buildMethodName = "batch")
 public class Batch implements LoggingInterface {
@@ -26,7 +28,16 @@ public class Batch implements LoggingInterface {
 	
 	public Flux<QueryResultInterface> flux(QueryExecutorInterface queryExecutor) {
 		queries.forEach(Query::pack);
-		return queryExecutor.execute(queries);
+		return queryExecutor.executeFlux(queries);
+	}
+	
+	public VirtualPromise<Stream<QueryResultInterface>> promise() {
+		return promise(QueryExecutorInterface.getInstance());
+	}
+	
+	public VirtualPromise<Stream<QueryResultInterface>> promise(QueryExecutorInterface queryExecutor) {
+		queries.forEach(Query::pack);
+		return VirtualPromise.supply(() -> queryExecutor.execute(queries), "QueryExecutor Batch");
 	}
 	
 	public Batch setProviders(ProviderInterface provider) {
@@ -45,9 +56,11 @@ public class Batch implements LoggingInterface {
 			throw new RuntimeException();
 		}
 		
-		val qrs = flux().toStream().toArray(QueryResultInterface[]::new);
+		val qrs = promise().join().map(s -> s.toArray(QueryResultInterface[]::new)).orElseThrow();
 		
-		return IntStream.range(0, clazzes.length).boxed().parallel()
+		return IntStream.range(0, clazzes.length)
+		                .boxed()
+		                .parallel()
 		                .collect(Collectors.toMap(
 				                i -> clazzes[i],
 				                i -> qrs[i].toStreamOf(clazzes[i]).toList()

@@ -6,10 +6,7 @@ import io.r2dbc.spi.Option;
 import io.r2dbc.spi.Result;
 import krystal.Tools;
 import krystal.framework.KrystalFramework;
-import krystal.framework.database.implementation.DBCDrivers;
-import krystal.framework.database.implementation.ExecutionType;
-import krystal.framework.database.implementation.QueryResult;
-import krystal.framework.database.implementation.QueryResultRow;
+import krystal.framework.database.implementation.*;
 import krystal.framework.logging.LoggingInterface;
 import krystal.framework.logging.LoggingWrapper;
 import lombok.val;
@@ -98,53 +95,91 @@ public interface QueryExecutorInterface extends LoggingInterface {
 	 * Execute
 	 */
 	
-	default Flux<QueryResultInterface> execute(List<Query> queries) {
-		return Flux.fromStream(queries.stream().collect(Collectors.groupingBy(q -> Optional.ofNullable(q.getProvider()).orElse(KrystalFramework.getDefaultProvider()))).entrySet().stream())
-		           .concatMap(e -> {
-			           val provider = e.getKey();
-			           val driver = provider.dbcDriver();
-			           
-			           log().trace("--> Querying database: " + provider.name());
-			           
-			           return Flux.fromStream(
-					                      e.getValue().stream().collect(Collectors.groupingBy(q -> {
-						                      q.setProvidersPacked(provider);
-						                      val type = q.determineType();
-						                      
-						                      return switch (type) {
-							                      case SELECT -> ExecutionType.read;
-							                      case INSERT -> {
-								                      // drivers which return inserted rows as result
-								                      if (List.of(
-										                      DBCDrivers.jdbcAS400,
-										                      DBCDrivers.jdbcSQLServer,
-										                      DBCDrivers.r2dbcSQLServer
-								                      ).contains(driver)) yield ExecutionType.read;
-								                      else yield ExecutionType.write;
-							                      }
-							                      default -> ExecutionType.write;
-						                      };
-					                      })).entrySet().stream())
-			                      .concatMap(g -> switch (driver.getDriverType()) {
-				                      case jdbc -> executeJDBC(g.getKey(), provider, g.getValue());
-				                      case r2dbc -> executeR2DBC(g.getKey(), provider, g.getValue());
-			                      });
-		           });
+	/**
+	 * The FLux reactive functionalities are superseded by Virtual Threads.
+	 */
+	@Deprecated
+	default Flux<QueryResultInterface> executeFlux(List<Query> queries) {
+		return Flux
+				.fromStream(
+						queries.stream().collect(Collectors.groupingBy(q -> Optional.ofNullable(q.getProvider()).orElse(KrystalFramework.getDefaultProvider()))).entrySet().stream().filter(e -> e.getKey().dbcDriver().getDriverType() == DriverType.r2dbc))
+				.concatMap(e -> {
+					val provider = e.getKey();
+					val driver = provider.dbcDriver();
+					
+					log().trace("--> Querying database: " + provider.name());
+					
+					return Flux.fromStream(
+							           e.getValue().stream().collect(Collectors.groupingBy(q -> {
+								           q.setProvidersPacked(provider);
+								           val type = q.determineType();
+								           
+								           return switch (type) {
+									           case SELECT -> ExecutionType.read;
+									           case INSERT -> {
+										           // drivers which return inserted rows as result
+										           if (Objects.equals(DBCDrivers.r2dbcSQLServer, driver)) yield ExecutionType.read;
+										           else yield ExecutionType.write;
+									           }
+									           default -> ExecutionType.write;
+								           };
+							           })).entrySet().stream())
+					           .concatMap(g -> executeR2DBC(g.getKey(), provider, g.getValue()));
+				});
 	}
+	
+	default Stream<QueryResultInterface> execute(List<Query> queries) {
+		
+		return queries.stream()
+		              .collect(Collectors.groupingBy(q -> Optional.ofNullable(q.getProvider()).orElse(KrystalFramework.getDefaultProvider())))
+		              .entrySet()
+		              .stream()
+		              .filter(e -> e.getKey().dbcDriver().getDriverType() == DriverType.jdbc)
+		              .flatMap(e -> {
+			              val provider = e.getKey();
+			              val driver = provider.dbcDriver();
+			              
+			              log().trace("--> Querying database: " + provider.name());
+			              
+			              return e.getValue()
+			                      .stream()
+			                      .collect(Collectors.groupingBy(q -> {
+				                      q.setProvidersPacked(provider);
+				                      val type = q.determineType();
+				                      
+				                      return switch (type) {
+					                      case SELECT -> ExecutionType.read;
+					                      case INSERT -> {
+						                      // drivers which return inserted rows as result
+						                      if (List.of(
+								                      DBCDrivers.jdbcAS400,
+								                      DBCDrivers.jdbcSQLServer
+						                      ).contains(driver)) yield ExecutionType.read;
+						                      else yield ExecutionType.write;
+					                      }
+					                      default -> ExecutionType.write;
+				                      };
+			                      }))
+			                      .entrySet()
+			                      .stream()
+			                      .flatMap(g -> executeJDBC(g.getKey(), provider, g.getValue()));
+		              });
+	}
+	
 	
 	/*
 	 * JDBC
 	 */
 	
-	private Flux<QueryResultInterface> executeJDBC(ExecutionType exeType, ProviderInterface provider, List<Query> queries) {
+	private Stream<QueryResultInterface> executeJDBC(ExecutionType exeType, ProviderInterface provider, List<Query> queries) {
 		return switch (exeType) {
 			case read -> readJDBC(provider, queries);
 			case write -> writeJDBC(provider, queries);
 		};
 	}
 	
-	private Flux<QueryResultInterface> readJDBC(ProviderInterface provider, List<Query> queries) {
-		return Flux.fromStream(queries.stream().map(q -> {
+	private Stream<QueryResultInterface> readJDBC(ProviderInterface provider, List<Query> queries) {
+		return queries.stream().map(q -> {
 			try (Connection conn = connectToJDBCProvider(provider)) {
 				log().trace("  - Connected Successfully.");
 				
@@ -160,11 +195,11 @@ public interface QueryExecutorInterface extends LoggingInterface {
 				log().fatal("!!! FATAL error during Database connection.\n" + e.getMessage());
 				return null;
 			}
-		}));
+		});
 		
 	}
 	
-	private Flux<QueryResultInterface> writeJDBC(ProviderInterface provider, List<Query> queries) {
+	private Stream<QueryResultInterface> writeJDBC(ProviderInterface provider, List<Query> queries) {
 		try (Connection conn = connectToJDBCProvider(provider)) {
 			log().trace("    Connected Successfully.");
 			val batch = conn.createStatement();
@@ -181,18 +216,18 @@ public interface QueryExecutorInterface extends LoggingInterface {
 			
 			val result = batch.executeBatch();
 			
-			return Flux.fromStream(Arrays.stream(result).mapToObj(i -> QueryResult.of(QueryResultInterface.singleton(ColumnInterface.of("#"), i))));
+			return Arrays.stream(result).mapToObj(i -> QueryResult.of(QueryResultInterface.singleton(ColumnInterface.of("#"), i)));
 			
 		} catch (SQLException e) {
 			log().fatal("!!! FATAL error during Database connection.\n" + e.getMessage());
-			return Flux.empty();
+			return Stream.empty();
 		}
 	}
 	
 	/*
 	 * R2DBC
 	 */
-	
+	@Deprecated
 	private Flux<QueryResultInterface> executeR2DBC(ExecutionType exeType, ProviderInterface provider, List<Query> queries) {
 		val execution = connectToR2DBCProvider(provider)
 				.flatMapMany(c -> {
@@ -231,6 +266,7 @@ public interface QueryExecutorInterface extends LoggingInterface {
 		return DriverManager.getConnection(getConnectionStrings().get(provider), getConnectionProperties().get(provider));
 	}
 	
+	@Deprecated
 	private Mono<? extends io.r2dbc.spi.Connection> connectToR2DBCProvider(ProviderInterface provider) {
 		val options = ConnectionFactoryOptions.builder();
 		options.option(Option.valueOf("driver"), provider.dbcDriver().getDriverName());

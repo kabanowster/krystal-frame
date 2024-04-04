@@ -66,7 +66,8 @@ public interface PersistenceInterface extends LoggingInterface {
 	/**
 	 * Flux version of {@link #streamAll(Class, QueryExecutorInterface, Object)}.
 	 */
-	static <T> Flux<T> fluxAll(Class<T> clazz, QueryExecutorInterface queryExecutor, @Nullable T optionalDummyType) {
+	@Deprecated
+	static <T> Flux<T> fluxAll(Class<T> clazz, QueryExecutorInterface queryExecutor) {
 		return getQuery(clazz, null).mono(queryExecutor)
 		                            .flatMapMany(qr -> Flux.fromStream(qr.toStreamOf(clazz)));
 	}
@@ -74,15 +75,17 @@ public interface PersistenceInterface extends LoggingInterface {
 	/**
 	 * Flux version of {@link #streamAll(Class)}.
 	 */
+	@Deprecated
 	static <T> Flux<T> fluxAll(Class<T> clazz) {
-		return fluxAll(clazz, QueryExecutorInterface.getInstance(), null);
+		return fluxAll(clazz, QueryExecutorInterface.getInstance());
 	}
 	
 	/**
 	 * Flux version of {@link #streamAll(Class, Object)}.
 	 */
+	@Deprecated
 	static <T> Flux<T> fluxAll(Class<T> clazz, @Nullable T optionalDummyType) {
-		return fluxAll(clazz, QueryExecutorInterface.getInstance(), null);
+		return fluxAll(clazz, QueryExecutorInterface.getInstance());
 	}
 	
 	/**
