@@ -81,28 +81,15 @@ public interface PersistenceInterface extends LoggingInterface {
 	}
 	
 	/**
-	 * Flux version of {@link #streamAll(Class, QueryExecutorInterface, Function, Object))}.
+	 * Flux version of {@link #streamAll(Class, QueryExecutorInterface, Function, Object) streamAll()}.
 	 */
 	@Deprecated
-	static <T> Flux<T> fluxAll(Class<T> clazz, QueryExecutorInterface queryExecutor) {
-		return getQuery(clazz, null).mono(queryExecutor)
-		                            .flatMapMany(qr -> Flux.fromStream(qr.toStreamOf(clazz)));
-	}
-	
-	/**
-	 * Flux version of {@link #streamAll(Class)}.
-	 */
-	@Deprecated
-	static <T> Flux<T> fluxAll(Class<T> clazz) {
-		return fluxAll(clazz, QueryExecutorInterface.getInstance());
-	}
-	
-	/**
-	 * Flux version of {@link #streamAll(Class, Object)}.
-	 */
-	@Deprecated
-	static <T> Flux<T> fluxAll(Class<T> clazz, @Nullable T optionalDummyType) {
-		return fluxAll(clazz, QueryExecutorInterface.getInstance());
+	static <T> Flux<T> fluxAll(Class<T> clazz, QueryExecutorInterface queryExecutor, @Nullable Function<SelectStatement, WhereClause> filter, @Nullable T optionalDummyType) {
+		val query = getQuery(clazz, optionalDummyType);
+		
+		return (filter == null ? query : filter.apply(query))
+				.mono(queryExecutor)
+				.flatMapMany(qr -> Flux.fromStream(qr.toStreamOf(clazz)));
 	}
 	
 	/**
