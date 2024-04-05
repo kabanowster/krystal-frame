@@ -13,6 +13,8 @@ import reactor.core.publisher.Flux;
 
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
+import java.util.concurrent.CompletableFuture;
 import java.util.stream.Collectors;
 import java.util.stream.IntStream;
 import java.util.stream.Stream;
@@ -22,10 +24,12 @@ public class Batch implements LoggingInterface {
 	
 	@Singular List<Query> queries;
 	
+	@Deprecated
 	public Flux<QueryResultInterface> flux() {
-		return flux(QueryExecutorInterface.getInstance());
+		return flux(Objects.requireNonNull(QueryExecutorInterface.getInstance()));
 	}
 	
+	@Deprecated
 	public Flux<QueryResultInterface> flux(QueryExecutorInterface queryExecutor) {
 		queries.forEach(Query::pack);
 		return queryExecutor.executeFlux(queries);
@@ -38,6 +42,15 @@ public class Batch implements LoggingInterface {
 	public VirtualPromise<Stream<QueryResultInterface>> promise(QueryExecutorInterface queryExecutor) {
 		queries.forEach(Query::pack);
 		return VirtualPromise.supply(() -> queryExecutor.execute(queries), "QueryExecutor Batch");
+	}
+	
+	public CompletableFuture<Stream<QueryResultInterface>> future() {
+		return future(QueryExecutorInterface.getInstance());
+	}
+	
+	public CompletableFuture<Stream<QueryResultInterface>> future(QueryExecutorInterface queryExecutor) {
+		queries.forEach(Query::pack);
+		return VirtualPromise.futureSupply(() -> queryExecutor.execute(queries));
 	}
 	
 	public Batch setProviders(ProviderInterface provider) {

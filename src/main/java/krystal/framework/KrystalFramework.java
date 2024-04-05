@@ -163,6 +163,21 @@ public class KrystalFramework {
 	 * @see #getTomcat()
 	 */
 	public void primaryInitialization(String... args) {
+		//@formatter:off
+		log.fatal("""
+
+
+*@@@@* *@@@*   *@@@***@@m  *@@@*   *@@* m@***@m@@@@**@@**@@@      @@      *@@@@*         *@@@***@@@*@@@***@@m        @@      *@@@@m     m@@@**@@@***@@@
+\s\s@@   m@*       @@   *@@m   @@@   m@  m@@    *@@*   @@   *@     m@@m       @@             @@    *@  @@   *@@m      m@@m       @@@@    @@@@    @@    *@
+\s\s@@ m@*         @@   m@@     @@@ m@   *@@@m         @@         m@*@@!      @@             @@   @    @@   m@@      m@*@@!      @ @@   m@ @@    @@   @
+\s\s@@@@@m         !@@@@@@       @!@@      *@@@@@m     !@        m@  *@@      @@             @@**@@    !@@@@@@      m@  *@@      @  @!  @* @@    @@@@@@
+\s\s!@  @@!        !@  @@m        !@           *@@     !@        @@@!@!@@     @!     m       !@   @    !@  @@m      @@@!@!@@     !  @!m@*  @@    @@   @  m
+\s\s!@   *!!m      !@   *!@       !@     @@     @@     !@       !*      @@    @!    :@       !@        !@   *!@    !*      @@    !  *!@*   @@    @!     m@
+\s\s!!    !:!      !@  ! !!       !@     !     *@!     !@        !!!!@!!@     !!     !       !!        !@  ! !!     !!!!@!!@     !  !!!!*  !!    !!   !  !
+\s\s!!     :!!!    !!   *!!!      !!     !!     !!     !!       !*      !!    !:    !!       :!        !!   *!!!   !*      !!    :  *!!*   !!    !!     !!
+: : :      : : : :!:  : : :   : :::    :!: : :!    : :!::   : : :   : ::: : :: !: :      :!: :     : :!:  : : :: : :   : ::: : ::: :   : ::: : :::!: : :
+				          """);
+		//@formatter:on
 		
 		if (appPropertiesFile == null) appPropertiesFile = exposedDirPath + "/application.properties";
 		if (commanderFile == null) commanderFile = exposedDirPath + "/commander.txt";
@@ -177,9 +192,9 @@ public class KrystalFramework {
 				.provider.value()
 				         .flatMap(
 						         p -> providersPool
-								         .stream()
-								         .filter(pp -> p.equals(pp.name()))
-								         .findFirst())
+								              .stream()
+								              .filter(pp -> p.equals(pp.name()))
+								              .findFirst())
 				         .ifPresent(dp -> defaultProvider = dp);
 		
 		log.fatal("=== App started" + (PropertiesInterface.areAny() ? " with properties: " + PropertiesInterface.printAll() : "."));

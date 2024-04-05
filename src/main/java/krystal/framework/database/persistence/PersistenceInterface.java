@@ -2,6 +2,7 @@ package krystal.framework.database.persistence;
 
 import krystal.JSON;
 import krystal.Tools;
+import krystal.VirtualPromise;
 import krystal.framework.database.abstraction.*;
 import krystal.framework.database.persistence.annotations.*;
 import krystal.framework.database.queryfactory.*;
@@ -16,6 +17,7 @@ import java.lang.reflect.Field;
 import java.lang.reflect.InvocationTargetException;
 import java.util.*;
 import java.util.Map.Entry;
+import java.util.concurrent.CompletableFuture;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
@@ -44,15 +46,13 @@ public interface PersistenceInterface extends LoggingInterface {
 	static <T> Stream<T> streamAll(Class<T> clazz, QueryExecutorInterface queryExecutor, @Nullable Function<SelectStatement, WhereClause> filter, @Nullable T optionalDummyType) {
 		val query = getQuery(clazz, optionalDummyType);
 		return (filter == null ? query : filter.apply(query))
-				.promise(queryExecutor)
-				.thenApply(qr -> qr.toStreamOf(clazz))
-				.join()
-				.orElse(Stream.empty());
+				       .promise(queryExecutor)
+				       .thenApply(qr -> qr.toStreamOf(clazz))
+				       .join()
+				       .orElse(Stream.empty());
 	}
 	
 	/**
-	 * To be utilised after initial Spring injections (after {@link QueryExecutorInterface} is initialised).
-	 *
 	 * @see #streamAll(Class, QueryExecutorInterface, Function, Object)
 	 */
 	static <T> Stream<T> streamAll(Class<T> clazz) {
@@ -76,20 +76,99 @@ public interface PersistenceInterface extends LoggingInterface {
 	/**
 	 * @see #streamAll(Class, QueryExecutorInterface, Function, Object)
 	 */
-	static <T> Stream<T> streamAll(Class<T> clazz, @Nullable T optionalDummyType) {
-		return streamAll(clazz, QueryExecutorInterface.getInstance(), null, optionalDummyType);
+	static <T> VirtualPromise<Stream<T>> promiseAll(Class<T> clazz, QueryExecutorInterface queryExecutor, @Nullable Function<SelectStatement, WhereClause> filter, @Nullable T optionalDummyType) {
+		val query = getQuery(clazz, optionalDummyType);
+		return (filter == null ? query : filter.apply(query))
+				       .promise(queryExecutor)
+				       .thenApply(qr -> qr.toStreamOf(clazz));
 	}
 	
 	/**
-	 * Flux version of {@link #streamAll(Class, QueryExecutorInterface, Function, Object) streamAll()}.
+	 * @see #streamAll(Class, QueryExecutorInterface, Function, Object)
+	 */
+	static <T> VirtualPromise<Stream<T>> promiseAll(Class<T> clazz) {
+		return promiseAll(clazz, QueryExecutorInterface.getInstance(), null, null);
+	}
+	
+	/**
+	 * @see #streamAll(Class, QueryExecutorInterface, Function, Object)
+	 */
+	static <T> VirtualPromise<Stream<T>> promiseAll(Class<T> clazz, QueryExecutorInterface queryExecutor) {
+		return promiseAll(clazz, queryExecutor, null, null);
+	}
+	
+	/**
+	 * @see #streamAll(Class, QueryExecutorInterface, Function, Object)
+	 */
+	static <T> VirtualPromise<Stream<T>> promiseAll(Class<T> clazz, Function<SelectStatement, WhereClause> filter) {
+		return promiseAll(clazz, QueryExecutorInterface.getInstance(), filter, null);
+	}
+	
+	/**
+	 * @see #streamAll(Class, QueryExecutorInterface, Function, Object)
+	 */
+	static <T> CompletableFuture<Stream<T>> futureAll(Class<T> clazz, QueryExecutorInterface queryExecutor, @Nullable Function<SelectStatement, WhereClause> filter, @Nullable T optionalDummyType) {
+		val query = getQuery(clazz, optionalDummyType);
+		return (filter == null ? query : filter.apply(query))
+				       .future(queryExecutor)
+				       .thenApply(qr -> qr.toStreamOf(clazz));
+	}
+	
+	/**
+	 * @see #streamAll(Class, QueryExecutorInterface, Function, Object)
+	 */
+	static <T> CompletableFuture<Stream<T>> futureAll(Class<T> clazz) {
+		return futureAll(clazz, QueryExecutorInterface.getInstance(), null, null);
+	}
+	
+	/**
+	 * @see #streamAll(Class, QueryExecutorInterface, Function, Object)
+	 */
+	static <T> CompletableFuture<Stream<T>> futureAll(Class<T> clazz, QueryExecutorInterface queryExecutor) {
+		return futureAll(clazz, queryExecutor, null, null);
+	}
+	
+	/**
+	 * @see #streamAll(Class, QueryExecutorInterface, Function, Object)
+	 */
+	static <T> CompletableFuture<Stream<T>> futureAll(Class<T> clazz, Function<SelectStatement, WhereClause> filter) {
+		return futureAll(clazz, QueryExecutorInterface.getInstance(), filter, null);
+	}
+	
+	/**
+	 * @see #streamAll(Class, QueryExecutorInterface, Function, Object)
 	 */
 	@Deprecated
 	static <T> Flux<T> fluxAll(Class<T> clazz, QueryExecutorInterface queryExecutor, @Nullable Function<SelectStatement, WhereClause> filter, @Nullable T optionalDummyType) {
 		val query = getQuery(clazz, optionalDummyType);
 		
 		return (filter == null ? query : filter.apply(query))
-				.mono(queryExecutor)
-				.flatMapMany(qr -> Flux.fromStream(qr.toStreamOf(clazz)));
+				       .mono(queryExecutor)
+				       .flatMapMany(qr -> Flux.fromStream(qr.toStreamOf(clazz)));
+	}
+	
+	/**
+	 * @see #streamAll(Class, QueryExecutorInterface, Function, Object)
+	 */
+	@Deprecated
+	static <T> Flux<T> fluxAll(Class<T> clazz) {
+		return fluxAll(clazz, QueryExecutorInterface.getInstance(), null, null);
+	}
+	
+	/**
+	 * @see #streamAll(Class, QueryExecutorInterface, Function, Object)
+	 */
+	@Deprecated
+	static <T> Flux<T> fluxAll(Class<T> clazz, QueryExecutorInterface queryExecutor) {
+		return fluxAll(clazz, queryExecutor, null, null);
+	}
+	
+	/**
+	 * @see #streamAll(Class, QueryExecutorInterface, Function, Object)
+	 */
+	@Deprecated
+	static <T> Flux<T> fluxAll(Class<T> clazz, Function<SelectStatement, WhereClause> filter) {
+		return fluxAll(clazz, QueryExecutorInterface.getInstance(), filter, null);
 	}
 	
 	/**
@@ -152,7 +231,7 @@ public interface PersistenceInterface extends LoggingInterface {
 				var constructor =
 						(Constructor<T>) Stream.of(clazz.getDeclaredConstructors())
 						                       .filter(c -> c.isAnnotationPresent(Reader.class)
-								                       && Arrays.equals(c.getParameterTypes(), qr.columns().values().toArray(Class<?>[]::new)))
+								                                    && Arrays.equals(c.getParameterTypes(), qr.columns().values().toArray(Class<?>[]::new)))
 						                       .findFirst()
 						                       .orElseThrow();
 				constructor.setAccessible(true);

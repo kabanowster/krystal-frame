@@ -110,7 +110,7 @@ public class ConsoleView implements LoggingInterface {
 		
 		frame = new JFrame();
 		frame.setDefaultCloseOperation(WindowConstants.EXIT_ON_CLOSE);
-		frame.setSize(1200, 600);
+		frame.setSize(1350, 700);
 		frame.setTitle("Console View");
 		frame.setLocationRelativeTo(null);
 		frame.setLayout(new BoxLayout(frame.getContentPane(), BoxLayout.Y_AXIS));

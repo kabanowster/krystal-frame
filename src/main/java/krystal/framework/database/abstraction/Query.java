@@ -16,6 +16,7 @@ import java.util.LinkedHashSet;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.Set;
+import java.util.concurrent.CompletableFuture;
 import java.util.stream.Stream;
 
 /**
@@ -118,14 +119,15 @@ public abstract class Query implements LoggingInterface {
 		return () -> "(%s) %s".formatted(pack().sqlQuery(), alias);
 	}
 	
-	// public CompletableFuture<Optional<QueryResultInterface>> future() {
-	// 	return mono().singleOptional().toFuture();
-	// }
-	//
-	// public CompletableFuture<Optional<QueryResultInterface>> future(QueryExecutorInterface executor) {
-	// 	return mono(executor).singleOptional().toFuture();
-	// }
-	//
+	public CompletableFuture<QueryResultInterface> future() {
+		return future(QueryExecutorInterface.getInstance());
+	}
+	
+	public CompletableFuture<QueryResultInterface> future(QueryExecutorInterface executor) {
+		pack();
+		return VirtualPromise.futureSupply(() -> executor.execute(List.of(this)).findFirst().orElse(QueryResultInterface.empty()));
+	}
+	
 	public VirtualPromise<QueryResultInterface> promise() {
 		return promise(QueryExecutorInterface.getInstance());
 	}
