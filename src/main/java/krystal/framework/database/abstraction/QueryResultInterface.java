@@ -2,6 +2,7 @@ package krystal.framework.database.abstraction;
 
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
+import krystal.VirtualPromise;
 import krystal.framework.database.persistence.PersistenceInterface;
 
 import java.util.*;
@@ -52,7 +53,7 @@ public interface QueryResultInterface {
 	 *
 	 * @see PersistenceInterface
 	 */
-	default <T> Stream<T> toStreamOf(Class<T> clazz) {
+	default <T> VirtualPromise<Stream<T>> toStreamOf(Class<T> clazz) {
 		return PersistenceInterface.mapQueryResult(this, clazz);
 	}
 	

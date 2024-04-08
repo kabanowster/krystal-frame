@@ -293,6 +293,7 @@ public class KrystalFramework {
 	 */
 	
 	public void quit() {
+		// TODO first unlock flows
 		log.fatal("=== Clean Exit");
 		System.exit(0);
 	}

@@ -47,7 +47,7 @@ public interface PersistenceInterface extends LoggingInterface {
 		val query = getQuery(clazz, optionalDummyType);
 		return (filter == null ? query : filter.apply(query))
 				       .promise(queryExecutor)
-				       .thenApply(qr -> qr.toStreamOf(clazz))
+				       .compose(qr -> qr.toStreamOf(clazz))
 				       .join()
 				       .orElse(Stream.empty());
 	}
@@ -80,7 +80,7 @@ public interface PersistenceInterface extends LoggingInterface {
 		val query = getQuery(clazz, optionalDummyType);
 		return (filter == null ? query : filter.apply(query))
 				       .promise(queryExecutor)
-				       .thenApply(qr -> qr.toStreamOf(clazz));
+				       .compose(qr -> qr.toStreamOf(clazz));
 	}
 	
 	/**
@@ -111,7 +111,7 @@ public interface PersistenceInterface extends LoggingInterface {
 		val query = getQuery(clazz, optionalDummyType);
 		return (filter == null ? query : filter.apply(query))
 				       .future(queryExecutor)
-				       .thenApply(qr -> qr.toStreamOf(clazz));
+				       .thenApply(qr -> qr.toStreamOf(clazz).join().orElse(Stream.empty()));
 	}
 	
 	/**
@@ -144,7 +144,8 @@ public interface PersistenceInterface extends LoggingInterface {
 		
 		return (filter == null ? query : filter.apply(query))
 				       .mono(queryExecutor)
-				       .flatMapMany(qr -> Flux.fromStream(qr.toStreamOf(clazz)));
+				       .map(qr -> qr.toStreamOf(clazz).join().orElse(Stream.empty()))
+				       .flatMapMany(Flux::fromStream);
 	}
 	
 	/**
@@ -225,21 +226,26 @@ public interface PersistenceInterface extends LoggingInterface {
 	 * {@link QueryResultInterface} row. There can be a number of {@link Reader @Readers}, i.e. each responsible for handling different {@link ProviderInterface}.
 	 */
 	@SuppressWarnings("unchecked")
-	static <T> Stream<T> mapQueryResult(QueryResultInterface qr, Class<T> clazz) {
-		return qr.rows().stream().map(row -> {
-			try {
-				var constructor =
-						(Constructor<T>) Stream.of(clazz.getDeclaredConstructors())
-						                       .filter(c -> c.isAnnotationPresent(Reader.class)
-								                                    && Arrays.equals(c.getParameterTypes(), qr.columns().values().toArray(Class<?>[]::new)))
-						                       .findFirst()
-						                       .orElseThrow();
-				constructor.setAccessible(true);
-				return constructor.newInstance(row.values().toArray());
-			} catch (InvocationTargetException | IllegalAccessException | InstantiationException | NoSuchElementException e) {
-				throw new RuntimeException("Exception during QueryResult Persistence Constructor mapping.", e);
-			}
-		});
+	static <T> VirtualPromise<Stream<T>> mapQueryResult(QueryResultInterface qr, Class<T> clazz) {
+		try {
+			val constructor =
+					(Constructor<T>) Stream.of(clazz.getDeclaredConstructors())
+					                       .filter(c -> c.isAnnotationPresent(Reader.class) && c.trySetAccessible()
+							                                    && Arrays.equals(c.getParameterTypes(), qr.columns().values().toArray(Class<?>[]::new)))
+					                       .findFirst()
+					                       .orElseThrow();
+			return VirtualPromise.supply(qr::rows)
+			                     .mapFork(Collection::stream, row -> {
+				                     try {
+					                     return constructor.newInstance(row.values().toArray());
+				                     } catch (InstantiationException | IllegalAccessException | InvocationTargetException e) {
+					                     throw new RuntimeException("Exception during QueryResult Persistence Constructor mapping.", e);
+				                     }
+			                     });
+		} catch (NoSuchElementException e) {
+			throw new RuntimeException("Exception during QueryResult Persistence: No constructor found.", e);
+		}
+		
 	}
 	
 	/*
@@ -470,8 +476,8 @@ public interface PersistenceInterface extends LoggingInterface {
 		var query = getQuery();
 		if (query == null) query = table.select(fieldsColumns.values().toArray(ColumnInterface[]::new));
 		return query.where(keysPairs).setProvider(getProvider()).promise()
+		            .compose(qr -> qr.toStreamOf(getClass()))
 		            .join()
-		            .map(qr -> qr.toStreamOf(getClass()))
 		            .orElse(Stream.empty())
 		            .findFirst();
 	}
@@ -554,7 +560,7 @@ public interface PersistenceInterface extends LoggingInterface {
 		     .values(colval.values().toArray())
 		     .setProvider(getProvider())
 		     .promise()
-		     .thenApply(qr -> qr.toStreamOf(getClass()))
+		     .map(qr -> qr.toStreamOf(getClass()))
 		     .join()
 		     .ifPresent(this::copyFrom);
 	}

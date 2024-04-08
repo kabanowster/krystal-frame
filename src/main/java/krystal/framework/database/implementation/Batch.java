@@ -8,13 +8,14 @@ import krystal.framework.database.abstraction.QueryResultInterface;
 import krystal.framework.logging.LoggingInterface;
 import lombok.Builder;
 import lombok.Singular;
-import lombok.val;
 import reactor.core.publisher.Flux;
 
+import javax.annotation.Nullable;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.ExecutionException;
 import java.util.stream.Collectors;
 import java.util.stream.IntStream;
 import java.util.stream.Stream;
@@ -63,21 +64,28 @@ public class Batch implements LoggingInterface {
 	 *
 	 * @see krystal.framework.database.persistence.PersistenceInterface PersistenceInterface
 	 */
-	public Map<Class<?>, List<?>> toListsOf(Class<?>... clazzes) {
+	public @Nullable Map<? extends Class<?>, ? extends List<?>> toListsOf(Class<?>... clazzes) {
 		if (clazzes.length != queries.size()) {
 			log().fatal("The queries count must be equal with the classes count in the toStreamOf() method of the Batch.");
 			throw new RuntimeException();
 		}
 		
-		val qrs = promise().join().map(s -> s.toArray(QueryResultInterface[]::new)).orElseThrow();
+		return promise().map(s -> s.toArray(QueryResultInterface[]::new))
+		                .join()
+		                .map(qrs -> IntStream.range(0, clazzes.length)
+		                                     .boxed()
+		                                     .collect(Collectors.toMap(
+				                                     i -> clazzes[i],
+				                                     i -> {
+					                                     try {
+						                                     return qrs[i].toStreamOf(clazzes[i]).joinExceptionally().orElseGet(Stream::empty).toList();
+					                                     } catch (ExecutionException e) {
+						                                     throw new RuntimeException(e);
+					                                     }
+				                                     }
+		                                     )))
+		                .orElse(null);
 		
-		return IntStream.range(0, clazzes.length)
-		                .boxed()
-		                .parallel()
-		                .collect(Collectors.toMap(
-				                i -> clazzes[i],
-				                i -> qrs[i].toStreamOf(clazzes[i]).toList()
-		                ));
 	}
 	
 }
