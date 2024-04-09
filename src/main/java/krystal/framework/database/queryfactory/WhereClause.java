@@ -1,13 +1,22 @@
 package krystal.framework.database.queryfactory;
 
 import krystal.framework.database.abstraction.Query;
+import krystal.framework.database.abstraction.QueryExecutorInterface;
 
 import java.util.Collections;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.Set;
+import java.util.function.Function;
 
 public class WhereClause extends Query implements OrderByInterface, GroupByInterface {
+	
+	/**
+	 * Factory method for {@link Function} used in {@link krystal.framework.database.persistence.PersistenceInterface#streamAll(Class, QueryExecutorInterface, Function, Object) PersistenceInterface.streamAll()} and its variants.
+	 */
+	public static Function<SelectStatement, WhereClause> persistenceFilter(Function<SelectStatement, WhereClause> where) {
+		return where;
+	}
 	
 	private final List<WhereClauseOuterBlock> where = Collections.synchronizedList(new LinkedList<>());
 	

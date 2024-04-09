@@ -12,6 +12,7 @@ import org.json.JSONObject;
 import reactor.core.publisher.Flux;
 
 import javax.annotation.Nullable;
+import java.lang.annotation.Annotation;
 import java.lang.reflect.Constructor;
 import java.lang.reflect.Field;
 import java.lang.reflect.InvocationTargetException;
@@ -29,15 +30,15 @@ import java.util.stream.Stream;
 public interface PersistenceInterface extends LoggingInterface {
 	
 	/*
-	 * Static tools
+	 * Persistence conversion
 	 */
 	
 	/**
-	 * Get all persisted objects from the database of particular type. The class must declare empty (no arguments) constructor. {@link QueryExecutorInterface} here is present for initial Spring injections support. You can use {@link #streamAll(Class)} in
-	 * cases following after.
+	 * Get all persisted objects from the database of particular type. The class must declare empty (no arguments) constructor. Use {@link QueryExecutorInterface} for initial dependency injection. Use {@link WhereClause#persistenceFilter(Function)} for
+	 * filtering the {@link Loader loading} query.
 	 *
 	 * @param optionalDummyType
-	 * 		If provided, instead of constructing object with {@link lombok.NoArgsConstructor NoArgsConstructor}, method will take the dummy as source of invoked methods. With additional {@link Skip} fields as parameters, you can set up conditional outputs
+	 * 		If provided, will be taken as source for invoked methods in query construction. With, i.e. additional {@link Skip} fields as parameters, you can set up different conditional outputs
 	 * 		for key methods, like {@link #getTable()} or {@link #getQuery()}.
 	 * @see Loader
 	 * @see Reader
@@ -173,55 +174,6 @@ public interface PersistenceInterface extends LoggingInterface {
 	}
 	
 	/**
-	 * Returns {@link Query} used to load instance of an object of provided class, or throws error if it's missing.
-	 *
-	 * @see Loader
-	 */
-	static <T> SelectStatement getQuery(Class<T> clazz, @Nullable T optionalDummyType) {
-		try {
-			T instance;
-			if (optionalDummyType != null) {
-				instance = optionalDummyType;
-			} else {
-				Constructor<T> emptyConstructor = clazz.getDeclaredConstructor();
-				instance = emptyConstructor.newInstance();
-			}
-			
-			var query = Tools.getFirstAnnotadedValue(Loader.class, SelectStatement.class, instance);
-			if (query == null) {
-				if (PersistenceInterface.class.isAssignableFrom(clazz)) {
-					query = ((PersistenceInterface) instance).getTable().select();
-				} else {
-					throw new RuntimeException("Class %s does not have defined Query to load from.".formatted(clazz.getSimpleName()));
-				}
-			}
-			return query;
-		} catch (NoSuchMethodException | InstantiationException | IllegalAccessException | InvocationTargetException e) {
-			throw new RuntimeException("Class %s requires no args constructor, to perform loading.".formatted(clazz.getSimpleName()));
-		}
-	}
-	
-	/**
-	 * Returns first custom {@link Loader} query used to load this class or {@code null} if missing.
-	 *
-	 * @see #getQuery(Class, Object) )
-	 */
-	default SelectStatement getQuery() {
-		return Tools.getFirstAnnotadedValue(Loader.class, SelectStatement.class, this);
-	}
-	
-	/**
-	 * Check, if the class specified is valid for persistence writing.
-	 */
-	static boolean classHasKeys(Class<?> clazz) {
-		return Stream.of(clazz.getDeclaredFields()).anyMatch(f -> f.isAnnotationPresent(Key.class));
-	}
-	
-	static boolean classIsReadOnly(Class<?> clazz) {
-		return clazz.isAnnotationPresent(ReadOnly.class);
-	}
-	
-	/**
 	 * Convert rows of {@link QueryResultInterface} data into stream of objects, using their {@link Reader @Reader} annotated constructors. The types of argument of particular constructor must match the data type of each column in the
 	 * {@link QueryResultInterface} row. There can be a number of {@link Reader @Readers}, i.e. each responsible for handling different {@link ProviderInterface}.
 	 */
@@ -253,7 +205,7 @@ public interface PersistenceInterface extends LoggingInterface {
 	 */
 	
 	/**
-	 * Table linked with object's persistence. Each row of table represents a single object. You can use Lombok to set a @Getter marked field - in that case also mark it with {@link Skip @Skip}.
+	 * Table linked with object's persistence. Each row of table represents a single object. You can use Lombok to set a {@link lombok.Getter @Getter} marked field - in that case also mark it with {@link Skip @Skip}.
 	 * As being a method, you can condition its output on values of other fields that can be {@link Skip Skipped}.
 	 *
 	 * @see TableInterface
@@ -261,40 +213,61 @@ public interface PersistenceInterface extends LoggingInterface {
 	TableInterface getTable();
 	
 	/**
+	 * Returns {@link ProviderInterface} used to load instance of an object of provided class.
+	 *
+	 * @see Provider
+	 */
+	static <T, D extends T> @Nullable ProviderInterface getProvider(Class<T> clazz, @Nullable D optionalDummyType) {
+		return getFirstAnnotatedValueOrInvokeDefaultWithOptionalDummy(clazz, Provider.class, ProviderInterface.class, optionalDummyType, PersistenceInterface::getProvider);
+	}
+	
+	/**
 	 * Declared with {@link Provider @Provider}, or {@link krystal.framework.KrystalFramework#getDefaultProvider() KrystalFramework#getDefaultProvider()} as default.
 	 */
-	default ProviderInterface getProvider() {
+	default @Nullable ProviderInterface getProvider() {
 		return Tools.getFirstAnnotadedValue(Provider.class, ProviderInterface.class, this);
-		// val errMsg = "Provider declaration must return or extend the type of ProviderInterface.";
-		//
-		// return (ProviderInterface)
-		// 		Stream.of(getClass().getDeclaredFields())
-		// 		      .filter(f -> f.isAnnotationPresent(Provider.class))
-		// 		      .map(f -> {
-		// 			      f.setAccessible(true);
-		// 			      if (!ProviderInterface.class.isAssignableFrom(f.getType()))
-		// 				      throw new RuntimeException(errMsg);
-		// 			      try {
-		// 				      return f.get(this);
-		// 			      } catch (IllegalAccessException e) {
-		// 				      throw new RuntimeException(e);
-		// 			      }
-		// 		      })
-		// 		      .findFirst()
-		// 		      .or(() -> Stream.of(getClass().getDeclaredMethods())
-		// 		                      .filter(m -> m.isAnnotationPresent(Provider.class))
-		// 		                      .map(m -> {
-		// 			                      m.setAccessible(true);
-		// 			                      if (!ProviderInterface.class.isAssignableFrom(m.getReturnType()))
-		// 				                      throw new RuntimeException(errMsg);
-		// 			                      try {
-		// 				                      return m.invoke(this);
-		// 			                      } catch (IllegalAccessException | InvocationTargetException e) {
-		// 				                      throw new RuntimeException(e);
-		// 			                      }
-		// 		                      })
-		// 		                      .findFirst()
-		// 		      ).orElse(null); // null passed to Loader.setProvider causes to use defaultProvider
+	}
+	
+	/**
+	 * Returns {@link Query} used to load instance of an object of provided class, default, or throws error if for some reason it's missing.
+	 *
+	 * @see Loader
+	 */
+	static <T, D extends T> SelectStatement getQuery(Class<T> clazz, @Nullable D optionalDummyType) {
+		return Optional.ofNullable(getFirstAnnotatedValueOrInvokeDefaultWithOptionalDummy(clazz, Loader.class, SelectStatement.class, optionalDummyType, p -> p.getTable().select()))
+		               .orElseThrow();
+	}
+	
+	/**
+	 * Returns first custom {@link Loader} query used to load this class or {@code null} if missing.
+	 *
+	 * @see #getQuery(Class, Object)
+	 */
+	default @Nullable SelectStatement getQuery() {
+		return Tools.getFirstAnnotadedValue(Loader.class, SelectStatement.class, this);
+	}
+	
+	static <T, D extends T, R, A extends Annotation> R getFirstAnnotatedValueOrInvokeDefaultWithOptionalDummy(Class<T> clazz, Class<A> annotation, Class<R> returnType, @Nullable D optionalDummyType, Function<PersistenceInterface, R> invoker) {
+		try {
+			T instance;
+			if (optionalDummyType != null) {
+				instance = optionalDummyType;
+			} else {
+				Constructor<T> emptyConstructor = clazz.getDeclaredConstructor();
+				instance = emptyConstructor.newInstance();
+			}
+			var result = Tools.getFirstAnnotadedValue(annotation, returnType, instance);
+			if (result == null) {
+				if (PersistenceInterface.class.isAssignableFrom(clazz)) {
+					result = invoker.apply((PersistenceInterface) instance);
+				} else {
+					throw new RuntimeException("Class %s is not a PersistenceInterface.".formatted(clazz.getSimpleName()));
+				}
+			}
+			return result;
+		} catch (NoSuchMethodException | InstantiationException | IllegalAccessException | InvocationTargetException e) {
+			throw new RuntimeException("Class %s requires no args constructor, to perform annotated parameters loading.".formatted(clazz.getSimpleName()));
+		}
 	}
 	
 	/**
@@ -392,6 +365,21 @@ public interface PersistenceInterface extends LoggingInterface {
 	}
 	
 	/*
+	 * Validation
+	 */
+	
+	/**
+	 * Check, if the class specified is valid for persistence writing.
+	 */
+	static boolean classHasKeys(Class<?> clazz) {
+		return Stream.of(clazz.getDeclaredFields()).anyMatch(f -> f.isAnnotationPresent(Key.class));
+	}
+	
+	static boolean classIsReadOnly(Class<?> clazz) {
+		return clazz.isAnnotationPresent(ReadOnly.class);
+	}
+	
+	/*
 	 * Public overloads
 	 */
 	
@@ -439,7 +427,7 @@ public interface PersistenceInterface extends LoggingInterface {
 	 * Factory method for persistence executions. Performs initial checks and data collection.
 	 */
 	private void execute(PersistenceExecutions execution) {
-		log().trace(">>> Performing persistence execution: " + execution.toString());
+		log().trace(">>> Performing persistence execution: {}", execution.toString());
 		
 		if (!classHasKeys(getClass()))
 			throw new RuntimeException(String.format("  ! %s.class is missing @Keys - can not perform single persistence operations.", getClass().getSimpleName()));
@@ -541,7 +529,7 @@ public interface PersistenceInterface extends LoggingInterface {
 				     .flatMap(QueryResultInterface::getResult)
 				     .orElse(0L)));
 		if (deleted > 0)
-			log().trace("  ! Persisted object deleted from database. Deleted rows: " + deleted);
+			log().trace("  ! Persisted object deleted from database. Deleted rows: {}", deleted);
 		else
 			log().trace("  ! Persisted object not deleted from database.");
 	}
@@ -554,10 +542,10 @@ public interface PersistenceInterface extends LoggingInterface {
 	 * Create persistence record and consume it.
 	 */
 	private void insertAndConsumeSelf(TableInterface table, Map<Field, ColumnInterface> fieldsColumns, Map<Field, Object> fieldsValues) {
-		val colval = columnsToValues(fieldsColumns, fieldsValues);
+		val value = columnsToValues(fieldsColumns, fieldsValues);
 		table.insert()
-		     .into(colval.keySet().toArray(ColumnInterface[]::new))
-		     .values(colval.values().toArray())
+		     .into(value.keySet().toArray(ColumnInterface[]::new))
+		     .values(value.values().toArray())
 		     .setProvider(getProvider())
 		     .promise()
 		     .map(qr -> qr.toStreamOf(getClass()))
