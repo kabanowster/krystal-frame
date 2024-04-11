@@ -6,11 +6,13 @@ import java.lang.annotation.RetentionPolicy;
 import java.lang.annotation.Target;
 
 /**
- * Use to mark methods that are writers. Writers are mappings for fields to output desired values and types when writing to database. Writer is defined by creating a method declared as <i><b>writeFieldName()</b></i>, returning desired value and type. This
- * annotation is available just for convenience - the writer is distinguished by the method's name only.
+ * Use to mark methods that are writers. Writers are mappings for fields to return desired values and types when writing to database. Writer is defined by creating a method declared as <i><b>writeFieldName()</b></i>, or by using this annotation with
+ * field's name as parameter.
  */
 @Target({ElementType.METHOD})
 @Retention(RetentionPolicy.RUNTIME)
 public @interface Writer {
-
+	
+	String fieldName();
+	
 }

@@ -2,6 +2,9 @@ package krystal.framework.database.abstraction;
 
 import krystal.framework.database.queryfactory.*;
 
+import java.util.Collection;
+import java.util.Optional;
+
 /**
  * Represents the database column instance. Attach to enum to create a convenient column access when building queries.
  */
@@ -46,20 +49,30 @@ public interface ColumnInterface {
 		return () -> "%s.%s".formatted(tableAlias, sqlName());
 	}
 	
-	default ColumnInterface sum() {
-		return () -> "SUM(%s)".formatted(sqlName());
-	}
-	
-	default ColumnInterface min() {
-		return () -> "MIN(%s)".formatted(sqlName());
-	}
-	
-	default ColumnInterface max() {
-		return () -> "MAX(%s)".formatted(sqlName());
-	}
-	
 	default ColumnInterface dist() {
 		return () -> "DISTINCT " + sqlName();
+	}
+	
+	default ColumnInterface fun(Functions function) {
+		return fun(function.name(), true);
+	}
+	
+	default ColumnInterface fun(Functions function, boolean addNameAsAlias) {
+		return fun(function.name(), addNameAsAlias);
+	}
+	
+	default ColumnInterface fun(String function, boolean addNameAsAlias) {
+		return () -> "%s(%s)%s".formatted(function, sqlName(), addNameAsAlias ? " " + sqlName() : "");
+	}
+	
+	static Optional<ColumnInterface> pickEqual(ColumnInterface column, Collection<ColumnInterface> from) {
+		return from.stream()
+		           .filter(c -> c.sqlName().equalsIgnoreCase(column.sqlName()))
+		           .findFirst();
+	}
+	
+	enum Functions {
+		SUM, MIN, MAX, AVG, COUNT, TRIM
 	}
 	
 }
