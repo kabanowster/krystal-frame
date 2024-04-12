@@ -188,31 +188,27 @@ public interface PersistenceInterface extends LoggingInterface {
 	@SuppressWarnings("unchecked")
 	static <T> VirtualPromise<Stream<T>> mapQueryResult(QueryResultInterface qr, Class<T> clazz) {
 		
-		QueryResultInterface finalQuery;
-		
 		if (clazz.isAnnotationPresent(Vertical.class)) {
 			
 			val verticalColumns = getVerticalMandatoryAnnotations(clazz);
 			List<? extends ColumnInterface> intoColumns = Optional.ofNullable(Tools.getFirstAnnotatedValue(UnpivotToColumns.class, List.class, clazz, null)).orElse(List.of());
 			
-			finalQuery = qr.unpivot(verticalColumns.get(PivotColumn.class), verticalColumns.get(ValuesColumn.class), intoColumns.toArray(ColumnInterface[]::new));
+			qr.unpivot(verticalColumns.get(PivotColumn.class), verticalColumns.get(ValuesColumn.class), intoColumns.toArray(ColumnInterface[]::new));
 			
-		} else {
-			finalQuery = qr;
 		}
 		
 		Constructor<T> constructor;
 		try {
 			constructor = (Constructor<T>) Stream.of(clazz.getDeclaredConstructors())
 			                                     .filter(c -> c.isAnnotationPresent(Reader.class) && c.trySetAccessible()
-					                                                  && Arrays.equals(c.getParameterTypes(), finalQuery.columns().values().toArray(Class<?>[]::new)))
+					                                                  && Arrays.equals(c.getParameterTypes(), qr.columns().values().toArray(Class<?>[]::new)))
 			                                     .findFirst()
 			                                     .orElseThrow();
 		} catch (NoSuchElementException e) {
 			throw new RuntimeException("No @Reader constructor found in %s matching the QueryResult columns. Check constructors arguments types with used ProviderInterface.".formatted(clazz.getSimpleName()), e);
 		}
 		
-		return VirtualPromise.supply(finalQuery::rows)
+		return VirtualPromise.supply(qr::rows)
 		                     .mapFork(Collection::stream, row -> {
 			                     try {
 				                     return constructor.newInstance(row.values().toArray());
@@ -272,7 +268,7 @@ public interface PersistenceInterface extends LoggingInterface {
 	
 	static <T, D extends T, R, A extends Annotation> R getFirstAnnotatedValueOrInvokeDefaultWithOptionalDummy(Class<T> clazz, Class<A> annotation, Class<R> returnType, @Nullable D optionalDummyType, Function<PersistenceInterface, R> invoker) {
 		try {
-			T instance = null;
+			T instance;
 			if (optionalDummyType != null) {
 				instance = optionalDummyType;
 			} else {
@@ -749,7 +745,7 @@ public interface PersistenceInterface extends LoggingInterface {
 		return Stream.of(PivotColumn.class, ValuesColumn.class)
 		             .collect(Collectors.toMap(
 				             a -> a,
-				             a -> Optional.ofNullable(Tools.getFirstAnnotatedValue(PivotColumn.class, ColumnInterface.class, clazz, null))
+				             a -> Optional.ofNullable(Tools.getFirstAnnotatedValue(a, ColumnInterface.class, clazz, null))
 				                          .orElseThrow(() -> new RuntimeException("Vertical Persistence: %s is missing PivotColumn or ValuesColumn annotation.".formatted(clazz.getSimpleName())))
 		             ));
 	}

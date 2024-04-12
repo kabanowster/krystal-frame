@@ -9,10 +9,7 @@ import lombok.val;
 import java.sql.ResultSet;
 import java.sql.ResultSetMetaData;
 import java.sql.SQLException;
-import java.util.LinkedHashMap;
-import java.util.LinkedList;
-import java.util.List;
-import java.util.Map;
+import java.util.*;
 
 /**
  * Parses and stores the ResultSet data.
@@ -22,7 +19,7 @@ import java.util.Map;
 public record QueryResult(List<Map<ColumnInterface, Object>> rows, Map<ColumnInterface, Class<?>> columns) implements QueryResultInterface, LoggingInterface {
 	
 	public QueryResult() {
-		this(new LinkedList<>(), new LinkedHashMap<>());
+		this(Collections.synchronizedList(new ArrayList<>()), Collections.synchronizedMap(new LinkedHashMap<>()));
 	}
 	
 	public QueryResult(ResultSet rs) {
@@ -46,7 +43,7 @@ public record QueryResult(List<Map<ColumnInterface, Object>> rows, Map<ColumnInt
 			
 			// Data
 			while (rs.next()) {
-				Map<ColumnInterface, Object> row = LinkedHashMap.newLinkedHashMap(columns.size());
+				Map<ColumnInterface, Object> row = Collections.synchronizedMap(LinkedHashMap.newLinkedHashMap(columns.size()));
 				// classic for-loop to catch exception
 				for (Map.Entry<ColumnInterface, Class<?>> entry : columns.entrySet()) {
 					val value = rs.getObject(entry.getKey().sqlName());
