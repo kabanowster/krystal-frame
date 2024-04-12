@@ -8,6 +8,7 @@ import lombok.val;
 
 import java.util.*;
 import java.util.Map.Entry;
+import java.util.stream.Collector;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
@@ -144,43 +145,43 @@ public interface QueryResultInterface {
 						      .map(ColumnInterface::of)
 				).collect(Collectors.toMap(
 						c -> c,
-						c -> String.class,
-						(a, b) -> a,
-						LinkedHashMap::new
+						c -> String.class
+						// (a, b) -> a,
+						// LinkedHashMap::new
 				));
 		
-		final List<Map<ColumnInterface, Object>> rows = rows().stream()
-		                                                      .collect(Collectors.groupingBy(
-				                                                      row -> row.entrySet().stream()
-				                                                                .filter(e -> groupBy.containsKey(e.getKey()))
-				                                                                .collect(Collectors.toMap(
-						                                                                Entry::getKey,
-						                                                                Entry::getValue,
-						                                                                (a, b) -> a,
-						                                                                LinkedHashMap::new
-				                                                                ))))
-		                                                      .entrySet().stream()
-		                                                      .map(e -> {
-			                                                      // each entry set is a new row
-			                                                      Map<ColumnInterface, Object> group = e.getKey();
-			                                                      // initialize values for all new columns
-			                                                      newColumns.forEach((c, t) -> group.put(c, null));
-			                                                      val newColumnsKeys = newColumns.keySet();
-			                                                      
-			                                                      e.getValue().forEach(
-					                                                      r -> {
-						                                                      val col = Optional.ofNullable(r.get(equalFieldsColumn)).map(Object::toString);
-						                                                      if (col.isEmpty()) return;
-						                                                      col.flatMap(c -> ColumnInterface.pickEqual(() -> c, newColumnsKeys))
-						                                                         .ifPresent(c -> group.put(
-								                                                         c,
-								                                                         Optional.ofNullable(r.get(equalValuesColumn)).map(Object::toString).orElse(null)
-						                                                         ));
-					                                                      }
-			                                                      );
-			                                                      return group;
-		                                                      })
-		                                                      .toList();
+		// initial grouping and un-pivot transformation
+		List<Map<ColumnInterface, Object>> rowsResult = new LinkedList<>();
+		val batchSize = 100000;
+		val size = rows().size();
+		for (int i = 0; i < size; i += batchSize) {
+			rowsResult.addAll(rows().subList(i, Math.min(i + batchSize, size))
+			                        .stream()
+			                        .collect(Collectors.groupingBy(
+					                        row -> row.entrySet().stream()
+					                                  .filter(e -> groupBy.containsKey(e.getKey()))
+					                                  .map(Entry::getValue)
+					                                  .toArray(),
+					                        Collector.of(
+							                        () -> new LinkedHashMap<ColumnInterface, Object>(groupBy.size() + newColumns.size()),
+							                        (group, r) -> {
+								                        // un-pivot each row
+								                        groupBy.forEach((c, t) -> group.put(c, r.get(c)));
+								                        newColumns.forEach((c, t) -> group.put(c, Optional.ofNullable(r.get(equalValuesColumn)).map(Object::toString).orElse(null)));
+							                        },
+							                        (a, b) -> {
+								                        // merge rows
+								                        a.forEach(b::putIfAbsent);
+								                        return b;
+							                        }
+					                        )))
+			                        .values());
+		}
+		
+		while (needsReducing(groupBy, rowsResult))
+			rowsResult = reduceGroupedRows(groupBy, rowsResult, 1000);
+		
+		val finalResult = rowsResult;
 		
 		// merge columns containers
 		groupBy.putAll(newColumns);
@@ -188,15 +189,43 @@ public interface QueryResultInterface {
 		return new QueryResultInterface() {
 			@Override
 			public List<Map<ColumnInterface, Object>> rows() {
-				return new LinkedList<>(rows);
+				return finalResult; // new LinkedList<>(rowsResult);
 			}
 			
 			@Override
 			public Map<ColumnInterface, Class<?>> columns() {
-				return new LinkedHashMap<>(groupBy);
+				return groupBy; // new LinkedHashMap<>(groupBy);
 			}
 		};
 		
+	}
+	
+	private List<Map<ColumnInterface, Object>> reduceGroupedRows(Map<ColumnInterface, Class<?>> groupBy, List<Map<ColumnInterface, Object>> rows, int batchSize) {
+		List<Map<ColumnInterface, Object>> result = new LinkedList<>();
+		val size = rows.size();
+		for (int i = 0; i < size; i += batchSize) {
+			result.addAll(
+					rows.subList(i, Math.min(i + batchSize, size)).stream()
+					    .collect(Collectors.groupingBy(
+							    row -> row.entrySet().stream()
+							              .filter(e -> groupBy.containsKey(e.getKey()))
+							              .map(Entry::getValue)
+							              .toArray(),
+							    Collector.of(
+									    LinkedHashMap<ColumnInterface, Object>::new,
+									    LinkedHashMap::putAll,
+									    (a, b) -> {
+										    a.forEach(b::putIfAbsent);
+										    return b;
+									    }
+							    )))
+					    .values());
+		}
+		return result;
+	}
+	
+	private boolean needsReducing(Map<ColumnInterface, Class<?>> groupBy, List<Map<ColumnInterface, Object>> rows) {
+		return rows.stream().map(r -> groupBy.keySet().stream().map(r::get)).distinct().count() == rows.size();
 	}
 	
 }
