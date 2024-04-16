@@ -293,7 +293,6 @@ public class KrystalFramework {
 	 */
 	
 	public void quit() {
-		// TODO first unlock flows
 		log.fatal("=== Clean Exit");
 		System.exit(0);
 	}
@@ -332,7 +331,8 @@ public class KrystalFramework {
 	public enum DefaultImplementation {
 		FlowControl(krystal.framework.core.flow.implementation.FlowControl.class),
 		QueryExecutor(krystal.framework.database.implementation.QueryExecutor.class),
-		BaseCommander(krystal.framework.commander.implementation.BaseCommander.class);
+		BaseCommander(krystal.framework.commander.implementation.BaseCommander.class),
+		ConnectionPool(krystal.framework.database.implementation.ConnectionPool.class);
 		
 		public final Class<?> implementation;
 		

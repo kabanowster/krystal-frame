@@ -13,6 +13,7 @@ import krystal.framework.tomcat.TomcatFactory;
 import lombok.NoArgsConstructor;
 import lombok.val;
 import org.apache.catalina.LifecycleException;
+import org.springframework.stereotype.Service;
 
 import java.util.Arrays;
 import java.util.List;
@@ -24,7 +25,7 @@ import java.util.stream.Collectors;
  *
  * @see CommanderInterface
  */
-//@Service
+@Service
 @NoArgsConstructor
 public class BaseCommander implements CommanderInterface {
 	
@@ -131,7 +132,7 @@ public class BaseCommander implements CommanderInterface {
 				return false;
 			}
 			case providers -> {
-				Optional.ofNullable(QueryExecutorInterface.getInstance()).ifPresent(q -> {
+				QueryExecutorInterface.getInstance().ifPresent(q -> {
 					logConsole(">>> Loaded DefaultProviders properties:\n%s".formatted(JSON.from(q.getConnectionProperties()).toString(4)));
 				});
 				return true;

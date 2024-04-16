@@ -63,9 +63,7 @@ public class ConsoleView implements LoggingInterface {
 		commandPrompt.setForeground(Color.lightGray);
 		commandPrompt.setCaretColor(Color.white);
 		commandPrompt.addActionListener((e) -> {
-			val executor = CommanderInterface.getInstance();
-			if (executor != null)
-				executor.parseCommand(commandPrompt.getText());
+			CommanderInterface.getInstance().ifPresent(ci -> ci.parseCommand(commandPrompt.getText()));
 			commandPrompt.setText(null);
 			commandPrompt.requestFocus();
 		});
@@ -111,7 +109,7 @@ public class ConsoleView implements LoggingInterface {
 		frame = new JFrame();
 		frame.setDefaultCloseOperation(WindowConstants.EXIT_ON_CLOSE);
 		frame.setSize(1350, 700);
-		frame.setTitle("Console View");
+		frame.setTitle("Krystal Frame: Console View");
 		frame.setLocationRelativeTo(null);
 		frame.setLayout(new BoxLayout(frame.getContentPane(), BoxLayout.Y_AXIS));
 		

@@ -4,6 +4,7 @@ import krystal.JSON;
 import krystal.Tools;
 import krystal.VirtualPromise;
 import krystal.framework.database.abstraction.*;
+import krystal.framework.database.implementation.DriverType;
 import krystal.framework.database.persistence.annotations.*;
 import krystal.framework.database.persistence.annotations.Vertical.PivotColumn;
 import krystal.framework.database.persistence.annotations.Vertical.UnpivotToColumns;
@@ -30,6 +31,8 @@ import java.util.stream.Stream;
 
 /**
  * TODO JDoc :)
+ *
+ * @see #streamAll(Class, QueryExecutorInterface, Function, Object)
  */
 @FunctionalInterface
 public interface PersistenceInterface extends LoggingInterface {
@@ -40,7 +43,7 @@ public interface PersistenceInterface extends LoggingInterface {
 	
 	/**
 	 * Get all persisted objects from the database of particular type. The class must declare empty (no arguments) constructor. Use {@link QueryExecutorInterface} for initial dependency injection. Use {@link WhereClause#persistenceFilter(Function)} for
-	 * filtering the {@link Loader loading} query.
+	 * filtering the {@link Loader loading} query. Utilises blocking {@link VirtualPromise} for fetching the data and parallel mapping of objects.
 	 *
 	 * @param optionalDummyType
 	 * 		If provided, will be taken as source for invoked methods in query construction. With, i.e. additional {@link Skip} fields as parameters, you can set up different conditional outputs
@@ -48,6 +51,8 @@ public interface PersistenceInterface extends LoggingInterface {
 	 * @see Loader @Loader
 	 * @see Reader @Reader
 	 * @see ReadOnly @ReadOnly
+	 * @see #promiseAll(Class, QueryExecutorInterface, Function, Object)
+	 * @see #fluxAll(Class, QueryExecutorInterface, Function, Object)
 	 */
 	static <T> Stream<T> streamAll(Class<T> clazz, QueryExecutorInterface queryExecutor, @Nullable Function<SelectStatement, WhereClause> filter, @Nullable T optionalDummyType) {
 		val query = getQuery(clazz, optionalDummyType);
@@ -62,7 +67,7 @@ public interface PersistenceInterface extends LoggingInterface {
 	 * @see #streamAll(Class, QueryExecutorInterface, Function, Object)
 	 */
 	static <T> Stream<T> streamAll(Class<T> clazz) {
-		return streamAll(clazz, QueryExecutorInterface.getInstance(), null, null);
+		return streamAll(clazz, QueryExecutorInterface.getInstance().orElseThrow(), null, null);
 	}
 	
 	/**
@@ -76,10 +81,12 @@ public interface PersistenceInterface extends LoggingInterface {
 	 * @see #streamAll(Class, QueryExecutorInterface, Function, Object)
 	 */
 	static <T> Stream<T> streamAll(Class<T> clazz, Function<SelectStatement, WhereClause> filter) {
-		return streamAll(clazz, QueryExecutorInterface.getInstance(), filter, null);
+		return streamAll(clazz, QueryExecutorInterface.getInstance().orElseThrow(), filter, null);
 	}
 	
 	/**
+	 * Returning {@link VirtualPromise} instead blocking.
+	 *
 	 * @see #streamAll(Class, QueryExecutorInterface, Function, Object)
 	 */
 	static <T> VirtualPromise<Stream<T>> promiseAll(Class<T> clazz, QueryExecutorInterface queryExecutor, @Nullable Function<SelectStatement, WhereClause> filter, @Nullable T optionalDummyType) {
@@ -93,7 +100,7 @@ public interface PersistenceInterface extends LoggingInterface {
 	 * @see #streamAll(Class, QueryExecutorInterface, Function, Object)
 	 */
 	static <T> VirtualPromise<Stream<T>> promiseAll(Class<T> clazz) {
-		return promiseAll(clazz, QueryExecutorInterface.getInstance(), null, null);
+		return promiseAll(clazz, QueryExecutorInterface.getInstance().orElseThrow(), null, null);
 	}
 	
 	/**
@@ -107,10 +114,12 @@ public interface PersistenceInterface extends LoggingInterface {
 	 * @see #streamAll(Class, QueryExecutorInterface, Function, Object)
 	 */
 	static <T> VirtualPromise<Stream<T>> promiseAll(Class<T> clazz, Function<SelectStatement, WhereClause> filter) {
-		return promiseAll(clazz, QueryExecutorInterface.getInstance(), filter, null);
+		return promiseAll(clazz, QueryExecutorInterface.getInstance().orElseThrow(), filter, null);
 	}
 	
 	/**
+	 * Performs fetch through {@link CompletableFuture}, mapping through {@link VirtualPromise} (blocking parallel virtual), returning {@link CompletableFuture}.
+	 *
 	 * @see #streamAll(Class, QueryExecutorInterface, Function, Object)
 	 */
 	static <T> CompletableFuture<Stream<T>> futureAll(Class<T> clazz, QueryExecutorInterface queryExecutor, @Nullable Function<SelectStatement, WhereClause> filter, @Nullable T optionalDummyType) {
@@ -124,7 +133,7 @@ public interface PersistenceInterface extends LoggingInterface {
 	 * @see #streamAll(Class, QueryExecutorInterface, Function, Object)
 	 */
 	static <T> CompletableFuture<Stream<T>> futureAll(Class<T> clazz) {
-		return futureAll(clazz, QueryExecutorInterface.getInstance(), null, null);
+		return futureAll(clazz, QueryExecutorInterface.getInstance().orElseThrow(), null, null);
 	}
 	
 	/**
@@ -138,10 +147,12 @@ public interface PersistenceInterface extends LoggingInterface {
 	 * @see #streamAll(Class, QueryExecutorInterface, Function, Object)
 	 */
 	static <T> CompletableFuture<Stream<T>> futureAll(Class<T> clazz, Function<SelectStatement, WhereClause> filter) {
-		return futureAll(clazz, QueryExecutorInterface.getInstance(), filter, null);
+		return futureAll(clazz, QueryExecutorInterface.getInstance().orElseThrow(), filter, null);
 	}
 	
 	/**
+	 * Uses {@link Flux} data fetch (can be used with {@link DriverType R2DBC} {@link DBCDriverInterface driver} {@link ProviderInterface}) and wraps around {@link VirtualPromise} blocking parallel virtual object mapping.
+	 *
 	 * @see #streamAll(Class, QueryExecutorInterface, Function, Object)
 	 */
 	@Deprecated
@@ -159,7 +170,7 @@ public interface PersistenceInterface extends LoggingInterface {
 	 */
 	@Deprecated
 	static <T> Flux<T> fluxAll(Class<T> clazz) {
-		return fluxAll(clazz, QueryExecutorInterface.getInstance(), null, null);
+		return fluxAll(clazz, QueryExecutorInterface.getInstance().orElseThrow(), null, null);
 	}
 	
 	/**
@@ -175,7 +186,7 @@ public interface PersistenceInterface extends LoggingInterface {
 	 */
 	@Deprecated
 	static <T> Flux<T> fluxAll(Class<T> clazz, Function<SelectStatement, WhereClause> filter) {
-		return fluxAll(clazz, QueryExecutorInterface.getInstance(), filter, null);
+		return fluxAll(clazz, QueryExecutorInterface.getInstance().orElseThrow(), filter, null);
 	}
 	
 	/**
@@ -531,7 +542,7 @@ public interface PersistenceInterface extends LoggingInterface {
 						this::copyFrom,
 						() -> {
 							log().trace(String.format("  ! No record found for persistence to load. Creating new %s.class persisted object.", getClass().getSimpleName()));
-							insertAndConsumeSelf(table, fieldsColumns, fieldsValues);
+							insertAndConsume(table, fieldsColumns, fieldsValues);
 						}
 				);
 	}
@@ -542,7 +553,7 @@ public interface PersistenceInterface extends LoggingInterface {
 	private void save(TableInterface table, ColumnsPairingInterface[] keysPairs, Map<Field, ColumnInterface> fieldsColumns, Map<Field, Object> fieldsValues) {
 		if (getClass().isAnnotationPresent(Vertical.class)) {
 			delete(table, keysPairs);
-			insertAndConsumeSelf(table, fieldsColumns, fieldsValues);
+			insertAndConsume(table, fieldsColumns, fieldsValues);
 		} else {
 			load(table, keysPairs, fieldsColumns)
 					.ifPresentOrElse(
@@ -561,7 +572,7 @@ public interface PersistenceInterface extends LoggingInterface {
 									throw new RuntimeException(e);
 								}
 							},
-							() -> insertAndConsumeSelf(table, fieldsColumns, fieldsValues)
+							() -> insertAndConsume(table, fieldsColumns, fieldsValues)
 					);
 		}
 	}
@@ -579,7 +590,7 @@ public interface PersistenceInterface extends LoggingInterface {
 		if (keysHaveNoValues(true, keys, fieldsValues))
 			throw new RuntimeException(String.format("Obligatory keys have no values. Aborting creation of %s.class.", getClass().getSimpleName()));
 		
-		insertAndConsumeSelf(table, fieldsColumns, fieldsValues);
+		insertAndConsume(table, fieldsColumns, fieldsValues);
 	}
 	
 	/**
@@ -604,7 +615,7 @@ public interface PersistenceInterface extends LoggingInterface {
 	/**
 	 * Create persistence record and consume it.
 	 */
-	private void insertAndConsumeSelf(TableInterface table, Map<Field, ColumnInterface> fieldsColumns, Map<Field, Object> fieldsValues) {
+	private void insertAndConsume(TableInterface table, Map<Field, ColumnInterface> fieldsColumns, Map<Field, Object> fieldsValues) {
 		List<Map<ColumnInterface, Object>> values = columnsToValues(fieldsColumns, fieldsValues);
 		
 		val insert = table.insert()

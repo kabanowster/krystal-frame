@@ -6,6 +6,7 @@ import krystal.framework.logging.LoggingWrapper;
 import org.springframework.beans.factory.NoSuchBeanDefinitionException;
 
 import java.util.Map;
+import java.util.Optional;
 import java.util.concurrent.Phaser;
 import java.util.concurrent.ScheduledExecutorService;
 
@@ -15,14 +16,14 @@ public interface FlowControlInterface extends LoggingInterface {
 	
 	ScheduledExecutorService getScheduledExecutor();
 	
-	static FlowControlInterface getInstance() {
+	static Optional<FlowControlInterface> getInstance() {
 		try {
-			return KrystalFramework.getSpringContext().getBean(FlowControlInterface.class);
+			return Optional.of(KrystalFramework.getSpringContext().getBean(FlowControlInterface.class));
 		} catch (NullPointerException e) {
-			return null;
+			return Optional.empty();
 		} catch (NoSuchBeanDefinitionException e) {
 			LoggingWrapper.ROOT_LOGGER.fatal(e.getMessage());
-			return null;
+			return Optional.empty();
 		}
 	}
 	

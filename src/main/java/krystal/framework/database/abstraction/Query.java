@@ -120,7 +120,7 @@ public abstract class Query implements LoggingInterface {
 	}
 	
 	public CompletableFuture<QueryResultInterface> future() {
-		return future(QueryExecutorInterface.getInstance());
+		return future(QueryExecutorInterface.getInstance().orElseThrow());
 	}
 	
 	public CompletableFuture<QueryResultInterface> future(QueryExecutorInterface executor) {
@@ -129,7 +129,7 @@ public abstract class Query implements LoggingInterface {
 	}
 	
 	public VirtualPromise<QueryResultInterface> promise() {
-		return promise(QueryExecutorInterface.getInstance());
+		return promise(QueryExecutorInterface.getInstance().orElseThrow());
 	}
 	
 	public VirtualPromise<QueryResultInterface> promise(QueryExecutorInterface executor) {
@@ -139,7 +139,7 @@ public abstract class Query implements LoggingInterface {
 	
 	@Deprecated
 	public Mono<QueryResultInterface> mono() {
-		return mono(QueryExecutorInterface.getInstance());
+		return mono(QueryExecutorInterface.getInstance().orElseThrow());
 	}
 	
 	@Deprecated

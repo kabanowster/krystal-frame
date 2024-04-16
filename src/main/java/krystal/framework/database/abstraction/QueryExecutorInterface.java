@@ -27,22 +27,16 @@ import java.util.stream.Stream;
  */
 public interface QueryExecutorInterface extends LoggingInterface {
 	
-	static QueryExecutorInterface getInstance() {
+	static Optional<QueryExecutorInterface> getInstance() {
 		try {
-			return KrystalFramework.getSpringContext().getBean(QueryExecutorInterface.class);
+			return Optional.of(KrystalFramework.getSpringContext().getBean(QueryExecutorInterface.class));
 		} catch (NullPointerException e) {
-			return null;
+			return Optional.empty();
 		} catch (NoSuchBeanDefinitionException e) {
 			LoggingWrapper.ROOT_LOGGER.fatal(e.getMessage());
-			return null;
+			return Optional.empty();
 		}
 	}
-	
-	// default ProviderInterface getDefaultProvider() {
-	// 	return PropertiesAndArguments.provider.value().map(p -> (ProviderInterface) DefaultProviders.valueOf((String) p))
-	// 	                                      .or(() -> Optional.ofNullable(KrystalFramework.getDefaultProvider()))
-	// 	                                      .orElse(DefaultProviders.sqlserver);
-	// }
 	
 	/**
 	 * Set of properties applied to the connection, including user and password, loaded from <i>provider.properties</i>.
@@ -74,17 +68,20 @@ public interface QueryExecutorInterface extends LoggingInterface {
 							props.load(path.openStream());
 							connectionProperties.put(provider, props);
 							
-							// TODO throw if mandatory missing?
-							connectionStrings.put(provider, provider.dbcDriver().getConnectionStringBase() + props
-									                                                                                 .entrySet()
-									                                                                                 .stream()
-									                                                                                 .filter(e -> Stream.of(MandatoryProperties.values()).map(Enum::toString).anyMatch(m -> m.equals(e.getKey().toString())))
-									                                                                                 .sorted((e1, e2) -> e2.getKey().toString().compareTo(e1.getKey().toString()))
-									                                                                                 .map(e -> e.getValue().toString())
-									                                                                                 .collect(Collectors.joining("/")));
+							val mandatories = Stream.of(MandatoryProperties.values())
+							                        .map(Enum::name)
+							                        .map(props::get)
+							                        .filter(Objects::nonNull)
+							                        .map(Objects::toString)
+							                        .toList();
+							
+							if (mandatories.size() != MandatoryProperties.values().length)
+								throw new IllegalArgumentException("Mandatory provider properties not found.");
+							
+							connectionStrings.put(provider, provider.dbcDriver().getConnectionStringBase() + String.join("/", mandatories));
 							
 						} catch (IOException | IllegalArgumentException ex) {
-							log().fatal(String.format("!!! Exception while loading '%s' provider properties file at '%s'. Skipping.", provider, path.getPath()));
+							log().fatal(String.format("!!! Exception while loading '%s' provider properties file at '%s'. Skipping. %s", provider.name(), path.getPath(), ex.getMessage()));
 						}
 					}
 			);
@@ -267,8 +264,15 @@ public interface QueryExecutorInterface extends LoggingInterface {
 	 */
 	
 	private Connection connectToJDBCProvider(ProviderInterface provider) throws SQLException {
-		// TODO keep opened connection pool?
-		return DriverManager.getConnection(getConnectionStrings().get(provider), getConnectionProperties().get(provider));
+		return ConnectionPoolInterface.getInstance()
+		                              .map(c -> {
+			                              try {
+				                              return c.getJDBCConnection(provider);
+			                              } catch (SQLException e) {
+				                              throw new RuntimeException(e);
+			                              }
+		                              })
+		                              .orElse(DriverManager.getConnection(getConnectionStrings().get(provider), getConnectionProperties().get(provider)));
 	}
 	
 	@Deprecated

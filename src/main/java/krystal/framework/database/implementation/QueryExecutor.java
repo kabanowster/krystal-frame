@@ -4,13 +4,14 @@ import krystal.framework.KrystalFramework;
 import krystal.framework.database.abstraction.ProviderInterface;
 import krystal.framework.database.abstraction.QueryExecutorInterface;
 import lombok.Getter;
+import org.springframework.stereotype.Service;
 
 import java.util.*;
 
 /**
  * Basic settings and operations on databases
  */
-//@Service
+@Service
 @Getter
 public final class QueryExecutor implements QueryExecutorInterface {
 	
@@ -29,7 +30,7 @@ public final class QueryExecutor implements QueryExecutorInterface {
 	 * Static overload for {@link QueryExecutorInterface#loadProviders(List)}.
 	 */
 	public static void loadProviders(ProviderInterface... providers) {
-		Objects.requireNonNull(QueryExecutorInterface.getInstance()).loadProviders(Arrays.asList(providers));
+		QueryExecutorInterface.getInstance().orElseThrow().loadProviders(Arrays.asList(providers));
 	}
 	
 }

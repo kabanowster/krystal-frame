@@ -13,7 +13,6 @@ import reactor.core.publisher.Flux;
 import javax.annotation.Nullable;
 import java.util.List;
 import java.util.Map;
-import java.util.Objects;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutionException;
 import java.util.stream.Collectors;
@@ -27,7 +26,7 @@ public class Batch implements LoggingInterface {
 	
 	@Deprecated
 	public Flux<QueryResultInterface> flux() {
-		return flux(Objects.requireNonNull(QueryExecutorInterface.getInstance()));
+		return flux(QueryExecutorInterface.getInstance().orElseThrow());
 	}
 	
 	@Deprecated
@@ -37,7 +36,7 @@ public class Batch implements LoggingInterface {
 	}
 	
 	public VirtualPromise<Stream<QueryResultInterface>> promise() {
-		return promise(QueryExecutorInterface.getInstance());
+		return promise(QueryExecutorInterface.getInstance().orElseThrow());
 	}
 	
 	public VirtualPromise<Stream<QueryResultInterface>> promise(QueryExecutorInterface queryExecutor) {
@@ -46,7 +45,7 @@ public class Batch implements LoggingInterface {
 	}
 	
 	public CompletableFuture<Stream<QueryResultInterface>> future() {
-		return future(QueryExecutorInterface.getInstance());
+		return future(QueryExecutorInterface.getInstance().orElseThrow());
 	}
 	
 	public CompletableFuture<Stream<QueryResultInterface>> future(QueryExecutorInterface queryExecutor) {

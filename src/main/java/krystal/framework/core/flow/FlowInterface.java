@@ -12,7 +12,7 @@ public interface FlowInterface {
 	String name();
 	
 	private FlowControlInterface flowController() {
-		return FlowControlInterface.getInstance();
+		return FlowControlInterface.getInstance().orElseThrow();
 	}
 	
 	private Phaser controller() {

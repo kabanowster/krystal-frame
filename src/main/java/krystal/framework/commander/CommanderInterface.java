@@ -20,14 +20,14 @@ import java.util.stream.Stream;
  */
 public interface CommanderInterface extends LoggingInterface {
 	
-	static CommanderInterface getInstance() {
+	static Optional<CommanderInterface> getInstance() {
 		try {
-			return KrystalFramework.getSpringContext().getBean(CommanderInterface.class);
+			return Optional.of(KrystalFramework.getSpringContext().getBean(CommanderInterface.class));
 		} catch (NullPointerException e) {
-			return null;
+			return Optional.empty();
 		} catch (NoSuchBeanDefinitionException e) {
 			LoggingWrapper.ROOT_LOGGER.fatal(e.getMessage());
-			return null;
+			return Optional.empty();
 		}
 	}
 	
