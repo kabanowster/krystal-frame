@@ -327,6 +327,7 @@ public class KrystalFramework {
 	 * @see krystal.framework.database.abstraction.QueryExecutorInterface QueryExecutorInterface
 	 * @see krystal.framework.core.flow.FlowControlInterface FlowControlInterface
 	 * @see krystal.framework.commander.CommanderInterface CommanderInterface
+	 * @see krystal.framework.database.abstraction.ConnectionPoolInterface ConnectionPoolInterface
 	 */
 	public enum DefaultImplementation {
 		FlowControl(krystal.framework.core.flow.implementation.FlowControl.class),

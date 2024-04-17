@@ -10,7 +10,6 @@ import krystal.framework.core.PropertiesInterface;
 import krystal.framework.database.abstraction.QueryExecutorInterface;
 import krystal.framework.logging.LoggingWrapper;
 import krystal.framework.tomcat.TomcatFactory;
-import lombok.NoArgsConstructor;
 import lombok.val;
 import org.apache.catalina.LifecycleException;
 import org.springframework.stereotype.Service;
@@ -26,7 +25,6 @@ import java.util.stream.Collectors;
  * @see CommanderInterface
  */
 @Service
-@NoArgsConstructor
 public class BaseCommander implements CommanderInterface {
 	
 	@Override
@@ -36,7 +34,6 @@ public class BaseCommander implements CommanderInterface {
 		try {
 			acceptedCommand = BaseCommands.valueOf(command.name());
 		} catch (IllegalArgumentException e) {
-			log().fatal("  ! Command unidentified.");
 			return false;
 		}
 		

@@ -43,7 +43,7 @@ public class ConnectionPool implements ConnectionPoolInterface, LoggingInterface
 	}
 	
 	private HikariDataSource createPool(ProviderInterface provider) {
-		log().trace("    Creating new pool for {}...", provider.toString());
+		log().trace("    Creating new pool for {}...", provider.name());
 		
 		val config = new HikariConfig();
 		config.setJdbcUrl(queryExecutor.getConnectionStrings().get(provider));
