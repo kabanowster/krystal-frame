@@ -30,6 +30,8 @@ public class BaseCommander implements CommanderInterface {
 	@Override
 	public boolean executeCommand(CommandInterface command, List<String> arguments) {
 		
+		logConsole(">>>>%s %s".formatted(command.name(), String.join(" ", arguments)));
+		
 		BaseCommands acceptedCommand;
 		try {
 			acceptedCommand = BaseCommands.valueOf(command.name());

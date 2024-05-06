@@ -28,7 +28,7 @@ public class ConnectionPool implements ConnectionPoolInterface, LoggingInterface
 	
 	ConnectionPool(QueryExecutorInterface queryExecutor) {
 		this.queryExecutor = queryExecutor;
-		log().fatal("*** Building Connection Pool...");
+		log().debug("*** Building Connection Pool.");
 		pools = Collections.synchronizedMap(new HashMap<>());
 		
 		queryExecutor.getConnectionStrings().keySet().stream()

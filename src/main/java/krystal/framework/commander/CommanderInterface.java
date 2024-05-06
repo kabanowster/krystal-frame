@@ -4,9 +4,11 @@ import com.google.common.io.Files;
 import krystal.framework.KrystalFramework;
 import krystal.framework.logging.LoggingInterface;
 import krystal.framework.logging.LoggingWrapper;
+import lombok.NonNull;
 import lombok.val;
 import org.springframework.beans.factory.NoSuchBeanDefinitionException;
 
+import javax.annotation.Nullable;
 import java.io.File;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
@@ -77,7 +79,8 @@ public interface CommanderInterface extends LoggingInterface {
 	/**
 	 * Checks if argument fits the valid pattern, and if it's name is one of the variants.
 	 */
-	default boolean argumentMatches(String argument, String... variants) {
+	default boolean argumentMatches(@Nullable String argument, String... variants) {
+		if (argument == null) return false;
 		val regex = "^(%s)([\\s=]\\w[\\w\\W]*?)?$".formatted(String.join("|", variants));
 		return argument.matches(regex);
 	}
@@ -85,7 +88,7 @@ public interface CommanderInterface extends LoggingInterface {
 	/**
 	 * Gets the value of the argument, issued with either " " or "=".
 	 */
-	default String getArgumetnValue(String argument) {
+	default String getArgumetnValue(@NonNull String argument) {
 		return argument.split("[\\s=]", 2)[1].strip().transform(s -> s.isEmpty() ? null : s);
 	}
 	
