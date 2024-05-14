@@ -14,7 +14,6 @@ import javax.annotation.Nullable;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.CompletableFuture;
-import java.util.concurrent.ExecutionException;
 import java.util.stream.Collectors;
 import java.util.stream.IntStream;
 import java.util.stream.Stream;
@@ -70,18 +69,12 @@ public class Batch implements LoggingInterface {
 		}
 		
 		return promise().map(s -> s.toArray(QueryResultInterface[]::new))
-		                .join()
+		                .joinThrow()
 		                .map(qrs -> IntStream.range(0, clazzes.length)
 		                                     .boxed()
 		                                     .collect(Collectors.toMap(
 				                                     i -> clazzes[i],
-				                                     i -> {
-					                                     try {
-						                                     return qrs[i].toStreamOf(clazzes[i]).joinExceptionally().orElseGet(Stream::empty).toList();
-					                                     } catch (ExecutionException e) {
-						                                     throw new RuntimeException(e);
-					                                     }
-				                                     }
+				                                     i -> qrs[i].toStreamOf(clazzes[i]).joinThrow().orElseGet(Stream::empty).toList()
 		                                     )))
 		                .orElse(null);
 		

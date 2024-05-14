@@ -24,7 +24,6 @@ import java.lang.reflect.InvocationTargetException;
 import java.util.*;
 import java.util.Map.Entry;
 import java.util.concurrent.CompletableFuture;
-import java.util.concurrent.ExecutionException;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
@@ -126,7 +125,7 @@ public interface PersistenceInterface extends LoggingInterface {
 		val query = getQuery(clazz, optionalDummyType);
 		return (filter == null ? query : filter.apply(query))
 				       .future(queryExecutor)
-				       .thenApply(qr -> qr.toStreamOf(clazz).join().orElse(Stream.empty()));
+				       .thenApply(qr -> qr.toStreamOf(clazz).joinThrow().orElse(Stream.empty()));
 	}
 	
 	/**
@@ -161,7 +160,7 @@ public interface PersistenceInterface extends LoggingInterface {
 		
 		return (filter == null ? query : filter.apply(query))
 				       .mono(queryExecutor)
-				       .map(qr -> qr.toStreamOf(clazz).join().orElse(Stream.empty()))
+				       .map(qr -> qr.toStreamOf(clazz).joinThrow().orElse(Stream.empty()))
 				       .flatMapMany(Flux::fromStream);
 	}
 	
@@ -220,7 +219,7 @@ public interface PersistenceInterface extends LoggingInterface {
 		}
 		
 		return VirtualPromise.supply(qr::rows)
-		                     .mapFork(Collection::stream, row -> {
+		                     .mapFork(List::stream, row -> {
 			                     try {
 				                     return constructor.newInstance(row.values().toArray());
 			                     } catch (InstantiationException | IllegalAccessException | InvocationTargetException e) {
@@ -523,14 +522,10 @@ public interface PersistenceInterface extends LoggingInterface {
 			
 			query = table.select(queryColumns);
 		}
-		try {
-			return query.where(keysPairs).setProvider(getProvider()).promise()
-			            .compose(qr -> qr.toStreamOf(getClass()))
-			            .joinExceptionally()
-			            .flatMap(Stream::findFirst);
-		} catch (ExecutionException e) {
-			throw new RuntimeException(e);
-		}
+		return query.where(keysPairs).setProvider(getProvider()).promise()
+		            .compose(qr -> qr.toStreamOf(getClass()))
+		            .joinThrow()
+		            .flatMap(Stream::findFirst);
 	}
 	
 	/**
@@ -558,19 +553,15 @@ public interface PersistenceInterface extends LoggingInterface {
 			load(table, keysPairs, fieldsColumns)
 					.ifPresentOrElse(
 							l -> {
-								try {
-									table.update(fieldsValues.entrySet().stream()
-									                         .filter(e -> !e.getKey().isAnnotationPresent(Key.class))
-									                         .map(e -> ColumnSetPair.of(fieldsColumns.get(e.getKey()), e.getValue()))
-									                         .toArray(ColumnSetPair[]::new))
-									     .where(keysPairs)
-									     .setProvider(getProvider())
-									     .promise()
-									     .thenRun(() -> log().trace("    Record updated."))
-									     .joinExceptionally();
-								} catch (ExecutionException e) {
-									throw new RuntimeException(e);
-								}
+								table.update(fieldsValues.entrySet().stream()
+								                         .filter(e -> !e.getKey().isAnnotationPresent(Key.class))
+								                         .map(e -> ColumnSetPair.of(fieldsColumns.get(e.getKey()), e.getValue()))
+								                         .toArray(ColumnSetPair[]::new))
+								     .where(keysPairs)
+								     .setProvider(getProvider())
+								     .promise()
+								     .thenRun(() -> log().trace("    Record updated."))
+								     .joinThrow();
 							},
 							() -> insertAndConsume(table, fieldsColumns, fieldsValues)
 					);
@@ -623,16 +614,12 @@ public interface PersistenceInterface extends LoggingInterface {
 		
 		values.forEach(v -> insert.values(v.values().toArray()));
 		
-		try {
-			insert.setProvider(getProvider())
-			      .promise()
-			      .compose(qr -> qr.toStreamOf(getClass()))
-			      .joinExceptionally()
-			      .flatMap(Stream::findFirst)
-			      .ifPresent(this::copyFrom);
-		} catch (ExecutionException e) {
-			throw new RuntimeException(e);
-		}
+		insert.setProvider(getProvider())
+		      .promise()
+		      .compose(qr -> qr.toStreamOf(getClass()))
+		      .joinThrow()
+		      .flatMap(Stream::findFirst)
+		      .ifPresent(this::copyFrom);
 	}
 	
 	private List<Map<ColumnInterface, Object>> columnsToValues(Map<Field, ColumnInterface> fieldsColumns, Map<Field, Object> fieldsValues) {
