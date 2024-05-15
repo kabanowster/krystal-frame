@@ -41,7 +41,7 @@ public class ConnectionPool implements ConnectionPoolInterface, LoggingInterface
 	/**
 	 * Default lifetime for a connection as defined in {@link HikariDataSource#getMaxLifetime()}.
 	 */
-	private static @Getter @Setter Duration defaultConnectionLifeTime;
+	private static @Getter @Setter Duration defaultConnectionKeepAlive;
 	
 	ConnectionPool(QueryExecutorInterface queryExecutor) {
 		this.queryExecutor = queryExecutor;
@@ -68,7 +68,7 @@ public class ConnectionPool implements ConnectionPoolInterface, LoggingInterface
 		
 		config.setMaximumPoolSize(Optional.ofNullable(maximumPoolSizes.get(provider)).orElse(defaultMaximumPoolSize));
 		config.setPoolName(provider.name() + " connection pool");
-		Optional.ofNullable(defaultConnectionLifeTime).ifPresent(duration -> config.setMaxLifetime(duration.toMillis()));
+		Optional.ofNullable(defaultConnectionKeepAlive).ifPresent(duration -> config.setKeepaliveTime(duration.toMillis()));
 		
 		val dataSource = new HikariDataSource(config);
 		pools.put(provider, dataSource);
