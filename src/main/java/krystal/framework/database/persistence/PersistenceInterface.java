@@ -79,7 +79,7 @@ public interface PersistenceInterface extends LoggingInterface {
 	/**
 	 * @see #streamAll(Class, QueryExecutorInterface, Function, Object)
 	 */
-	static <T> Stream<T> streamAll(Class<T> clazz, Function<SelectStatement, WhereClause> filter) {
+	static <T> Stream<T> streamAll(Class<T> clazz, @Nullable Function<SelectStatement, WhereClause> filter) {
 		return streamAll(clazz, QueryExecutorInterface.getInstance().orElseThrow(), filter, null);
 	}
 	
@@ -112,7 +112,7 @@ public interface PersistenceInterface extends LoggingInterface {
 	/**
 	 * @see #streamAll(Class, QueryExecutorInterface, Function, Object)
 	 */
-	static <T> VirtualPromise<Stream<T>> promiseAll(Class<T> clazz, Function<SelectStatement, WhereClause> filter) {
+	static <T> VirtualPromise<Stream<T>> promiseAll(Class<T> clazz, @Nullable Function<SelectStatement, WhereClause> filter) {
 		return promiseAll(clazz, QueryExecutorInterface.getInstance().orElseThrow(), filter, null);
 	}
 	
@@ -145,7 +145,7 @@ public interface PersistenceInterface extends LoggingInterface {
 	/**
 	 * @see #streamAll(Class, QueryExecutorInterface, Function, Object)
 	 */
-	static <T> CompletableFuture<Stream<T>> futureAll(Class<T> clazz, Function<SelectStatement, WhereClause> filter) {
+	static <T> CompletableFuture<Stream<T>> futureAll(Class<T> clazz, @Nullable Function<SelectStatement, WhereClause> filter) {
 		return futureAll(clazz, QueryExecutorInterface.getInstance().orElseThrow(), filter, null);
 	}
 	
@@ -184,7 +184,7 @@ public interface PersistenceInterface extends LoggingInterface {
 	 * @see #streamAll(Class, QueryExecutorInterface, Function, Object)
 	 */
 	@Deprecated
-	static <T> Flux<T> fluxAll(Class<T> clazz, Function<SelectStatement, WhereClause> filter) {
+	static <T> Flux<T> fluxAll(Class<T> clazz, @Nullable Function<SelectStatement, WhereClause> filter) {
 		return fluxAll(clazz, QueryExecutorInterface.getInstance().orElseThrow(), filter, null);
 	}
 	
@@ -246,7 +246,7 @@ public interface PersistenceInterface extends LoggingInterface {
 	 *
 	 * @see Provider @Provider
 	 */
-	static <T, D extends T> @Nullable ProviderInterface getProvider(Class<T> clazz, @Nullable D optionalDummyType) {
+	static <T extends PersistenceInterface, D extends T> @Nullable ProviderInterface getProvider(Class<T> clazz, @Nullable D optionalDummyType) {
 		return getFirstAnnotatedValueOrInvokeDefaultWithOptionalDummy(clazz, Provider.class, ProviderInterface.class, optionalDummyType, PersistenceInterface::getProvider);
 	}
 	
@@ -262,9 +262,33 @@ public interface PersistenceInterface extends LoggingInterface {
 	 *
 	 * @see Loader @Loader
 	 */
-	static <T, D extends T> SelectStatement getQuery(Class<T> clazz, @Nullable D optionalDummyType) {
-		return Optional.ofNullable(getFirstAnnotatedValueOrInvokeDefaultWithOptionalDummy(clazz, Loader.class, SelectStatement.class, optionalDummyType, p -> p.getTable().select()))
-		               .orElseThrow();
+	static <T> SelectStatement getQuery(Class<? extends T> clazz, @Nullable T optionalDummyType) {
+		
+		try {
+			T instance;
+			if (optionalDummyType != null) {
+				instance = optionalDummyType;
+			} else {
+				Constructor<? extends T> emptyConstructor = clazz.getDeclaredConstructor();
+				instance = emptyConstructor.newInstance();
+			}
+			
+			return Optional.ofNullable(Tools.getFirstAnnotatedValue(Loader.class, SelectStatement.class, instance))
+			               .orElseGet(() -> {
+				               if (PersistenceInterface.class.isAssignableFrom(clazz)) {
+					               val obj = (PersistenceInterface) instance;
+					               return Arrays.stream(clazz.getDeclaredClasses())
+					                            .filter(c -> c.isAnnotationPresent(Loader.class) && ColumnInterface.class.isAssignableFrom(c) && Enum.class.isAssignableFrom(c))
+					                            .findFirst()
+					                            .map(c -> obj.getTable().select((ColumnInterface[]) c.getEnumConstants()))
+					                            .orElseGet(() -> obj.getTable().select());
+				               } else {
+					               throw new RuntimeException("Class %s is not a PersistenceInterface nor declares single @Loader SelectStatement returning method.");
+				               }
+			               });
+		} catch (InvocationTargetException | InstantiationException | IllegalAccessException | NoSuchMethodException e) {
+			throw new RuntimeException("Class %s requires no args constructor, to perform annotated parameters loading.".formatted(clazz.getSimpleName()));
+		}
 	}
 	
 	/**
@@ -273,10 +297,11 @@ public interface PersistenceInterface extends LoggingInterface {
 	 * @see #getQuery(Class, Object)
 	 */
 	default @Nullable SelectStatement getQuery() {
-		return Tools.getFirstAnnotatedValue(Loader.class, SelectStatement.class, this);
+		return PersistenceInterface.getQuery(getClass(), this);
 	}
 	
-	static <T, D extends T, R, A extends Annotation> R getFirstAnnotatedValueOrInvokeDefaultWithOptionalDummy(Class<T> clazz, Class<A> annotation, Class<R> returnType, @Nullable D optionalDummyType, Function<PersistenceInterface, R> invoker) {
+	static <T extends PersistenceInterface, D extends T, R, A extends Annotation> R getFirstAnnotatedValueOrInvokeDefaultWithOptionalDummy(Class<T> clazz, Class<A> annotation, Class<R> returnType, @Nullable D optionalDummyType,
+	                                                                                                                                       Function<PersistenceInterface, R> invoker) {
 		try {
 			T instance;
 			if (optionalDummyType != null) {
@@ -288,7 +313,7 @@ public interface PersistenceInterface extends LoggingInterface {
 			var result = Tools.getFirstAnnotatedValue(annotation, returnType, instance);
 			if (result == null) {
 				if (PersistenceInterface.class.isAssignableFrom(clazz)) {
-					result = invoker.apply((PersistenceInterface) instance);
+					result = invoker.apply(instance);
 				} else {
 					throw new RuntimeException("Class %s is not a PersistenceInterface.".formatted(clazz.getSimpleName()));
 				}
@@ -300,13 +325,19 @@ public interface PersistenceInterface extends LoggingInterface {
 	}
 	
 	/**
-	 * Mappings of fields names and corresponding columns in database, if other than plain names.
+	 * Mappings of fields names and corresponding {@link ColumnInterface columns} in database, if other than plain names.
 	 *
 	 * @see ColumnsMap
 	 * @see ColumnsMapping @ColumnsMapping
 	 */
-	default ColumnsMap getFieldsToColumnsMap() {
-		return Tools.getFirstAnnotatedValue(ColumnsMapping.class, ColumnsMap.class, this);
+	@SuppressWarnings("unchecked")
+	default <E extends Enum<?> & ColumnInterface> ColumnsMap getFieldsToColumnsMap() {
+		val clazz = getClass();
+		return Arrays.stream(clazz.getDeclaredClasses())
+		             .filter(c -> c.isAnnotationPresent(ColumnsMapping.class) && ColumnInterface.class.isAssignableFrom(c) && Enum.class.isAssignableFrom(c))
+		             .findFirst()
+		             .map(c -> ColumnsMap.fromColumnInterfaceEnum(clazz, (Class<E>) c))
+		             .orElseGet(() -> Tools.getFirstAnnotatedValue(ColumnsMapping.class, ColumnsMap.class, this));
 	}
 	
 	/*
@@ -691,15 +722,6 @@ public interface PersistenceInterface extends LoggingInterface {
 	 */
 	default Field fld(String fieldName) {
 		return Arrays.stream(getClass().getDeclaredFields()).filter(f -> f.getName().equals(fieldName)).findFirst().orElseThrow();
-	}
-	
-	/**
-	 * Type in the format, that will be issued for each field name in a class (using <i>String.format()</i>). Use as return with {@link #getFieldsColumns()}. I.e. <b><i>this.formatAll("[%s]")</i></b> will format all fields as "<i>[fieldName]</i>"
-	 */
-	default ColumnsMap formatAll(String format) {
-		val map = ColumnsMap.define();
-		Arrays.stream(getClass().getDeclaredFields()).forEach(f -> map.column(f, () -> format.formatted(f.getName())));
-		return map.set();
 	}
 	
 	/**

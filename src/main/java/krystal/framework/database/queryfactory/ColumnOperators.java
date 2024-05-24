@@ -8,7 +8,8 @@ public enum ColumnOperators {
 	MoreEqual(">=", null),
 	LessEqual("<=", null),
 	Equal("=", null),
-	notEqual("=", "NOT ");
+	notEqual("=", "NOT "),
+	Between("BETWEEN", null);
 	
 	public final String face;
 	public final String prefix;

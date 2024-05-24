@@ -19,17 +19,17 @@ public record ColumnIsPair(ColumnInterface column, ColumnOperators operator, Lis
 	
 	@Override
 	public String pairTogether() {
-		boolean nullValue = values().isEmpty();
+		boolean nullValue = values.isEmpty();
 		return String.format(
-				"%s%s %s " + (nullValue ? "%s" : "(%s)"),
+				"%s%s %s " + (nullValue || operator.equals(ColumnOperators.Between) ? "%s" : "(%s)"),
 				operator.prefix,
 				column.sqlName(),
 				nullValue ? "IS" : operator.face,
 				switch (operator) {
-					case In, notIn -> nullValue ? "NULL" : Tools.concat(KrystalFramework.getDefaultDelimeter(),
-					                                                    values().stream());
-					case Equal, notEqual -> nullValue ? "NULL" : values().stream().findFirst().get();
-					default -> values().stream().findFirst().get();
+					case In, notIn -> nullValue ? "NULL" : Tools.concat(KrystalFramework.getDefaultDelimeter(), values.stream());
+					case Equal, notEqual -> nullValue ? "NULL" : values.getFirst();
+					case Between -> "%s AND %s".formatted(values.getFirst(), values.getLast());
+					default -> values.getFirst();
 				}
 		);
 	}

@@ -26,7 +26,7 @@ public @interface Vertical {
 	/**
 	 * Static return of {@link ColumnInterface} of {@link PersistenceInterface#getTable()} that describes fields names.
 	 */
-	@Target({ElementType.METHOD, ElementType.FIELD})
+	@Target({ElementType.METHOD})
 	@Retention(RetentionPolicy.RUNTIME)
 	@interface PivotColumn {
 	
@@ -35,7 +35,7 @@ public @interface Vertical {
 	/**
 	 * Static return of {@link ColumnInterface} of {@link PersistenceInterface#getTable()} that describes fields values.
 	 */
-	@Target({ElementType.METHOD, ElementType.FIELD})
+	@Target({ElementType.METHOD})
 	@Retention(RetentionPolicy.RUNTIME)
 	@interface ValuesColumn {
 	
@@ -46,7 +46,7 @@ public @interface Vertical {
 	 *
 	 * @see QueryResultInterface#unpivot(ColumnInterface, ColumnInterface, ColumnInterface...)
 	 */
-	@Target({ElementType.METHOD, ElementType.FIELD})
+	@Target({ElementType.METHOD})
 	@Retention(RetentionPolicy.RUNTIME)
 	@interface UnpivotToColumns {
 	

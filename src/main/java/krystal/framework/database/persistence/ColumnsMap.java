@@ -1,6 +1,7 @@
 package krystal.framework.database.persistence;
 
 import krystal.framework.database.abstraction.ColumnInterface;
+import krystal.framework.database.persistence.annotations.ColumnsMapping;
 import krystal.framework.database.persistence.annotations.Key;
 import krystal.framework.database.persistence.annotations.Vertical;
 import lombok.*;
@@ -17,10 +18,12 @@ import java.util.stream.Collectors;
 /**
  * Use this builder to create a map of fields to columns if they have different names.
  * Get a field using <b><i>this.fld(fieldName)</i></b> method.
- * Implement as method returning this type, within {@link PersistenceInterface} class.
+ * Use as method returning this type or {@link Enum} implementing {@link ColumnInterface}, all within {@link PersistenceInterface} class and marked with {@link ColumnsMapping}.
  * In case of {@link Vertical @Vertical} class, the columns mapping for {@link Key non-@Key} fields becomes their name within {@link Vertical.PivotColumn} values.
  *
- * @see PersistenceInterface#formatAll(String)
+ * @see ColumnsMapping
+ * @see #fromColumnInterfaceEnum(Class, Class)
+ * @see #formatAll(Class, String)
  * @see PersistenceInterface#fld(String)
  */
 @Builder(builderMethodName = "define", buildMethodName = "set", toBuilder = true)
@@ -58,6 +61,15 @@ public class ColumnsMap {
 		val builder = ColumnsMap.define();
 		Arrays.stream(columns.getEnumConstants()).forEach(c -> builder.column(Objects.requireNonNull(fields.get(c.name())), c));
 		return builder.set();
+	}
+	
+	/**
+	 * Type in the format, that will be issued for each field name in a class (using <i>String.format()</i>) and returned as {@link ColumnInterface}.
+	 */
+	public static ColumnsMap formatAll(Class<?> clazz, String format) {
+		val map = ColumnsMap.define();
+		Arrays.stream(clazz.getDeclaredFields()).forEach(f -> map.column(f, () -> format.formatted(f.getName())));
+		return map.set();
 	}
 	
 }

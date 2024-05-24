@@ -25,6 +25,10 @@ public interface ColumnInterface {
 		return ColumnIsPair.of(this, ColumnOperators.notIn, ColumnIsPair.parseValues(values));
 	}
 	
+	default ColumnsPairingInterface isBetween(Object left, Object right) {
+		return ColumnIsPair.of(this, ColumnOperators.Between, ColumnIsPair.parseValues(left, right));
+	}
+	
 	default ColumnsPairingInterface is(ColumnOperators operator, Object to) {
 		return ColumnIsPair.of(this, operator, ColumnIsPair.parseValues(to));
 	}
