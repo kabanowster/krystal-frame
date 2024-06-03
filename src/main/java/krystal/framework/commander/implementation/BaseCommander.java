@@ -65,12 +65,12 @@ public class BaseCommander implements CommanderInterface {
 				
 				for (var arg : arguments) {
 					if (argumentMatches(arg, "-m", "msg")) {
-						msg = getArgumetnValue(arg);
+						msg = getArgumentValue(arg);
 						continue;
 					}
 					
 					if (argumentMatches(arg, "-l", "lvl")) {
-						lvl = LoggingWrapper.parseLogLevel(getArgumetnValue(arg));
+						lvl = LoggingWrapper.parseLogLevel(getArgumentValue(arg));
 						continue;
 					}
 					
@@ -98,7 +98,7 @@ public class BaseCommander implements CommanderInterface {
 					}
 					
 					if (argumentMatches(arg, "-r", "remove")) {
-						val prop = getArgumetnValue(arg);
+						val prop = getArgumentValue(arg);
 						PropertiesInterface.properties.remove(prop);
 						logConsole(">>> Property removed: \"%s\".".formatted(prop));
 						return true;
@@ -186,7 +186,7 @@ public class BaseCommander implements CommanderInterface {
 						}
 						
 						if (argumentMatches(arg, "-a", "app")) {
-							var app = getArgumetnValue(arg).split("\\s", 2);
+							var app = getArgumentValue(arg).split("\\s", 2);
 							if (app.length != 2) {
 								logConsole(">>> Tomcat --app command takes exactly 2 arguments separated with space: appName and appSrc.");
 								return false;

@@ -8,7 +8,6 @@ import krystal.framework.logging.LoggingInterface;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.val;
-import reactor.core.publisher.Mono;
 
 import java.time.LocalDate;
 import java.time.LocalDateTime;
@@ -16,7 +15,6 @@ import java.util.LinkedHashSet;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.Set;
-import java.util.concurrent.CompletableFuture;
 import java.util.stream.Stream;
 
 /**
@@ -30,7 +28,7 @@ import java.util.stream.Stream;
  */
 @Getter
 @NoArgsConstructor
-public abstract class Query implements LoggingInterface {
+public abstract class Query implements QueryExecutionInterface, LoggingInterface {
 	
 	protected volatile StringBuilder query;
 	protected ProviderInterface provider;
@@ -119,38 +117,14 @@ public abstract class Query implements LoggingInterface {
 		return () -> "(%s) %s".formatted(pack().sqlQuery(), alias);
 	}
 	
-	public CompletableFuture<QueryResultInterface> future() {
-		return future(QueryExecutorInterface.getInstance().orElseThrow());
-	}
-	
-	public CompletableFuture<QueryResultInterface> future(QueryExecutorInterface executor) {
+	public VirtualPromise<Stream<QueryResultInterface>> promise(QueryExecutorInterface executor) {
 		pack();
-		return VirtualPromise.futureSupply(() -> executor.execute(List.of(this)).findFirst().orElse(QueryResultInterface.empty()));
+		return VirtualPromise.supply(() -> executor.execute(List.of(this)), "QueryExecutor");
 	}
 	
 	public VirtualPromise<QueryResultInterface> promise() {
-		return promise(QueryExecutorInterface.getInstance().orElseThrow());
+		return promise(QueryExecutorInterface.getInstance().orElseThrow()).map(s -> s.findFirst().orElse(QueryResultInterface.empty()));
 	}
-	
-	public VirtualPromise<QueryResultInterface> promise(QueryExecutorInterface executor) {
-		pack();
-		return VirtualPromise.supply(() -> executor.execute(List.of(this)).findFirst().orElse(QueryResultInterface.empty()), "QueryExecutor");
-	}
-	
-	@Deprecated
-	public Mono<QueryResultInterface> mono() {
-		return mono(QueryExecutorInterface.getInstance().orElseThrow());
-	}
-	
-	@Deprecated
-	public Mono<QueryResultInterface> mono(QueryExecutorInterface executor) {
-		pack();
-		return executor.executeFlux(List.of(this)).singleOrEmpty();
-	}
-	
-	// public <T> T as(Class<T> clazz) {
-	// 	this.query().map(qr -> qr.toStreamOf(clazz));
-	// }
 	
 	public QueryType determineType() {
 		QueryType type = getType();

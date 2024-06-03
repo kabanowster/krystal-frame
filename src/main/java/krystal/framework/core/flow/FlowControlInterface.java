@@ -2,7 +2,6 @@ package krystal.framework.core.flow;
 
 import krystal.framework.KrystalFramework;
 import krystal.framework.logging.LoggingInterface;
-import krystal.framework.logging.LoggingWrapper;
 import org.springframework.beans.factory.NoSuchBeanDefinitionException;
 
 import java.util.Map;
@@ -22,7 +21,7 @@ public interface FlowControlInterface extends LoggingInterface {
 		} catch (NullPointerException e) {
 			return Optional.empty();
 		} catch (NoSuchBeanDefinitionException e) {
-			LoggingWrapper.ROOT_LOGGER.fatal(e.getMessage());
+			LoggingInterface.logger().fatal(e.getMessage());
 			return Optional.empty();
 		}
 	}

@@ -95,7 +95,7 @@ public interface QueryExecutorInterface extends LoggingInterface {
 	/**
 	 * The FLux reactive functionalities are superseded by Virtual Threads.
 	 */
-	@Deprecated
+	@Deprecated(forRemoval = true)
 	default Flux<QueryResultInterface> executeFlux(List<Query> queries) {
 		return Flux.fromStream(queries.stream().collect(Collectors.groupingBy(q -> Optional.ofNullable(q.getProvider()).orElse(KrystalFramework.getDefaultProvider()))).entrySet().stream())
 		           .concatMap(e -> {
@@ -229,7 +229,7 @@ public interface QueryExecutorInterface extends LoggingInterface {
 	/*
 	 * R2DBC
 	 */
-	@Deprecated
+	@Deprecated(forRemoval = true)
 	private Flux<QueryResultInterface> executeR2DBC(ExecutionType exeType, ProviderInterface provider, List<Query> queries) {
 		val execution = connectToR2DBCProvider(provider)
 				                .flatMapMany(c -> {
@@ -269,13 +269,13 @@ public interface QueryExecutorInterface extends LoggingInterface {
 			                              try {
 				                              return c.getJDBCConnection(provider);
 			                              } catch (SQLException e) {
-				                              throw new RuntimeException(e);
+				                              throw logFatalAndThrow(e);
 			                              }
 		                              })
 		                              .orElse(DriverManager.getConnection(getConnectionStrings().get(provider), getConnectionProperties().get(provider)));
 	}
 	
-	@Deprecated
+	@Deprecated(forRemoval = true)
 	private Mono<? extends io.r2dbc.spi.Connection> connectToR2DBCProvider(ProviderInterface provider) {
 		val options = ConnectionFactoryOptions.builder();
 		options.option(Option.valueOf("driver"), provider.dbcDriver().getDriverName());

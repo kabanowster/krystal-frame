@@ -1,7 +1,7 @@
 package krystal.framework.database.abstraction;
 
 import krystal.framework.KrystalFramework;
-import krystal.framework.logging.LoggingWrapper;
+import krystal.framework.logging.LoggingInterface;
 import org.springframework.beans.factory.NoSuchBeanDefinitionException;
 
 import java.sql.Connection;
@@ -23,7 +23,7 @@ public interface ConnectionPoolInterface {
 		} catch (NullPointerException e) {
 			return Optional.empty();
 		} catch (NoSuchBeanDefinitionException e) {
-			LoggingWrapper.ROOT_LOGGER.warn(e.getMessage());
+			LoggingInterface.logger().warn(e.getMessage());
 			return Optional.empty();
 		}
 	}

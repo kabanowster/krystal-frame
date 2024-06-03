@@ -106,25 +106,25 @@ public class LoggingWrapper {
 				);
 		
 		fileAppender = RollingFileAppender
-				.newBuilder()
-				.setFileName(logfile + ".log")
-				.setName("RollingFile")
-				.setFilePattern(logfile + "-%i.log")
-				.setLayout(
-						PatternLayout.newBuilder()
-						             .setPattern(KrystalFramework.getLoggingPattern())
-						             .build())
-				.setPolicy(
-						SizeBasedTriggeringPolicy.createPolicy("5MB"))
-				.setStrategy(
-						DefaultRolloverStrategy.newBuilder()
-						                       .setMax("3")
-						                       .build())
-				.build();
+				               .newBuilder()
+				               .setFileName(logfile + ".log")
+				               .setName("RollingFile")
+				               .setFilePattern(logfile + "-%i.log")
+				               .setLayout(
+						               PatternLayout.newBuilder()
+						                            .setPattern(KrystalFramework.getLoggingPattern())
+						                            .build())
+				               .setPolicy(
+						               SizeBasedTriggeringPolicy.createPolicy("5MB"))
+				               .setStrategy(
+						               DefaultRolloverStrategy.newBuilder()
+						                                      .setMax("3")
+						                                      .build())
+				               .build();
 		
 		ROOT_LOGGER.addAppender(fileAppender);
 		fileAppender.start();
-		ROOT_LOGGER.fatal("=== Logging to file started at level " + ROOT_LOGGER.getLevel() + (PropertiesInterface.areAny() ? ", with App properties: " + PropertiesInterface.printAll() : "."));
+		ROOT_LOGGER.fatal("=== Logging to file started at level {}{}", ROOT_LOGGER.getLevel(), PropertiesInterface.areAny() ? ", with App properties: " + PropertiesInterface.printAll() : ".");
 	}
 	
 }

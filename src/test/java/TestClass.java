@@ -12,7 +12,6 @@ import org.junit.jupiter.api.Test;
 
 import java.util.List;
 import java.util.Objects;
-import java.util.concurrent.ExecutionException;
 
 public class TestClass implements LoggingInterface {
 	
@@ -46,14 +45,10 @@ public class TestClass implements LoggingInterface {
 	
 	@Test
 	void generalTest() {
-		try {
-			Q.t("MASZYNY").select().promise()
-			 .map(Objects::toString)
-			 .accept(this::logTest)
-			 .joinExceptionally();
-		} catch (ExecutionException e) {
-			throw new RuntimeException(e);
-		}
+		Q.t("MASZYNY").select().promise()
+		 .map(Objects::toString)
+		 .accept(this::logTest)
+		 .joinThrow();
 	}
 	
 }

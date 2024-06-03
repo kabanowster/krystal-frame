@@ -4,6 +4,7 @@ import krystal.VirtualPromise;
 
 import java.util.Objects;
 
+@Deprecated(forRemoval = true)
 public record Task(String name, VirtualPromise<?> task, FlowInterface flow) {
 	
 	public String report() {

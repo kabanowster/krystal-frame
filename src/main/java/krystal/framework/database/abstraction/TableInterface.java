@@ -2,9 +2,8 @@ package krystal.framework.database.abstraction;
 
 import krystal.framework.database.persistence.PersistenceInterface;
 import krystal.framework.database.queryfactory.*;
+import lombok.NonNull;
 import lombok.val;
-
-import java.util.stream.Stream;
 
 /**
  * Represents the database table instance. Attach to enum to create a convenient query factory out of it.
@@ -50,7 +49,18 @@ public interface TableInterface {
 	default TableInterface join(JoinTypes joinType, TableInterface table, ColumnsPairingInterface... on) {
 		return () -> {
 			val result = new StringBuilder("%s %s JOIN %s ON 1=1".formatted(sqlName(), joinType, table.sqlName()));
-			Stream.of(on).forEach(cpi -> result.append(" AND ").append(cpi.pairTogether()));
+			for (var cpi : on)
+				result.append(" AND ").append(cpi.pairTogether());
+			return result.toString();
+		};
+	}
+	
+	default TableInterface joinSelf(@NonNull String firstAlias, @NonNull String secondAlias, String... otherAliases) {
+		return () -> {
+			val n = sqlName();
+			val result = new StringBuilder("%s %s, %s %s".formatted(n, firstAlias, n, secondAlias));
+			for (var alias : otherAliases)
+				result.append(", ").append("%s %s".formatted(n, alias));
 			return result.toString();
 		};
 	}

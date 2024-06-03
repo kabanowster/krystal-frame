@@ -3,7 +3,6 @@ package krystal.framework.commander;
 import com.google.common.io.Files;
 import krystal.framework.KrystalFramework;
 import krystal.framework.logging.LoggingInterface;
-import krystal.framework.logging.LoggingWrapper;
 import lombok.NonNull;
 import lombok.val;
 import org.springframework.beans.factory.NoSuchBeanDefinitionException;
@@ -28,7 +27,7 @@ public interface CommanderInterface extends LoggingInterface {
 		} catch (NullPointerException e) {
 			return Optional.empty();
 		} catch (NoSuchBeanDefinitionException e) {
-			LoggingWrapper.ROOT_LOGGER.fatal(e.getMessage());
+			LoggingInterface.logger().fatal(e.getMessage());
 			return Optional.empty();
 		}
 	}
@@ -45,7 +44,7 @@ public interface CommanderInterface extends LoggingInterface {
 		try {
 			Files.readLines(commandsFile, StandardCharsets.UTF_8)
 			     .forEach(line -> {
-				     log().fatal("*** EXTERNAL COMMAND PARSING: " + line);
+				     log().fatal("*** EXTERNAL COMMAND PARSING: {}", line);
 				     parseCommand(line);
 			     });
 		} catch (IOException ex) {
@@ -70,7 +69,7 @@ public interface CommanderInterface extends LoggingInterface {
 	 */
 	default Optional<String> getValueIfArgumentIs(String argument, String... variants) {
 		if (argumentMatches(argument, variants)) {
-			return Optional.ofNullable(getArgumetnValue(argument));
+			return Optional.ofNullable(getArgumentValue(argument));
 		} else {
 			return Optional.empty();
 		}
@@ -88,7 +87,7 @@ public interface CommanderInterface extends LoggingInterface {
 	/**
 	 * Gets the value of the argument, issued with either " " or "=".
 	 */
-	default String getArgumetnValue(@NonNull String argument) {
+	default String getArgumentValue(@NonNull String argument) {
 		return argument.split("[\\s=]", 2)[1].strip().transform(s -> s.isEmpty() ? null : s);
 	}
 	
