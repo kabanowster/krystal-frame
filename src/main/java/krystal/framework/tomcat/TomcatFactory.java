@@ -1,31 +1,28 @@
 package krystal.framework.tomcat;
 
 import krystal.Tools;
-import krystal.framework.KrystalFramework;
 import lombok.experimental.UtilityClass;
 import lombok.extern.log4j.Log4j2;
 import lombok.val;
+import org.apache.catalina.Context;
 import org.apache.catalina.startup.Tomcat;
-import org.springframework.beans.factory.NoSuchBeanDefinitionException;
-import org.springframework.http.server.reactive.TomcatHttpHandlerAdapter;
-import org.springframework.web.server.adapter.WebHttpHandlerBuilder;
 
 import java.io.File;
+import java.util.HashSet;
 import java.util.Optional;
 
 /**
  * Use {@link #buildServer(TomcatProperties)} to create embedded {@link Tomcat} implementation.
  *
  * @see TomcatProperties
- * @see KrystalHttpServlet
+ * @see KrystalServlet
  */
 @Log4j2
 @UtilityClass
 public class TomcatFactory {
 	
 	/**
-	 * Default {@link Tomcat} implementation. Sets-up basic properties, attaches web-app if provided, adds default context with spring web-handlers (i.e. {@link org.springframework.web.bind.annotation.RestController @RestController}s), along
-	 * with custom {@link KrystalHttpServlet}s.
+	 * Default {@link Tomcat} implementation. Sets-up basic properties, attaches web-app if provided, with custom {@link KrystalServlet}s.
 	 */
 	public Tomcat buildServer(TomcatProperties properties) {
 		val tomcat = new Tomcat();
@@ -71,35 +68,41 @@ public class TomcatFactory {
 		);
 		
 		/*
-		 * API context pattern: server:port/contextPath/servletMapping/springControllersMappings
+		 * API context pattern: server:port/contextPath/servletMapping
 		 */
 		
-		// default context
-		val context = tomcat.addContext(properties.getServletsRootContext(), baseDir.getAbsolutePath());
+		// For each servlet - filter for context (KrystalServlet can have it defined), or default. Create contexts with servlets.
 		
-		// Spring controllers
-		try {
-			val handler = WebHttpHandlerBuilder.applicationContext(KrystalFramework.getSpringContext()).build();
-			val servlet = new TomcatHttpHandlerAdapter(handler);
-			Tomcat.addServlet(context, "spring", servlet).setAsyncSupported(true);
-			context.addServletMappingDecoded("/", "spring");
-		} catch (NoSuchBeanDefinitionException e) {
-			log.fatal("  ! Web Handlers are missing within Spring context (like @RestController). Skipped Spring servlet.");
-		}
+		// Tomcat has no method to list contexts?
+		val contexts = new HashSet<Context>();
+		val defaultContextString = properties.getDefaultServletsContext();
 		
 		// Custom servlets
 		properties.getServlets().forEach(servlet -> {
-			val name = servlet.getServletName();
-			Tomcat.addServlet(context, name, servlet);
+			val name = Optional.ofNullable(servlet.getServletName()).orElse("unnamedServlet");
+			val contextString = servlet instanceof KrystalServlet s ? Optional.ofNullable(s.getServletContextString()).orElse(defaultContextString) : defaultContextString;
 			
-			if (servlet instanceof KrystalHttpServlet s) {
+			val context = contexts.stream()
+			                      .filter(c -> c.getPath().equals(contextString))
+			                      .findFirst()
+			                      .orElseGet(() -> {
+				                      val result = tomcat.addContext(contextString, baseDir.getAbsolutePath());
+				                      contexts.add(result);
+				                      return result;
+			                      });
+			
+			val wrapper = Tomcat.addServlet(context, name, servlet);
+			
+			if (servlet instanceof KrystalServlet s) {
 				if (s.getMappings().isEmpty()) {
-					log.fatal("  ! No mappings are defined for %s servlet.".formatted(name));
+					log.fatal("  ! No mappings are defined for %s<%s> servlet. Adding default of '/'.".formatted(name, servlet.getClass().getSimpleName()));
+					context.addServletMappingDecoded("/", name);
 				} else {
 					s.getMappings().forEach(m -> context.addServletMappingDecoded(m, name));
 				}
+				wrapper.setAsyncSupported(true);
 			} else {
-				// jakarta compatible servlets TODO: testing
+				// other jakarta compatible servlets
 				context.addServletMappingDecoded(servlet.getServletContext().getContextPath(), servlet.getServletName());
 			}
 		});

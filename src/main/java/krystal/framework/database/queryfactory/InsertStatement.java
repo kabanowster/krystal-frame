@@ -85,8 +85,7 @@ public class InsertStatement extends Query {
 		));
 		
 		val drv = provider.dbcDriver();
-		if (DBCDrivers.jdbcSQLServer.equals(drv)
-				|| DBCDrivers.r2dbcSQLServer.equals(drv)) {
+		if (DBCDrivers.jdbcSQLServer.equals(drv)) {
 			query.append(String.format(
 					" OUTPUT %s",
 					output.isEmpty() ? "INSERTED.*" :

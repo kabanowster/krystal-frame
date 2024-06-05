@@ -75,8 +75,8 @@ public class SelectStatement extends Query implements WhereClauseInterface, Orde
 		if (limit > 0) {
 			// val drv = provider.dbcDriver();
 			switch (provider.dbcDriver()) {
-				case DBCDrivers.jdbcSQLServer, DBCDrivers.r2dbcSQLServer -> limitString = " TOP " + limit;
-				case DBCDrivers.jdbcMySQL, DBCDrivers.r2dbcMySQL -> appendLast.add("LIMIT " + limit);
+				case DBCDrivers.jdbcSQLServer -> limitString = " TOP " + limit;
+				case DBCDrivers.jdbcMySQL -> appendLast.add("LIMIT " + limit);
 				default -> appendLast.add("FETCH FIRST %s ROWS ONLY".formatted(limit));
 			}
 			//

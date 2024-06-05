@@ -65,12 +65,6 @@ public record QueryResult(List<Map<ColumnInterface, Object>> rows, Map<ColumnInt
 		
 	}
 	
-	public QueryResult(List<QueryResultRow> qRows) {
-		this();
-		columns.putAll(qRows.getFirst().columns());
-		rows.addAll(qRows.stream().map(QueryResultRow::row).toList());
-	}
-	
 	public QueryResult(QueryResultInterface qr) {
 		this();
 		

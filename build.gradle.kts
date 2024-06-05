@@ -16,7 +16,6 @@ java {
 dependencies {
     // impl
     jdbc()
-    r2dbc()
     processing()
 
     // api
@@ -24,7 +23,6 @@ dependencies {
     jfxVisuals(Config.api)
     coreTools(Config.api)
     springCore(Config.api)
-    springWebflux(Config.api)
     tomcatServer(Config.api)
 }
 

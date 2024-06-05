@@ -5,7 +5,6 @@ import krystal.Tools;
 import lombok.experimental.UtilityClass;
 import lombok.extern.log4j.Log4j2;
 import lombok.val;
-import reactor.core.publisher.Flux;
 
 import java.io.IOException;
 import java.net.URISyntaxException;
@@ -27,10 +26,6 @@ public class CSV {
 			}
 			
 		}).orElse(Stream.empty());
-	}
-	
-	public <T> Flux<T> flux(Class<T> clazz, String... path) {
-		return Flux.fromStream(stream(clazz, path));
 	}
 	
 	public void into(Path path) {

@@ -48,8 +48,7 @@ public class ConnectionPool implements ConnectionPoolInterface, LoggingInterface
 		log().debug("*** Building Connection Pool.");
 		pools = Collections.synchronizedMap(new HashMap<>());
 		
-		queryExecutor.getConnectionStrings().keySet().stream()
-		             .filter(p -> p.dbcDriver().getDriverType().equals(DriverType.jdbc))
+		queryExecutor.getConnectionStrings().keySet()
 		             .forEach(this::createPool);
 	}
 	

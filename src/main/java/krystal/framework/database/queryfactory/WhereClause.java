@@ -12,7 +12,7 @@ import java.util.function.Function;
 public class WhereClause extends Query implements OrderByInterface, GroupByInterface {
 	
 	/**
-	 * Factory method for {@link Function} used in {@link krystal.framework.database.persistence.PersistenceInterface#streamAll(Class, QueryExecutorInterface, Function, Object) PersistenceInterface.streamAll()} and its variants.
+	 * Factory method for {@link Function} used in {@link krystal.framework.database.persistence.PersistenceInterface#promiseAll(Class, QueryExecutorInterface, Function, Object) PersistenceInterface.promiseAll()} and its variants.
 	 */
 	public static Function<SelectStatement, WhereClause> persistenceFilter(Function<SelectStatement, WhereClause> where) {
 		return where;
