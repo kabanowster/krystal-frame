@@ -6,10 +6,10 @@ plugins {
 }
 
 group = "io.krystal"
-version = "1.5.12"
+version = "1.6.6"
 
 java {
-    withJavadocJar()
+    //withJavadocJar()
     withSourcesJar()
 }
 
@@ -41,7 +41,7 @@ publishing {
             }
             pom {
                 name = "Krystal Frame"
-                description = "Java framework based on Spring Core and Webflux modules, JavaFX, Tomcat, Log4j2 and various JDBC connectors."
+                description = "Java framework based on Spring Core modules, JavaFX, Tomcat, Log4j2 and various JDBC connectors."
                 licenses {
                     license {
                         name = "The Apache License, Version 2.0"
