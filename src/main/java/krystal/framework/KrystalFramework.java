@@ -34,6 +34,9 @@ import java.util.stream.Collectors;
  * </ol>
  *
  * @see #primaryInitialization(String...)
+ * @see #frameSpringConsole(List, String...)
+ * @see #frameSpringJavaFX(List, String...)
+ * @see #startTomcatServer(TomcatProperties)
  */
 @Log4j2
 @UtilityClass
@@ -44,8 +47,10 @@ public class KrystalFramework {
 	 */
 	
 	/**
-	 * <p>Root folder to search for external resources. Address folder outside, i.e. next to the jar.</p> <br>
+	 * <p>Root folder to search for external resources. </p> <br>
 	 * <p>Default: empty String</p>
+	 *
+	 * @apiNote Address folder outside, i.e. next to the jar.
 	 */
 	private @Getter @Setter String exposedDirPath = "";
 	/**
@@ -56,7 +61,7 @@ public class KrystalFramework {
 	 */
 	private @Getter @Setter String appPropertiesFile;
 	/**
-	 * <p>Dir path for database {@link ProviderInterface DefaultProviders} <i>.properties</i> files.</p> <br>
+	 * <p>Dir path for database {@link ProviderInterface} <i>.properties</i> files.</p> <br>
 	 * <p>Default: {@link #exposedDirPath}</p>
 	 */
 	private @Getter @Setter String providersPropertiesDir;
@@ -142,9 +147,9 @@ public class KrystalFramework {
 	 */
 	
 	/**
-	 * Loads default framework settings values (if not specified), app properties and args.
-	 * Establish their values before invoking this method.
+	 * Loads framework settings values, app properties and args.
 	 *
+	 * @apiNote Set settings values before invoking this method. Run this method before loading other modules.
 	 * @see #setExposedDirPath(String)
 	 * @see #setAppPropertiesFile(String)
 	 * @see #setProvidersPropertiesDir(String)
@@ -281,13 +286,6 @@ public class KrystalFramework {
 		startSpringCore(springContextRootClasses);
 	}
 	
-	// public void frameSpringWebConsole(Class<?> mainClass, String... args) {
-	// 	startConsole();
-	// 	primaryInitialization(args);
-	// 	startSpringWebCore(List.of(mainClass));
-	// 	startTomcatServer(null, 8082, mainClass);
-	// }
-	
 	/*
 	 * Utilities
 	 */
@@ -298,7 +296,7 @@ public class KrystalFramework {
 	}
 	
 	/**
-	 * Choose the default implementations of core framework components, to be loaded during Spring component scan.
+	 * Choose the {@link DefaultImplementation default implementations} of core framework components, to be loaded during Spring component scan.
 	 *
 	 * @param selectedImplementations
 	 * 		If Null, all default implementations will be loaded.
@@ -308,7 +306,7 @@ public class KrystalFramework {
 	}
 	
 	/**
-	 * Choose all default implementations of core framework components, except selected, to be loaded during Spring component scan.
+	 * Choose all {@link DefaultImplementation default implementations} of core framework components, except selected, to be loaded during Spring component scan.
 	 *
 	 * @param excludedImplementations
 	 * 		If Null, all default implementations will be loaded.

@@ -1,6 +1,7 @@
 package krystal.framework.database.abstraction;
 
 import krystal.framework.KrystalFramework;
+import krystal.framework.database.implementation.ConnectionPool;
 import krystal.framework.logging.LoggingInterface;
 import org.springframework.beans.factory.NoSuchBeanDefinitionException;
 
@@ -11,6 +12,8 @@ import java.util.Properties;
 
 /**
  * If implemented, {@link QueryExecutorInterface} will use it to load connections. If not, regular {@link java.sql.DriverManager#getConnection(String, Properties) DriverManager#getConnection(String, Properties)} will be invoked <b>for each</b> query call.
+ *
+ * @see ConnectionPool
  */
 @FunctionalInterface
 public interface ConnectionPoolInterface {

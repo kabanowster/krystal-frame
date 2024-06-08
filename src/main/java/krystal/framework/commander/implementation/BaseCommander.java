@@ -20,7 +20,7 @@ import java.util.Optional;
 import java.util.stream.Collectors;
 
 /**
- * Class to handle various basic commands. You can construct your own Commander extending this class and while overriding {@link #executeCommand(CommandInterface, List)} method, invoking it's superclass variant.
+ * Class to handle various basic commands. You can construct your own Commander extending this class and while overriding {@link #executeCommand(CommandInterface, List)} method, invoking its superclass variant if you want to keep these basics.
  *
  * @see CommanderInterface
  */

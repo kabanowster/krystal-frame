@@ -6,7 +6,7 @@ import lombok.NonNull;
 import lombok.val;
 
 /**
- * Represents the database table instance. Attach to enum to create a convenient query factory out of it.
+ * Represents the database table instance. Attach to {@link Enum} to create a convenient query factory out of it.
  *
  * @see PersistenceInterface#getTable()
  */

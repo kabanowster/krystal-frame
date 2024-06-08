@@ -16,8 +16,13 @@ import java.util.Optional;
 import java.util.stream.Stream;
 
 /**
- * To read external commands, use {@link #readCommandsFromTextFile(File)}, which can be scheduled with your flow manager. Commands can be defined with {@link CommandInterface} as enums and parsed through {@link #executeCommand(CommandInterface, List)} for
- * clarity or use {@link #parseCommand(String)}. First word in line is a command and arguments delimiter is "--". The split-part before first "--" is skipped. Further parse argument with {@link #getValueIfArgumentIs(String, String...)}.
+ * To read commands from outside of app, use {@link #readCommandsFromTextFile(File)}, which can be scheduled with your flow manager. Commands can be defined with {@link CommandInterface} as enums and parsed through
+ * {@link #executeCommand(CommandInterface, List)}.
+ *
+ * @see #parseCommand(String)
+ * @see #getValueIfArgumentIs(String, String...)
+ * @see #argumentMatches(String, String...)
+ * @see #getArgumentValue(String)
  */
 public interface CommanderInterface extends LoggingInterface {
 	
@@ -59,13 +64,12 @@ public interface CommanderInterface extends LoggingInterface {
 		val line = command.split(" ", 2);
 		return executeCommand(
 				() -> line[0].strip().toLowerCase(),
-				// line.length > 1 ? (line[1].transform((a) -> a.matches(".*?--.+?") ? Stream.of(a.split("--")).map(String::strip).filter(s -> !s.isEmpty()).toList() : List.of(a))) : List.of()
 				line.length > 1 ? Stream.of(line[1].split("--|\\s(?=-[a-zA-Z])")).map(String::strip).filter(s -> !s.isEmpty()).toList() : List.of()
 		);
 	}
 	
 	/**
-	 * If provided argument (String) matches pattern and any of the name variants, returns its value.
+	 * If provided argument (String) matches pattern or any of the variants, returns its value.
 	 */
 	default Optional<String> getValueIfArgumentIs(String argument, String... variants) {
 		if (argumentMatches(argument, variants)) {

@@ -21,6 +21,10 @@ import java.util.Optional;
 
 /**
  * Hikari Connection Pool wrapper implementation.
+ *
+ * @see #getMaximumPoolSizes()
+ * @see #getDefaultMaximumPoolSize()
+ * @see #getDefaultConnectionKeepAlive()
  */
 @Service
 public class ConnectionPool implements ConnectionPoolInterface, LoggingInterface {
@@ -39,7 +43,7 @@ public class ConnectionPool implements ConnectionPoolInterface, LoggingInterface
 	private static @Getter @Setter int defaultMaximumPoolSize = 3;
 	
 	/**
-	 * Default lifetime for a connection as defined in {@link HikariDataSource#getMaxLifetime()}.
+	 * Default keep-alive for a connection as defined in {@link HikariDataSource#getKeepaliveTime()} ()}.
 	 */
 	private static @Getter @Setter Duration defaultConnectionKeepAlive;
 	

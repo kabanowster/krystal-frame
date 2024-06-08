@@ -7,6 +7,7 @@ import lombok.experimental.UtilityClass;
 
 /**
  * Quick factory for basic {@link Query} abstractions.
+ * Use {@code Q.t("name")} to create {@link TableInterface}, {@code Q.c("name")} for {@link ColumnInterface} or {@code Q.q("sql_query")} for quick {@link Query}.
  */
 @UtilityClass
 public class Q {

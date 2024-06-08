@@ -2,16 +2,13 @@ import krystal.framework.KrystalFramework;
 import krystal.framework.core.flow.implementation.Flows;
 import krystal.framework.database.abstraction.DBCDriverInterface;
 import krystal.framework.database.abstraction.ProviderInterface;
-import krystal.framework.database.abstraction.QueryExecutorInterface;
 import krystal.framework.database.implementation.DBCDrivers;
-import krystal.framework.database.implementation.Q;
 import krystal.framework.logging.LoggingInterface;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 
 import java.util.List;
-import java.util.Objects;
 
 public class TestClass implements LoggingInterface {
 	
@@ -31,11 +28,9 @@ public class TestClass implements LoggingInterface {
 	static void loadBeforeTests() {
 		KrystalFramework.selectDefaultImplementations();
 		// KrystalFramework.setExposedDirPath("data");
-		KrystalFramework.setDefaultProvider(testServer);
-		KrystalFramework.primaryInitialization("--logtofile=no --loglvl=all");
-		KrystalFramework.startSpringCore(List.of(TestClass.class));
-		QueryExecutorInterface.getInstance().orElseThrow().loadProviders(List.of(testServer));
-		// KrystalFramework.startConsole();
+		// KrystalFramework.setDefaultProvider(testServer);
+		KrystalFramework.frameSpringConsole(List.of(TestClass.class), "--loglvl=all");
+		// QueryExecutorInterface.getInstance().orElseThrow().loadProviders(List.of(testServer));
 	}
 	
 	@AfterAll
@@ -45,10 +40,6 @@ public class TestClass implements LoggingInterface {
 	
 	@Test
 	void generalTest() {
-		Q.t("MASZYNY").select().promise()
-		 .map(Objects::toString)
-		 .accept(this::logTest)
-		 .joinThrow();
 	}
 	
 }

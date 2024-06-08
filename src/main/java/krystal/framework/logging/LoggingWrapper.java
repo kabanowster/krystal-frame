@@ -15,49 +15,49 @@ import org.apache.logging.log4j.core.config.Configurator;
 import org.apache.logging.log4j.core.layout.PatternLayout;
 
 /**
- * Simple logging wrapper around log4j. Use {@link LoggingInterface} to attach {@link LoggingInterface#log() log()} method to classes. Call {@link #initialize()} to load properties from {@link PropertiesInterface} and start start file appender if the
+ * Simple logging wrapper around log4j. Use {@link LoggingInterface} to attach {@link LoggingInterface#log() log()} method to classes. Call {@link #initialize()} to load properties from {@link PropertiesInterface} and start file appender if the
  * {@link PropertiesAndArguments#logtofile logtofile} property is true.
  * <p>Use properties:</p>
  * <dl>
  *     <dt><b><i>logtofile</i></b></dt>
  *     <dd>Determines if the file appender should be loaded during {@link #initialize()};</dd>
  *     <dt><b><i>logfile</i></b></dt>
- *     <dd>Sets the name of the file. You can set this property dynamically via accessing {@link PropertiesInterface#properties} directly;</dd>
+ *     <dd>Sets the name of the file. You can set this property programmatically via accessing {@link PropertiesInterface#properties} directly;</dd>
  *     <dt><b><i>logdir</i></b></dt>
  *     <dd>Sets the path to where the logfiles should be saved. Can also be set programmatically.</dd>
  * </dl>
+ * Additional log levels: {@link #TEST}, {@link #CONSOLE}
  *
  * @see LoggingInterface
  * @see #startFileAppender()
+ * @see #setRootLevel(String)
+ * @see #parseLogLevel(String)
  */
 @UtilityClass
 public class LoggingWrapper {
 	
 	// logger instance
-	public static final Logger ROOT_LOGGER = (Logger) LogManager.getRootLogger();
+	public final Logger ROOT_LOGGER = (Logger) LogManager.getRootLogger();
 	
 	/**
 	 * Custom TEST level. Use by invoking {@link LoggingInterface#logTest(String)}.
 	 */
-	public static final Level TEST = Level.forName("TEST", 700);
+	public final Level TEST = Level.forName("TEST", 700);
 	
 	/**
 	 * Custom CONSOLE level. Use by invoking {@link LoggingInterface#logConsole(String)}.
 	 */
-	public static final Level CONSOLE = Level.forName("CONSOLE", 1);
+	public final Level CONSOLE = Level.forName("CONSOLE", 1);
 	
-	// set the default logfile name
-	private static final String DEFAULT_LOGFILE = "logfile";
-	// set the default logfile location
-	private static final String DEFAULT_LOGDIR =
-			Tools.concatAsURIPath(KrystalFramework.getExposedDirPath(), "logs");
+	private final String DEFAULT_LOGFILE = "logfile";
+	private final String DEFAULT_LOGDIR = Tools.concatAsURIPath(KrystalFramework.getExposedDirPath(), "logs");
 	
-	public static RollingFileAppender fileAppender;
+	public RollingFileAppender fileAppender;
 	
 	public void initialize() {
 		
 		// Set level to given from command line or FATAL as default (also if level is not parsed correctly)
-		setRootLevel((String) PropertiesAndArguments.loglvl.value().orElse("all"));
+		setRootLevel((String) PropertiesAndArguments.loglvl.value().orElse("fatal"));
 		
 		// Start file appender if not suspended by cmdArgs
 		if ((Boolean) PropertiesAndArguments.logtofile.value().orElse(false))
@@ -81,7 +81,7 @@ public class LoggingWrapper {
 	 *
 	 * @return {@link Level} or {@link Level#ALL} if fails parsing.
 	 */
-	public static Level parseLogLevel(String level) {
+	public Level parseLogLevel(String level) {
 		try {
 			return Level.valueOf(level);
 		} catch (NullPointerException | IllegalArgumentException ex) {

@@ -19,7 +19,7 @@ import java.util.stream.Stream;
 
 /**
  * Base for all SQL related operations.
- * Use factory classes accessible from {@link TableInterface}s:
+ * Use factory classes accessible from {@link TableInterface}:
  * {@link krystal.framework.database.queryfactory.SelectStatement SelectStatement},
  * {@link krystal.framework.database.queryfactory.UpdateStatement UpdateStatement},
  * {@link krystal.framework.database.queryfactory.InsertStatement InsertStatement},

@@ -20,6 +20,10 @@ import java.util.stream.Stream;
 
 /**
  * Doing the dirty job of connecting through database drivers and processing the ResultSet into maintainable {@link QueryResultInterface}.
+ *
+ * @see #loadProviders(List)
+ * @see #execute(List)
+ * @see ConnectionPoolInterface
  */
 public interface QueryExecutorInterface extends LoggingInterface {
 	
@@ -88,6 +92,9 @@ public interface QueryExecutorInterface extends LoggingInterface {
 	 * Execute
 	 */
 	
+	/**
+	 * Execute the list of {@link Query queries}, read or write determined automatically
+	 */
 	default Stream<QueryResultInterface> execute(List<Query> queries) {
 		
 		return queries.stream()

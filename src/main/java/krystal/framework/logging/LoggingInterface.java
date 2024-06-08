@@ -9,6 +9,8 @@ import org.apache.logging.log4j.Logger;
  *
  * @see #log()
  * @see #logTest(String)
+ * @see #logConsole(String)
+ * @see #logFatalAndThrow(Logger, Throwable)
  * @see LoggingWrapper
  */
 public interface LoggingInterface {
@@ -39,20 +41,32 @@ public interface LoggingInterface {
 		log().log(LoggingWrapper.CONSOLE, message);
 	}
 	
+	/**
+	 * @see #logFatalAndThrow(Logger, Throwable)
+	 */
 	default RuntimeException logFatalAndThrow(String message) {
 		return logFatalAndThrow(logger(), message);
 	}
 	
+	/**
+	 * @see #logFatalAndThrow(Logger, Throwable)
+	 */
 	default RuntimeException logFatalAndThrow(Throwable throwable) {
 		return logFatalAndThrow(logger(), throwable);
 	}
 	
+	/**
+	 * @see #logFatalAndThrow(Logger, Throwable)
+	 */
 	static RuntimeException logFatalAndThrow(Logger logger, String message) {
 		val exception = new RuntimeException(message);
 		logger.fatal(exception.getMessage());
 		return exception;
 	}
 	
+	/**
+	 * Log fatal and throw {@link RuntimeException}.
+	 */
 	static RuntimeException logFatalAndThrow(Logger logger, Throwable throwable) {
 		val exception = new RuntimeException(throwable);
 		logger.fatal(exception.getMessage());
