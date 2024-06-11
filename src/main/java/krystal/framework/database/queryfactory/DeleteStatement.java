@@ -30,7 +30,9 @@ public class DeleteStatement extends Query implements WhereClauseInterface {
 		if (from == null)
 			throw new IllegalArgumentException();
 		
-		query.append("DELETE FROM ").append(from.sqlName());
+		query.append("DELETE FROM ").append(from.getSqlName());
+		
+		// TODO output deleted
 	}
 	
 }

@@ -6,7 +6,7 @@ public record ColumnPair(ColumnInterface first, ColumnOperators is, ColumnInterf
 	
 	@Override
 	public String pairTogether() {
-		return "%s %s %s".formatted(first.sqlName(), is.face, second.sqlName());
+		return "%s %s %s".formatted(first.getSqlName(), is.face, second.getSqlName());
 	}
 	
 	@Override

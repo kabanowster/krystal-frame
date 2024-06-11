@@ -80,8 +80,8 @@ public class InsertStatement extends Query {
 		
 		query.append(String.format(
 				"INSERT INTO %s%s",
-				into.sqlName(),
-				!columns.isEmpty() ? String.format(" (%s)", Tools.concat(", ", columns.stream().map(ColumnInterface::sqlName))) : ""
+				into.getSqlName(),
+				!columns.isEmpty() ? String.format(" (%s)", Tools.concat(", ", columns.stream().map(ColumnInterface::getSqlName))) : ""
 		));
 		
 		val drv = provider.dbcDriver();
@@ -90,7 +90,7 @@ public class InsertStatement extends Query {
 					" OUTPUT %s",
 					output.isEmpty() ? "INSERTED.*" :
 					output.stream()
-					      .map(c -> "INSERTED." + c.sqlName())
+					      .map(c -> "INSERTED." + c.getSqlName())
 					      .collect(Collectors.joining(", "))
 			));
 		}

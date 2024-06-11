@@ -29,7 +29,7 @@ public class GroupByStatement extends Query implements OrderByInterface {
 			throw new IllegalArgumentException();
 		
 		query.append(String.format(" GROUP BY %s",
-		                           columns.stream().map(ColumnInterface::sqlName).collect(Collectors.joining(", "))));
+		                           columns.stream().map(ColumnInterface::getSqlName).collect(Collectors.joining(", "))));
 	}
 	
 }

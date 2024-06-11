@@ -46,7 +46,7 @@ public record QueryResult(List<Map<ColumnInterface, Object>> rows, Map<ColumnInt
 				Map<ColumnInterface, Object> row = Collections.synchronizedMap(LinkedHashMap.newLinkedHashMap(columns.size()));
 				// classic for-loop to catch exception
 				for (Map.Entry<ColumnInterface, Class<?>> entry : columns.entrySet()) {
-					val value = rs.getObject(entry.getKey().sqlName());
+					val value = rs.getObject(entry.getKey().getSqlName());
 					Object cast;
 					try {
 						cast = entry.getValue().cast(value);
@@ -80,7 +80,7 @@ public record QueryResult(List<Map<ColumnInterface, Object>> rows, Map<ColumnInt
 	public String toString() {
 		return StringRenderer.renderTable(
 				columns.entrySet().stream()
-				       .map(e -> String.format("%s (%s)", e.getKey().sqlName(), e.getValue().getSimpleName()))
+				       .map(e -> String.format("%s (%s)", e.getKey().getSqlName(), e.getValue().getSimpleName()))
 				       .toList(),
 				rows.parallelStream()
 				    .map(r -> r.values().stream().map(String::valueOf).toList())

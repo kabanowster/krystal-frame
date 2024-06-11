@@ -433,7 +433,7 @@ public interface PersistenceInterface extends LoggingInterface {
 				val verticalColumns = getVerticalMandatoryAnnotations(clazz);
 				
 				List<ColumnInterface> columns = fieldsColumns.entrySet().stream()
-				                                             .collect(Collectors.partitioningBy(e -> e.getValue().sqlName().equals(verticalColumns.get(PivotColumn.class).sqlName())))
+				                                             .collect(Collectors.partitioningBy(e -> e.getValue().getSqlName().equals(verticalColumns.get(PivotColumn.class).getSqlName())))
 				                                             .get(false)
 				                                             .stream()
 				                                             .map(Entry::getValue)
@@ -563,7 +563,7 @@ public interface PersistenceInterface extends LoggingInterface {
 			return pivotFields.entrySet().stream()
 			                  .map(p -> {
 				                  Map<ColumnInterface, Object> group = new LinkedHashMap<>(groupFields);
-				                  group.put(verticalColumns.get(PivotColumn.class), p.getValue().sqlName());
+				                  group.put(verticalColumns.get(PivotColumn.class), p.getValue().getSqlName());
 				                  group.put(verticalColumns.get(ValuesColumn.class), String.valueOf(fieldsValues.get(p.getKey())));
 				                  return group;
 			                  })

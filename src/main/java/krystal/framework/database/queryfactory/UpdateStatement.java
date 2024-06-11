@@ -49,12 +49,12 @@ public class UpdateStatement extends Query implements WhereClauseInterface {
 		query.append(
 				String.format(
 						"UPDATE %s SET %s",
-						table.sqlName(),
+						table.getSqlName(),
 						Tools.concat(", ", columnSetPairs.stream())
 				)
 		);
 	}
 	
 	// TODO UPDATE from SELECT. Create "from" chain.
-	
+	// TODO output inserted
 }

@@ -15,7 +15,7 @@ public interface ColumnInterface {
 		return () -> name;
 	}
 	
-	String sqlName();
+	String getSqlName();
 	
 	default ColumnsPairingInterface is(Object... values) {
 		return ColumnIsPair.of(this, ColumnOperators.In, ColumnIsPair.parseValues(values));
@@ -46,15 +46,15 @@ public interface ColumnInterface {
 	}
 	
 	default ColumnInterface as(String alias) {
-		return () -> "%s %s".formatted(sqlName(), alias);
+		return () -> "%s %s".formatted(getSqlName(), alias);
 	}
 	
 	default ColumnInterface from(String tableAlias) {
-		return () -> "%s.%s".formatted(tableAlias, sqlName());
+		return () -> "%s.%s".formatted(tableAlias, getSqlName());
 	}
 	
 	default ColumnInterface dist() {
-		return () -> "DISTINCT " + sqlName();
+		return () -> "DISTINCT " + getSqlName();
 	}
 	
 	default ColumnInterface fun(Functions function) {
@@ -66,12 +66,12 @@ public interface ColumnInterface {
 	}
 	
 	default ColumnInterface fun(String function, boolean addNameAsAlias) {
-		return () -> "%s(%s)%s".formatted(function, sqlName(), addNameAsAlias ? " " + sqlName() : "");
+		return () -> "%s(%s)%s".formatted(function, getSqlName(), addNameAsAlias ? " " + getSqlName() : "");
 	}
 	
 	static Optional<ColumnInterface> pickEqual(ColumnInterface column, Collection<ColumnInterface> from) {
 		return from.stream()
-		           .filter(c -> c.sqlName().equalsIgnoreCase(column.sqlName()))
+		           .filter(c -> c.getSqlName().equalsIgnoreCase(column.getSqlName()))
 		           .findFirst();
 	}
 	

@@ -10,7 +10,7 @@ public record ColumnSetPair(ColumnInterface column, Object value) implements Col
 	
 	@Override
 	public String pairTogether() {
-		return String.format("%s = %s", column.sqlName(), Query.parseValueForSQL(value));
+		return String.format("%s = %s", column.getSqlName(), Query.parseValueForSQL(value));
 	}
 	
 	@Override

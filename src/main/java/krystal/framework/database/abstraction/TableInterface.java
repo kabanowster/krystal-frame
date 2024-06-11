@@ -24,7 +24,7 @@ public interface TableInterface {
 	/**
 	 * Code custom renaming (i.e. prefix/suffix, brackets) or return <b><i>.toString()</i></b>.
 	 */
-	String sqlName();
+	String getSqlName();
 	
 	default SelectStatement select(ColumnInterface... columns) {
 		return new SelectStatement(this, columns);
@@ -43,12 +43,12 @@ public interface TableInterface {
 	}
 	
 	default TableInterface as(String alias) {
-		return () -> "%s %s".formatted(sqlName(), alias);
+		return () -> "%s %s".formatted(getSqlName(), alias);
 	}
 	
 	default TableInterface join(JoinTypes joinType, TableInterface table, ColumnsPairingInterface... on) {
 		return () -> {
-			val result = new StringBuilder("%s %s JOIN %s ON 1=1".formatted(sqlName(), joinType, table.sqlName()));
+			val result = new StringBuilder("%s %s JOIN %s ON 1=1".formatted(getSqlName(), joinType, table.getSqlName()));
 			for (var cpi : on)
 				result.append(" AND ").append(cpi.pairTogether());
 			return result.toString();
@@ -57,7 +57,7 @@ public interface TableInterface {
 	
 	default TableInterface joinSelf(@NonNull String firstAlias, @NonNull String secondAlias, String... otherAliases) {
 		return () -> {
-			val n = sqlName();
+			val n = getSqlName();
 			val result = new StringBuilder("%s %s, %s %s".formatted(n, firstAlias, n, secondAlias));
 			for (var alias : otherAliases)
 				result.append(", ").append("%s %s".formatted(n, alias));

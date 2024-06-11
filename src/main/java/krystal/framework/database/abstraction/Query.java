@@ -117,6 +117,14 @@ public abstract class Query implements QueryExecutionInterface, LoggingInterface
 		return () -> "(%s) %s".formatted(pack().sqlQuery(), alias);
 	}
 	
+	public Query union(boolean all, Query query) {
+		return Query.of("""
+				                %s
+				                UNION%s
+				                %s
+				                """.formatted(pack().sqlQuery(), all ? " ALL" : "", query.pack().sqlQuery()));
+	}
+	
 	public VirtualPromise<Stream<QueryResultInterface>> promise(QueryExecutorInterface executor) {
 		pack();
 		return VirtualPromise.supply(() -> executor.execute(List.of(this)), "QueryExecutor");

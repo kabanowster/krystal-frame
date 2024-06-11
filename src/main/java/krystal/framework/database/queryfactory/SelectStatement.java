@@ -96,8 +96,8 @@ public class SelectStatement extends Query implements WhereClauseInterface, Orde
 						"SELECT%s%s %s FROM %s",
 						distinct ? " DISTINCT" : "",
 						limitString,
-						!columns.isEmpty() ? columns.stream().map(ColumnInterface::sqlName).collect(Collectors.joining(", ")) : "*",
-						from.sqlName()
+						!columns.isEmpty() ? columns.stream().map(ColumnInterface::getSqlName).collect(Collectors.joining(", ")) : "*",
+						from.getSqlName()
 				));
 	}
 	

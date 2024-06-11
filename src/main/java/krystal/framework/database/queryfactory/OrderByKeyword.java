@@ -41,7 +41,7 @@ public class OrderByKeyword extends Query {
 			throw new IllegalArgumentException();
 		
 		query.append(String.format(" ORDER BY %s%s",
-		                           columns.stream().map(ColumnInterface::sqlName).collect(Collectors.joining(KrystalFramework.getDefaultDelimeter())),
+		                           columns.stream().map(ColumnInterface::getSqlName).collect(Collectors.joining(KrystalFramework.getDefaultDelimeter())),
 		                           order != null ? " " + order : ""));
 	}
 	

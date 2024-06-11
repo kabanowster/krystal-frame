@@ -23,7 +23,7 @@ public record ColumnIsPair(ColumnInterface column, ColumnOperators operator, Lis
 		return String.format(
 				"%s%s %s " + (nullValue || operator.equals(ColumnOperators.Between) ? "%s" : "(%s)"),
 				operator.prefix,
-				column.sqlName(),
+				column.getSqlName(),
 				nullValue ? "IS" : operator.face,
 				switch (operator) {
 					case In, notIn -> nullValue ? "NULL" : Tools.concat(KrystalFramework.getDefaultDelimeter(), values.stream());
