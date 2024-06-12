@@ -15,24 +15,26 @@ import javax.swing.plaf.basic.BasicArrowButton;
 import javax.swing.plaf.basic.BasicScrollBarUI;
 import javax.swing.text.BadLocationException;
 import javax.swing.text.DefaultCaret;
+import javax.swing.text.Element;
 import javax.swing.text.StyleConstants;
-import javax.swing.text.StyledDocument;
+import javax.swing.text.html.HTMLDocument;
+import javax.swing.text.html.HTMLEditorKit;
 import java.awt.Color;
 import java.awt.Dimension;
-import java.awt.EventQueue;
 import java.awt.Font;
 import java.awt.event.KeyEvent;
 import java.awt.event.KeyListener;
+import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
-import java.util.Optional;
 import java.util.function.Supplier;
 
 public class ConsoleView implements LoggingInterface {
 	
 	private final JFrame frame;
 	private final JTextPane output;
-	private final StyledDocument doc;
+	private final HTMLDocument doc;
+	private final Element content;
 	private final JScrollPane scroll;
 	private final JCheckBox optionAutoScroll;
 	private final JTextField commandPrompt;
@@ -58,12 +60,40 @@ public class ConsoleView implements LoggingInterface {
 		output.setAlignmentX(JComponent.LEFT_ALIGNMENT);
 		output.setAlignmentY(JComponent.TOP_ALIGNMENT);
 		output.setBackground(innerColor);
-		output.setContentType("text/html");
-		((DefaultCaret) output.getCaret()).setUpdatePolicy(DefaultCaret.NEVER_UPDATE);
+		output.setEditorKit(new HTMLEditorKit());
+		output.setContentType("text/html; charset=utf-8");
+		output.setText("""
+				               <html>
+				               <head>
+				               <style>
+				                pre {
+				                    margin: 0 px;
+				                }
+				                #content {
+				                  display: flex;
+				                  flex-direction: column;
+				                  color: rgb(245,245,245);
+				                  font-size: 11 px;
+				                  font-family: monospaced;
+				                 }
+				                .fatal {color: rgb(255,51,0);}
+				                .test {color: rgb(255,204,0);}
+				                .console {color: rgb(51,204,51);}
+				                .trace {color: rgb(105,105,105);}
+				                .warn {color: rgb(255,153,51);}
+				                .error {color: rgb(255,80,80);}
+				               </style>
+				               </head>
+				               <body>
+				                <div id="content">
+				                </div>
+				               </body>
+				               </html>
+				               """);
+		((DefaultCaret) output.getCaret()).setUpdatePolicy(DefaultCaret.NEVER_UPDATE); // no auto-scrolling
 		
-		createStyles(output);
-		
-		doc = output.getStyledDocument();
+		doc = (HTMLDocument) output.getStyledDocument();
+		content = doc.getElement("content");
 		
 		commandPrompt = new JTextField();
 		commandPrompt.setAlignmentX(JComponent.LEFT_ALIGNMENT);
@@ -203,14 +233,12 @@ public class ConsoleView implements LoggingInterface {
 			
 			@Override
 			public void append(LogEvent event) {
-				EventQueue.invokeLater(() -> {
-					try {
-						doc.insertString(doc.getLength(), layout.toSerializable(event), Optional.ofNullable(output.getStyle(event.getLevel().name().toLowerCase())).orElse(output.getStyle("default")));
-					} catch (BadLocationException e) {
-						throw new RuntimeException(e);
-					}
-					revalidate();
-				});
+				try {
+					doc.insertBeforeEnd(content, "<div class=\"%s\"><pre>%s</pre></div>".formatted(event.getLevel().name().toLowerCase(), layout.toSerializable(event)));
+				} catch (BadLocationException | IOException e) {
+					throw new RuntimeException(e);
+				}
+				revalidate();
 			}
 			
 		};
