@@ -1,7 +1,7 @@
 package krystal.framework.database.queryfactory;
 
 import krystal.framework.database.abstraction.Query;
-import krystal.framework.database.abstraction.QueryExecutorInterface;
+import krystal.framework.database.persistence.annotations.Filter;
 
 import java.util.Collections;
 import java.util.LinkedList;
@@ -11,36 +11,29 @@ import java.util.function.Function;
 
 public class WhereClause extends Query implements OrderByInterface, GroupByInterface {
 	
-	/**
-	 * Factory method for {@link Function} used in {@link krystal.framework.database.persistence.PersistenceInterface#promiseAll(Class, QueryExecutorInterface, Function, Object) PersistenceInterface.promiseAll()} and its variants.
-	 */
-	public static Function<SelectStatement, WhereClause> persistenceFilter(Function<SelectStatement, WhereClause> where) {
-		return where;
-	}
-	
 	private final List<WhereClauseOuterBlock> where = Collections.synchronizedList(new LinkedList<>());
 	
-	public WhereClause(Query query, WhereClauseDelimiter delimeter, ColumnsPairingInterface... columnsAre) {
+	public WhereClause(Query query, WhereClauseDelimiter delimiter, ColumnsPairingInterface... columnsAre) {
 		super(query);
-		where.add(new WhereClauseOuterBlock(WhereClauseDelimiter.NULL, new WhereClauseInnerBlock(delimeter, columnsAre)));
+		where.add(new WhereClauseOuterBlock(WhereClauseDelimiter.NULL, new WhereClauseInnerBlock(delimiter, columnsAre)));
 	}
 	
-	public WhereClause orWhere(WhereClauseDelimiter delimeter, ColumnsPairingInterface... columnsAre) {
-		where.add(new WhereClauseOuterBlock(WhereClauseDelimiter.OR, new WhereClauseInnerBlock(delimeter, columnsAre)));
+	public WhereClause orWhere(WhereClauseDelimiter delimiter, ColumnsPairingInterface... columnsAre) {
+		where.add(new WhereClauseOuterBlock(WhereClauseDelimiter.OR, new WhereClauseInnerBlock(delimiter, columnsAre)));
 		return this;
 	}
 	
-	public WhereClause orWhere(ColumnIsPair columnIs) {
+	public WhereClause orWhere(ColumnsPairingInterface columnIs) {
 		where.add(new WhereClauseOuterBlock(WhereClauseDelimiter.OR, new WhereClauseInnerBlock(WhereClauseDelimiter.NULL, columnIs)));
 		return this;
 	}
 	
-	public WhereClause andWhere(WhereClauseDelimiter delimeter, ColumnIsPair... columnsAre) {
-		where.add(new WhereClauseOuterBlock(WhereClauseDelimiter.AND, new WhereClauseInnerBlock(delimeter, columnsAre)));
+	public WhereClause andWhere(WhereClauseDelimiter delimiter, ColumnsPairingInterface... columnsAre) {
+		where.add(new WhereClauseOuterBlock(WhereClauseDelimiter.AND, new WhereClauseInnerBlock(delimiter, columnsAre)));
 		return this;
 	}
 	
-	public WhereClause andWhere(ColumnIsPair columnIs) {
+	public WhereClause andWhere(ColumnsPairingInterface columnIs) {
 		where.add(new WhereClauseOuterBlock(WhereClauseDelimiter.AND, new WhereClauseInnerBlock(WhereClauseDelimiter.NULL, columnIs)));
 		return this;
 	}
@@ -49,6 +42,13 @@ public class WhereClause extends Query implements OrderByInterface, GroupByInter
 	public void build(StringBuilder query, Set<String> appendLast) {
 		query.append(" WHERE ");
 		where.forEach(query::append);
+	}
+	
+	/**
+	 * Factory method for {@link Function} used as {@link Filter @Filter}.
+	 */
+	public static Function<SelectStatement, WhereClause> filter(Function<SelectStatement, WhereClause> where) {
+		return where;
 	}
 	
 }

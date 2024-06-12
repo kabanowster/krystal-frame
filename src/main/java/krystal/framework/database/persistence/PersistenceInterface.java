@@ -22,13 +22,14 @@ import java.lang.reflect.InvocationTargetException;
 import java.util.*;
 import java.util.Map.Entry;
 import java.util.function.Function;
+import java.util.function.UnaryOperator;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
 /**
  * TODO JDoc :)
  *
- * @see #promiseAll(Class, QueryExecutorInterface, Function, Object)
+ * @see #promiseAll(Class, QueryExecutorInterface, UnaryOperator, Object)
  */
 @FunctionalInterface
 public interface PersistenceInterface extends LoggingInterface {
@@ -38,18 +39,18 @@ public interface PersistenceInterface extends LoggingInterface {
 	 */
 	
 	/**
-	 * Get all persisted objects from the database of particular type. The class must declare empty (no arguments) constructor. Use {@link QueryExecutorInterface} for initial dependency injection. Use {@link WhereClause#persistenceFilter(Function)} for
+	 * Get all persisted objects from the database of particular type. The class must declare empty (no arguments) constructor. Use {@link QueryExecutorInterface} for initial dependency injection. Use {@link WhereClause#filter(Function)} for
 	 * filtering the {@link Loader loading} query. Utilises {@link VirtualPromise} for fetching the data and parallel mapping of objects.
 	 *
 	 * @param optionalDummyType
 	 * 		If provided, will be taken as source for invoked methods in query construction. With, i.e. additional {@link Skip} fields as parameters, you can set up different conditional outputs
-	 * 		for key methods, like {@link #getTable()} or {@link #getQuery()}.
+	 * 		for key methods, like {@link #getTable()} or {@link #getSelectQuery()}.
 	 * @see Loader @Loader
 	 * @see Reader @Reader
 	 * @see ReadOnly @ReadOnly
 	 */
-	static <T> VirtualPromise<Stream<T>> promiseAll(Class<T> clazz, QueryExecutorInterface queryExecutor, @Nullable Function<SelectStatement, WhereClause> filter, @Nullable T optionalDummyType) {
-		val query = getQuery(clazz, optionalDummyType);
+	static <T> VirtualPromise<Stream<T>> promiseAll(Class<T> clazz, QueryExecutorInterface queryExecutor, @Nullable UnaryOperator<WhereClause> filter, @Nullable T optionalDummyType) {
+		val query = getFilterQuery(clazz, optionalDummyType).apply(getSelectQuery(clazz, optionalDummyType));
 		return (filter == null ? query : filter.apply(query))
 				       .promise(queryExecutor)
 				       .map(s -> s.findFirst().orElse(QueryResultInterface.empty()))
@@ -57,23 +58,23 @@ public interface PersistenceInterface extends LoggingInterface {
 	}
 	
 	/**
-	 * @see #promiseAll(Class, QueryExecutorInterface, Function, Object)
+	 * @see #promiseAll(Class, QueryExecutorInterface, UnaryOperator, Object)
 	 */
 	static <T> VirtualPromise<Stream<T>> promiseAll(Class<T> clazz) {
 		return promiseAll(clazz, QueryExecutorInterface.getInstance().orElseThrow(), null, null);
 	}
 	
 	/**
-	 * @see #promiseAll(Class, QueryExecutorInterface, Function, Object)
+	 * @see #promiseAll(Class, QueryExecutorInterface, UnaryOperator, Object)
 	 */
 	static <T> VirtualPromise<Stream<T>> promiseAll(Class<T> clazz, QueryExecutorInterface queryExecutor) {
 		return promiseAll(clazz, queryExecutor, null, null);
 	}
 	
 	/**
-	 * @see #promiseAll(Class, QueryExecutorInterface, Function, Object)
+	 * @see #promiseAll(Class, QueryExecutorInterface, UnaryOperator, Object)
 	 */
-	static <T> VirtualPromise<Stream<T>> promiseAll(Class<T> clazz, @Nullable Function<SelectStatement, WhereClause> filter) {
+	static <T> VirtualPromise<Stream<T>> promiseAll(Class<T> clazz, @Nullable UnaryOperator<WhereClause> filter) {
 		return promiseAll(clazz, QueryExecutorInterface.getInstance().orElseThrow(), filter, null);
 	}
 	
@@ -147,11 +148,11 @@ public interface PersistenceInterface extends LoggingInterface {
 	}
 	
 	/**
-	 * Returns {@link Query} used to load instance of an object of provided class, or default, or throws error if for some reason it's missing.
+	 * Returns {@link SelectStatement} used to load instance of an object of provided class, or default, or throws error if for some reason it's missing.
 	 *
 	 * @see Loader @Loader
 	 */
-	static <T> SelectStatement getQuery(Class<? extends T> clazz, @Nullable T optionalDummyType) {
+	static <T> SelectStatement getSelectQuery(Class<? extends T> clazz, @Nullable T optionalDummyType) {
 		
 		try {
 			T instance;
@@ -184,10 +185,48 @@ public interface PersistenceInterface extends LoggingInterface {
 	/**
 	 * Returns first custom {@link Loader @Loader} query used to load this class or {@code null} if missing.
 	 *
-	 * @see #getQuery(Class, Object)
+	 * @see #getSelectQuery(Class, Object)
 	 */
-	default @Nullable SelectStatement getQuery() {
-		return PersistenceInterface.getQuery(getClass(), this);
+	default @Nullable SelectStatement getSelectQuery() {
+		return getSelectQuery(getClass(), this);
+	}
+	
+	@SuppressWarnings("unchecked")
+	static <T> Function<SelectStatement, WhereClause> getFilterQuery(Class<? extends T> clazz, @Nullable T optionalDummyType) {
+		try {
+			T instance;
+			if (optionalDummyType != null) {
+				instance = optionalDummyType;
+			} else {
+				Constructor<? extends T> emptyConstructor = clazz.getDeclaredConstructor();
+				instance = emptyConstructor.newInstance();
+			}
+			
+			return Arrays.stream(clazz.getDeclaredMethods())
+			             .filter(m -> {
+				             val primarily = m.trySetAccessible() && m.isAnnotationPresent(Filter.class) && Function.class.isAssignableFrom(m.getReturnType());
+				             if (!primarily) return false;
+				             val params = Set.of(Tools.determineParameterTypes(m.getGenericReturnType()).types());
+				             return params.size() == 2 && params.containsAll(Set.of(SelectStatement.class, WhereClause.class));
+			             })
+			             .findFirst()
+			             .map(m -> {
+				             try {
+					             return (Function<SelectStatement, WhereClause>) m.invoke(instance);
+				             } catch (IllegalAccessException | InvocationTargetException e) {
+					             throw new RuntimeException(e);
+				             }
+			             })
+			             .orElse(s -> s.where1is1());
+			
+		} catch (InvocationTargetException | InstantiationException | IllegalAccessException | NoSuchMethodException e) {
+			
+			throw new RuntimeException("Class %s requires no args constructor, to perform annotated parameters loading.".formatted(clazz.getSimpleName()));
+		}
+	}
+	
+	default Function<SelectStatement, WhereClause> getFilterQuery() {
+		return getFilterQuery(getClass(), this);
 	}
 	
 	static <T extends PersistenceInterface, D extends T, R, A extends Annotation> R getFirstAnnotatedValueOrInvokeDefaultWithOptionalDummy(Class<T> clazz, Class<A> annotation, Class<R> returnType, @Nullable D optionalDummyType,
@@ -310,7 +349,7 @@ public interface PersistenceInterface extends LoggingInterface {
 							             }
 						             }
 				             ),
-				             (f1, f2) -> f1,
+				             (f, _) -> f,
 				             LinkedHashMap::new
 		             ));
 	}
@@ -424,7 +463,7 @@ public interface PersistenceInterface extends LoggingInterface {
 	 * Load persistence object from database.
 	 */
 	private Optional<? extends PersistenceInterface> load(TableInterface table, ColumnsPairingInterface[] keysPairs, Map<Field, ColumnInterface> fieldsColumns) {
-		var query = getQuery();
+		var query = getSelectQuery();
 		if (query == null) {
 			val clazz = getClass();
 			ColumnInterface[] queryColumns;
@@ -477,17 +516,15 @@ public interface PersistenceInterface extends LoggingInterface {
 		} else {
 			load(table, keysPairs, fieldsColumns)
 					.ifPresentOrElse(
-							l -> {
-								table.update(fieldsValues.entrySet().stream()
-								                         .filter(e -> !e.getKey().isAnnotationPresent(Key.class))
-								                         .map(e -> ColumnSetPair.of(fieldsColumns.get(e.getKey()), e.getValue()))
-								                         .toArray(ColumnSetPair[]::new))
-								     .where(keysPairs)
-								     .setProvider(getProvider())
-								     .promise()
-								     .thenRun(() -> log().trace("    Record updated."))
-								     .joinThrow();
-							},
+							_ -> table.update(fieldsValues.entrySet().stream()
+							                              .filter(e -> !e.getKey().isAnnotationPresent(Key.class))
+							                              .map(e -> ColumnSetPair.of(fieldsColumns.get(e.getKey()), e.getValue()))
+							                              .toArray(ColumnSetPair[]::new))
+							          .where(keysPairs)
+							          .setProvider(getProvider())
+							          .promise()
+							          .thenRun(() -> log().trace("    Record updated."))
+							          .joinThrow(),
 							() -> insertAndConsume(table, fieldsColumns, fieldsValues)
 					);
 		}
@@ -556,9 +593,9 @@ public interface PersistenceInterface extends LoggingInterface {
 			                                                                             .filter(e -> PersistenceInterface.getPersistenceSetupAnnotationsExcluding(Key.class).stream().noneMatch(e.getKey()::isAnnotationPresent))
 			                                                                             .collect(Collectors.partitioningBy(e -> !e.getKey().isAnnotationPresent(Key.class)));
 			
-			Map<ColumnInterface, Object> groupFields = splitFields.get(false).stream().collect(Collectors.toMap(Entry::getValue, e -> fieldsValues.get(e.getKey()), (a, b) -> b, LinkedHashMap::new));
+			Map<ColumnInterface, Object> groupFields = splitFields.get(false).stream().collect(Collectors.toMap(Entry::getValue, e -> fieldsValues.get(e.getKey()), (_, b) -> b, LinkedHashMap::new));
 			
-			Map<Field, ColumnInterface> pivotFields = splitFields.get(true).stream().collect(Collectors.toMap(Entry::getKey, Entry::getValue, (a, b) -> b, LinkedHashMap::new));
+			Map<Field, ColumnInterface> pivotFields = splitFields.get(true).stream().collect(Collectors.toMap(Entry::getKey, Entry::getValue, (_, b) -> b, LinkedHashMap::new));
 			
 			return pivotFields.entrySet().stream()
 			                  .map(p -> {
@@ -575,7 +612,7 @@ public interface PersistenceInterface extends LoggingInterface {
 			                            .collect(Collectors.toMap(
 					                            Entry::getValue,
 					                            e -> fieldsValues.get(e.getKey()),
-					                            (a, b) -> a,
+					                            (a, _) -> a,
 					                            LinkedHashMap::new
 			                            )));
 		}
@@ -635,6 +672,7 @@ public interface PersistenceInterface extends LoggingInterface {
 				Skip.class,
 				ColumnsMapping.class,
 				Loader.class,
+				Filter.class,
 				Provider.class,
 				PivotColumn.class,
 				ValuesColumn.class,

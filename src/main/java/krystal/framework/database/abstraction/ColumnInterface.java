@@ -17,10 +17,16 @@ public interface ColumnInterface {
 	
 	String getSqlName();
 	
+	/**
+	 * @implNote To check for {@code NULL} either leave the list empty or type in {@code "null"}.
+	 */
 	default ColumnsPairingInterface is(Object... values) {
 		return ColumnIsPair.of(this, ColumnOperators.In, ColumnIsPair.parseValues(values));
 	}
 	
+	/**
+	 * @implNote To check for {@code NULL} either leave the list empty or type in {@code "null"}.
+	 */
 	default ColumnsPairingInterface isNot(Object... values) {
 		return ColumnIsPair.of(this, ColumnOperators.notIn, ColumnIsPair.parseValues(values));
 	}

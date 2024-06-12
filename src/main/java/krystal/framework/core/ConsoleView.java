@@ -5,7 +5,6 @@ import krystal.framework.KrystalFramework;
 import krystal.framework.commander.CommanderInterface;
 import krystal.framework.logging.LoggingInterface;
 import krystal.framework.logging.LoggingWrapper;
-import lombok.SneakyThrows;
 import lombok.val;
 import org.apache.logging.log4j.core.LogEvent;
 import org.apache.logging.log4j.core.appender.AbstractAppender;
@@ -75,7 +74,7 @@ public class ConsoleView implements LoggingInterface {
 		commandPrompt.setBackground(middleColor);
 		commandPrompt.setForeground(Color.lightGray);
 		commandPrompt.setCaretColor(Color.white);
-		commandPrompt.addActionListener((e) -> {
+		commandPrompt.addActionListener(_ -> {
 			val command = commandPrompt.getText();
 			if (Strings.isNullOrEmpty(command))
 				return;
@@ -160,16 +159,14 @@ public class ConsoleView implements LoggingInterface {
 		optionAutoScroll.setAlignmentX(JComponent.LEFT_ALIGNMENT);
 		optionAutoScroll.setForeground(Color.white);
 		optionAutoScroll.setOpaque(false);
-		optionAutoScroll.addActionListener(e -> {
-			commandPrompt.requestFocus();
-		});
+		optionAutoScroll.addActionListener(_ -> commandPrompt.requestFocus());
 		options.add(optionAutoScroll);
 		
 		options.add(Box.createHorizontalGlue());
 		
 		val btnScroll = new JButton("Bottom");
 		btnScroll.setAlignmentX(JComponent.RIGHT_ALIGNMENT);
-		btnScroll.addActionListener((e) -> scrollToBottom());
+		btnScroll.addActionListener(_ -> scrollToBottom());
 		btnScroll.setMaximumSize(new Dimension(100, 20));
 		options.add(btnScroll);
 		
@@ -233,7 +230,7 @@ public class ConsoleView implements LoggingInterface {
 		var style = textPane.addStyle("info", defaultStyle);
 		StyleConstants.setForeground(style, new Color(0, 153, 255));
 		
-		style = textPane.addStyle("debug", defaultStyle);
+		textPane.addStyle("debug", defaultStyle);
 		
 		style = textPane.addStyle("fatal", defaultStyle);
 		StyleConstants.setForeground(style, new Color(255, 51, 0));
@@ -271,9 +268,12 @@ public class ConsoleView implements LoggingInterface {
 	/**
 	 * Clear log messages from the view.
 	 */
-	@SneakyThrows
 	public void clear() {
-		doc.remove(0, doc.getLength());
+		try {
+			doc.remove(0, doc.getLength());
+		} catch (BadLocationException e) {
+			throw new RuntimeException(e);
+		}
 		logConsole(">>> Clear");
 		revalidate();
 	}

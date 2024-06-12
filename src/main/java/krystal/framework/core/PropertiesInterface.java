@@ -16,7 +16,7 @@ import java.util.stream.Stream;
 /**
  * Interface to manage properties and cmd-line arguments.
  *
- * @apiNote Access static {@link #properties} map or implement this with {@link Enum} for convenience.
+ * @implNote Access static {@link #properties} map or implement this with {@link Enum} for convenience.
  * @see PropertiesAndArguments
  */
 @FunctionalInterface

@@ -65,7 +65,7 @@ public abstract class Query implements QueryExecutionInterface, LoggingInterface
 		// Enquoted format
 		String senq = "'%s'";
 		
-		if (value == null || String.valueOf(value).equals("null")) return "NULL";
+		if (value == null || String.valueOf(value).equalsIgnoreCase("null")) return "NULL";
 		if (value instanceof String val) return String.format(senq, val);
 		if (value instanceof LocalDateTime val) return String.format(senq, val.format(KrystalFramework.getDatetimeFormat()));
 		if (value instanceof LocalDate val) return String.format(senq, val.format(KrystalFramework.getDateFormat()));

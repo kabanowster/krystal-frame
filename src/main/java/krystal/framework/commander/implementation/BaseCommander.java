@@ -44,9 +44,7 @@ public class BaseCommander implements CommanderInterface {
 				log().fatal(">>> EXIT COMMAND");
 				if (!arguments.isEmpty()) {
 					getValueIfArgumentIs(arguments.getFirst(), "-m", "msg").ifPresent(
-							s -> {
-								log().fatal("--> WITH MESSAGE: " + s);
-							}
+							s -> log().fatal("--> WITH MESSAGE: {}", s)
 					);
 				}
 				KrystalFramework.quit();
@@ -131,9 +129,7 @@ public class BaseCommander implements CommanderInterface {
 				return false;
 			}
 			case providers -> {
-				QueryExecutorInterface.getInstance().ifPresent(q -> {
-					logConsole(">>> Loaded DefaultProviders properties:\n%s".formatted(JSON.from(q.getConnectionProperties()).toString(4)));
-				});
+				QueryExecutorInterface.getInstance().ifPresent(q -> logConsole(">>> Loaded DefaultProviders properties:\n%s".formatted(JSON.from(q.getConnectionProperties()).toString(4))));
 				return true;
 			}
 			case help -> {
@@ -143,12 +139,10 @@ public class BaseCommander implements CommanderInterface {
 				return true;
 			}
 			case spring -> {
-				Optional.ofNullable(KrystalFramework.getSpringContext()).ifPresent(c -> {
-					logConsole(">>> Loaded %s Spring Beans:\n\n%s".formatted(
-							c.getBeanDefinitionCount(),
-							String.join("\n", c.getBeanDefinitionNames())
-					));
-				});
+				Optional.ofNullable(KrystalFramework.getSpringContext()).ifPresent(c -> logConsole(">>> Loaded %s Spring Beans:\n\n%s".formatted(
+						c.getBeanDefinitionCount(),
+						String.join("\n", c.getBeanDefinitionNames())
+				)));
 				return true;
 			}
 			case krystal -> {
@@ -208,7 +202,7 @@ public class BaseCommander implements CommanderInterface {
 						}
 					}
 				} catch (LifecycleException e) {
-					log().fatal("!!! Tomcat broke with exception:\n" + e.getMessage());
+					log().fatal("!!! Tomcat broke with exception:\n{}", e.getMessage());
 				}
 				
 				return true;

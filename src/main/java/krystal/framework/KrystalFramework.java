@@ -50,7 +50,7 @@ public class KrystalFramework {
 	 * <p>Root folder to search for external resources. </p> <br>
 	 * <p>Default: empty String</p>
 	 *
-	 * @apiNote Address folder outside, i.e. next to the jar.
+	 * @implNote Address folder outside, i.e. next to the jar.
 	 */
 	private @Getter @Setter String exposedDirPath = "";
 	/**
@@ -149,7 +149,7 @@ public class KrystalFramework {
 	/**
 	 * Loads framework settings values, app properties and args.
 	 *
-	 * @apiNote Set settings values before invoking this method. Run this method before loading other modules.
+	 * @implNote Set settings values before invoking this method. Run this method before loading other modules.
 	 * @see #setExposedDirPath(String)
 	 * @see #setAppPropertiesFile(String)
 	 * @see #setProvidersPropertiesDir(String)

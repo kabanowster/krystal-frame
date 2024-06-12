@@ -50,7 +50,7 @@ public class ColumnsMap {
 	public static ColumnsMap allMatchingToSingle(Class<?> clazz, ColumnInterface column, Predicate<Field> predicate) {
 		return new ColumnsMap(Arrays.stream(clazz.getDeclaredFields())
 		                            .filter(predicate)
-		                            .collect(Collectors.toMap(f -> f, f -> column, (f1, f2) -> f1, HashMap::new)));
+		                            .collect(Collectors.toMap(f -> f, _ -> column, (f1, _) -> f1, HashMap::new)));
 	}
 	
 	/**

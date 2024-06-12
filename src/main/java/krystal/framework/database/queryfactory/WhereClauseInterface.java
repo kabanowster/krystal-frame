@@ -1,6 +1,7 @@
 package krystal.framework.database.queryfactory;
 
 import krystal.framework.database.abstraction.Query;
+import krystal.framework.database.implementation.Q;
 
 interface WhereClauseInterface {
 	
@@ -15,6 +16,13 @@ interface WhereClauseInterface {
 	 */
 	default WhereClause where(ColumnsPairingInterface... columnsAre) {
 		return new WhereClause(pack(), WhereClauseDelimiter.AND, columnsAre);
+	}
+	
+	/**
+	 * 1=1
+	 */
+	default WhereClause where1is1() {
+		return new WhereClause(pack(), WhereClauseDelimiter.NULL, Q.c("1").is(1));
 	}
 	
 }

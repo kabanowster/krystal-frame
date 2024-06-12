@@ -24,7 +24,7 @@ public interface FlowInterface {
 	}
 	
 	default void register(int times) {
-		IntStream.range(0, times).forEach(i -> controller().register());
+		IntStream.range(0, times).forEach(_ -> controller().register());
 	}
 	
 	default void await(int phase) {

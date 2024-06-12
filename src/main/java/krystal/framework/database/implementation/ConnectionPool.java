@@ -56,6 +56,7 @@ public class ConnectionPool implements ConnectionPoolInterface, LoggingInterface
 		             .forEach(this::createPool);
 	}
 	
+	@SuppressWarnings("resource")
 	@Override
 	public Connection getJDBCConnection(ProviderInterface provider) throws SQLException {
 		return Optional.ofNullable(pools.get(provider))
