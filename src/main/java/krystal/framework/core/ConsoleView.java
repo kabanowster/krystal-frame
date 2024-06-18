@@ -16,11 +16,11 @@ import javax.swing.plaf.basic.BasicScrollBarUI;
 import javax.swing.text.BadLocationException;
 import javax.swing.text.DefaultCaret;
 import javax.swing.text.Element;
-import javax.swing.text.StyleConstants;
 import javax.swing.text.html.HTMLDocument;
 import javax.swing.text.html.HTMLEditorKit;
 import java.awt.Color;
 import java.awt.Dimension;
+import java.awt.EventQueue;
 import java.awt.Font;
 import java.awt.event.KeyEvent;
 import java.awt.event.KeyListener;
@@ -76,6 +76,7 @@ public class ConsoleView implements LoggingInterface {
 				                  font-size: 11 px;
 				                  font-family: monospaced;
 				                 }
+				                .info {color: rgb(0, 153, 255);}
 				                .fatal {color: rgb(255,51,0);}
 				                .test {color: rgb(255,204,0);}
 				                .console {color: rgb(51,204,51);}
@@ -233,12 +234,14 @@ public class ConsoleView implements LoggingInterface {
 			
 			@Override
 			public void append(LogEvent event) {
-				try {
-					doc.insertBeforeEnd(content, "<div class=\"%s\"><pre>%s</pre></div>".formatted(event.getLevel().name().toLowerCase(), layout.toSerializable(event)));
-				} catch (BadLocationException | IOException e) {
-					throw new RuntimeException(e);
-				}
-				revalidate();
+				EventQueue.invokeLater(() -> {
+					try {
+						doc.insertBeforeEnd(content, "<div class=\"%s\"><pre>%s</pre></div>".formatted(event.getLevel().name().toLowerCase(), layout.toSerializable(event)));
+					} catch (BadLocationException | IOException e) {
+						throw new RuntimeException(e);
+					}
+					revalidate();
+				});
 			}
 			
 		};
@@ -247,36 +250,6 @@ public class ConsoleView implements LoggingInterface {
 		appender.start();
 		
 		log().fatal("=== Custom Console Viewer created and logger wired.");
-	}
-	
-	private void createStyles(JTextPane textPane) {
-		val defaultStyle = textPane.addStyle("default", null);
-		StyleConstants.setForeground(defaultStyle, Color.lightGray);
-		StyleConstants.setFontFamily(defaultStyle, defaultFont.getFamily());
-		StyleConstants.setFontSize(defaultStyle, defaultFont.getSize());
-		
-		var style = textPane.addStyle("info", defaultStyle);
-		StyleConstants.setForeground(style, new Color(0, 153, 255));
-		
-		textPane.addStyle("debug", defaultStyle);
-		
-		style = textPane.addStyle("fatal", defaultStyle);
-		StyleConstants.setForeground(style, new Color(255, 51, 0));
-		
-		style = textPane.addStyle("test", defaultStyle);
-		StyleConstants.setForeground(style, new Color(255, 204, 0));
-		
-		style = textPane.addStyle("console", defaultStyle);
-		StyleConstants.setForeground(style, new Color(51, 204, 51));
-		
-		style = textPane.addStyle("trace", defaultStyle);
-		StyleConstants.setForeground(style, Color.gray.darker());
-		
-		style = textPane.addStyle("warn", defaultStyle);
-		StyleConstants.setForeground(style, new Color(255, 153, 51));
-		
-		style = textPane.addStyle("error", defaultStyle);
-		StyleConstants.setForeground(style, new Color(255, 80, 80));
 	}
 	
 	/**

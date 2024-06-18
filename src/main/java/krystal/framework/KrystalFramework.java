@@ -192,6 +192,17 @@ public class KrystalFramework {
 		PropertiesInterface.load(appPropertiesFile, args);
 		LoggingWrapper.initialize();
 		
+		// load jdbc drivers
+		try {
+			Class.forName("com.ibm.as400.access.AS400JDBCDriver");
+			Class.forName("com.microsoft.sqlserver.jdbc.SQLServerDriver");
+			Class.forName("org.h2.Driver");
+			Class.forName("org.postgresql.Driver");
+			Class.forName("com.mysql.cj.jdbc.Driver");
+		} catch (ClassNotFoundException e) {
+			log.fatal(e.getMessage());
+		}
+		
 		// default provider from properties / args
 		PropertiesAndArguments
 				.provider.value()
@@ -252,6 +263,8 @@ public class KrystalFramework {
 		disposeConsole();
 		console = new ConsoleView();
 	}
+	
+	// TODO startNativeConsole (cmd line listener for native console input)
 	
 	/**
 	 * Destroys the Swing console-log view.
