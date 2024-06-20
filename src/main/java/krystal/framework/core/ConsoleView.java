@@ -22,6 +22,8 @@ import java.awt.Color;
 import java.awt.Dimension;
 import java.awt.EventQueue;
 import java.awt.Font;
+import java.awt.event.FocusEvent;
+import java.awt.event.FocusListener;
 import java.awt.event.KeyEvent;
 import java.awt.event.KeyListener;
 import java.io.IOException;
@@ -61,6 +63,19 @@ public class ConsoleView implements LoggingInterface {
 		output.setAlignmentY(JComponent.TOP_ALIGNMENT);
 		output.setBackground(innerColor);
 		output.setEditorKit(new HTMLEditorKit());
+		output.setEditable(false);
+		output.addFocusListener(new FocusListener() {
+			@Override
+			public void focusGained(FocusEvent e) {
+				output.getCaret().setVisible(true);
+			}
+			
+			@Override
+			public void focusLost(FocusEvent e) {
+				output.getCaret().setVisible(false);
+			}
+		});
+		output.setCaretColor(new Color(255, 153, 51));
 		output.setContentType("text/html; charset=utf-8");
 		output.setText("""
 				               <html>

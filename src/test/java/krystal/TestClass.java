@@ -13,7 +13,6 @@ import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 
 import java.util.List;
-import java.util.Objects;
 
 public class TestClass implements LoggingInterface {
 	
@@ -46,9 +45,11 @@ public class TestClass implements LoggingInterface {
 	@Test
 	void generalTest() {
 		PersistenceInterface.promiseAll(Machine.class)
-		                    .accept(s -> s.map(Objects::toString)
-		                                  .forEach(this::logTest))
+		                    .map(s -> s.map(Machine::render).toList())
+		                    .map(StringRenderer::renderMaps)
+		                    .accept(this::logTest)
 		                    .joinThrow();
+		
 	}
 	
 }

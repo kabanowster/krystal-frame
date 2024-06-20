@@ -14,7 +14,11 @@ import krystal.framework.database.queryfactory.WhereClause;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 
+import java.lang.reflect.Field;
+import java.util.Arrays;
+import java.util.Map;
 import java.util.function.Function;
+import java.util.stream.Collectors;
 
 @NoArgsConstructor
 @Getter
@@ -55,6 +59,21 @@ public class Machine implements PersistenceInterface {
 	@Override
 	public String toString() {
 		return "[%s %s]".formatted(linia, nazwa);
+	}
+	
+	public Map<String, String> render() {
+		return Arrays.stream(getClass().getDeclaredFields())
+		             .filter(Field::trySetAccessible)
+		             .collect(Collectors.toMap(
+				             Field::getName,
+				             f -> {
+					             try {
+						             return String.valueOf(f.get(this));
+					             } catch (IllegalAccessException e) {
+						             throw logFatalAndThrow(e);
+					             }
+				             }
+		             ));
 	}
 	
 }

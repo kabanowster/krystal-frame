@@ -1,6 +1,8 @@
 package krystal.framework.database.persistence;
 
 import krystal.JSON;
+import krystal.Skip;
+import krystal.Skip.SkipTypes;
 import krystal.Tools;
 import krystal.VirtualPromise;
 import krystal.framework.database.abstraction.*;
@@ -291,7 +293,7 @@ public interface PersistenceInterface extends LoggingInterface {
 		                .orElse(ColumnsMap.empty());
 		// collect for all fields, either mapping or name
 		return Stream.of(getClass().getDeclaredFields())
-		             .filter(f -> !f.isAnnotationPresent(Skip.class))
+		             .filter(f -> !Tools.isSkipped(f, SkipTypes.persistence))
 		             .collect(Collectors.toMap(
 				             f -> f,
 				             f -> Optional.ofNullable(m.columns().get(f)).orElse(f::getName)
@@ -336,7 +338,7 @@ public interface PersistenceInterface extends LoggingInterface {
 	default Map<Field, Object> getFieldsValues() {
 		val m = getWriters();
 		return Stream.of(getClass().getDeclaredFields())
-		             .filter(f -> !f.isAnnotationPresent(Skip.class))
+		             .filter(f -> !Tools.isSkipped(f, SkipTypes.persistence))
 		             .collect(Collectors.toMap(
 				             f -> f,
 				             f -> Optional.ofNullable(m.get(f)).orElseGet(
@@ -634,7 +636,7 @@ public interface PersistenceInterface extends LoggingInterface {
 				      ));
 		
 		Stream.of(getClass().getDeclaredFields())
-		      .filter(f -> !f.isAnnotationPresent(Skip.class) && f.trySetAccessible())
+		      .filter(f -> !Tools.isSkipped(f, SkipTypes.persistence) && f.trySetAccessible())
 		      .forEach(f -> {
 			      try {
 				      f.set(this, Optional.ofNullable(anotherFields.get(f.getName().toLowerCase())).orElseThrow(NoSuchFieldException::new).get(another));
