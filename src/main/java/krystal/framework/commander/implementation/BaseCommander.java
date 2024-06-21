@@ -1,11 +1,11 @@
 package krystal.framework.commander.implementation;
 
+import krystal.ConsoleView;
 import krystal.JSON;
 import krystal.Tools;
 import krystal.framework.KrystalFramework;
 import krystal.framework.commander.CommandInterface;
 import krystal.framework.commander.CommanderInterface;
-import krystal.framework.core.ConsoleView;
 import krystal.framework.core.PropertiesInterface;
 import krystal.framework.database.abstraction.QueryExecutorInterface;
 import krystal.framework.logging.LoggingWrapper;

@@ -1,8 +1,9 @@
 package krystal.framework;
 
 import javafx.application.Application;
+import krystal.ConsoleView;
 import krystal.JSON;
-import krystal.framework.core.ConsoleView;
+import krystal.framework.commander.CommanderInterface;
 import krystal.framework.core.PropertiesAndArguments;
 import krystal.framework.core.PropertiesInterface;
 import krystal.framework.core.jfxApp;
@@ -18,6 +19,7 @@ import lombok.extern.log4j.Log4j2;
 import lombok.val;
 import org.apache.catalina.LifecycleException;
 import org.apache.catalina.startup.Tomcat;
+import org.apache.logging.log4j.core.layout.PatternLayout;
 import org.springframework.context.ApplicationContext;
 import org.springframework.context.annotation.AnnotationConfigApplicationContext;
 
@@ -261,7 +263,13 @@ public class KrystalFramework {
 	 */
 	public void startConsole() {
 		disposeConsole();
-		console = new ConsoleView();
+		console = new ConsoleView(
+				LoggingWrapper.ROOT_LOGGER,
+				PatternLayout.newBuilder()
+				             .setPattern(loggingPattern)
+				             .build(),
+				command -> CommanderInterface.getInstance().ifPresent(ci -> ci.parseCommand(command))
+		);
 	}
 	
 	// TODO startNativeConsole (cmd line listener for native console input)
