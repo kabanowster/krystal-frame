@@ -2,9 +2,6 @@ package krystal.framework.database.abstraction;
 
 import krystal.framework.database.queryfactory.*;
 
-import java.util.Collection;
-import java.util.Optional;
-
 /**
  * Represents the database column instance. Attach to enum to create a convenient column access when building queries.
  */
@@ -73,12 +70,6 @@ public interface ColumnInterface {
 	
 	default ColumnInterface fun(String function, boolean addNameAsAlias) {
 		return () -> "%s(%s)%s".formatted(function, getSqlName(), addNameAsAlias ? " " + getSqlName() : "");
-	}
-	
-	static Optional<ColumnInterface> pickEqual(ColumnInterface column, Collection<ColumnInterface> from) {
-		return from.stream()
-		           .filter(c -> c.getSqlName().equalsIgnoreCase(column.getSqlName()))
-		           .findFirst();
 	}
 	
 	enum Functions {

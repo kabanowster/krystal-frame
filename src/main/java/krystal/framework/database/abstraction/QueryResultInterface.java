@@ -61,6 +61,20 @@ public interface QueryResultInterface {
 	}
 	
 	/**
+	 * Gets the registered {@link ColumnInterface} column by its name.
+	 */
+	default Optional<ColumnInterface> column(String name) {
+		return columns().keySet().stream().filter(c -> name.equalsIgnoreCase(c.getSqlName())).findFirst();
+	}
+	
+	/**
+	 * Gets the registered {@link ColumnInterface} column if its name matches the givens.
+	 */
+	default Optional<ColumnInterface> column(ColumnInterface name) {
+		return column(name.getSqlName());
+	}
+	
+	/**
 	 * @return First row as Map.
 	 */
 	default Optional<Map<ColumnInterface, Object>> getRow() {
@@ -73,8 +87,7 @@ public interface QueryResultInterface {
 	 * @return ValuesColumn of a single column as list.
 	 */
 	default List<Object> getColumn(ColumnInterface column) {
-		val equalColumn = ColumnInterface.pickEqual(column, columns().keySet()).orElseThrow();
-		return rows().stream().map(row -> row.get(equalColumn)).collect(Collectors.toList());
+		return rows().stream().map(row -> row.get(column(column).orElseThrow())).collect(Collectors.toList());
 	}
 	
 	/**
@@ -85,7 +98,7 @@ public interface QueryResultInterface {
 	default List<Map<ColumnInterface, Object>> getColumns(ColumnInterface... columns) {
 		val columnsKeys = columns().keySet();
 		val cols = Arrays.stream(columns)
-		                 .map(c -> ColumnInterface.pickEqual(c, columnsKeys).orElseThrow())
+		                 .map(c -> column(c).orElseThrow())
 		                 .toList();
 		return rows().stream()
 		             .map(row -> row.entrySet().stream()
@@ -110,8 +123,7 @@ public interface QueryResultInterface {
 	 * @return First row result at given column name.
 	 */
 	default Optional<Object> getResult(ColumnInterface column) {
-		val equalColumn = ColumnInterface.pickEqual(column, columns().keySet()).orElseThrow();
-		return rows().stream().findFirst().map(o -> o.get(equalColumn));
+		return rows().stream().findFirst().map(o -> o.get(column(column).orElseThrow()));
 	}
 	
 	/**
@@ -122,8 +134,8 @@ public interface QueryResultInterface {
 	default void unpivot(ColumnInterface fieldsColumn, ColumnInterface valuesColumn, ColumnInterface... intoColumns) {
 		
 		// The interfaces have no equals, so we need to pull the corresponding ones from the object...
-		val equalFieldsColumn = ColumnInterface.pickEqual(fieldsColumn, columns().keySet()).orElseThrow();
-		val equalValuesColumn = ColumnInterface.pickEqual(valuesColumn, columns().keySet()).orElseThrow();
+		val equalFieldsColumn = column(fieldsColumn).orElseThrow();
+		val equalValuesColumn = column(valuesColumn).orElseThrow();
 		
 		// group columns that stay
 		final Map<ColumnInterface, Class<?>> groupBy = new LinkedHashMap<>(columns());
