@@ -51,13 +51,16 @@ public class BaseCommander implements CommanderInterface {
 				return true;
 			}
 			case loglvl -> {
-				logConsole("--> Set logger level");
+				logConsole(">>> Set logger level");
 				LoggingWrapper.setRootLevel(arguments.isEmpty() ? null : arguments.getFirst());
 				logConsole("    New level: " + log().getLevel().name());
 				return true;
 			}
 			case log -> {
-				if (arguments.isEmpty()) return false;
+				if (arguments.isEmpty()) {
+					logConsole(">>> To log a message - provide arguments: -m the_message, and optionally -l the_logging_level.");
+					return true;
+				}
 				var lvl = LoggingWrapper.CONSOLE;
 				String msg = null;
 				
@@ -90,12 +93,12 @@ public class BaseCommander implements CommanderInterface {
 			}
 			case props -> {
 				for (var arg : arguments) {
-					if (argumentMatches(arg, "-l", "list")) {
+					if (argumentMatches(arg, "-l")) {
 						logConsole(">>> Stored Properties: " + PropertiesInterface.printAll());
 						return true;
 					}
 					
-					if (argumentMatches(arg, "-r", "remove")) {
+					if (argumentMatches(arg, "-r")) {
 						val prop = getArgumentValue(arg);
 						PropertiesInterface.properties.remove(prop);
 						logConsole(">>> Property removed: \"%s\".".formatted(prop));
@@ -125,7 +128,7 @@ public class BaseCommander implements CommanderInterface {
 					}
 				}
 				
-				logConsole("??? Specify the arguments of the props command: -l/--list to list all properties, -r/--remove to remove a property, [name] to return property or [name] [value] to set.");
+				logConsole("??? Specify the arguments of the props command: -l to list all properties, -r to remove a property, [name] to return property or [name] [value] to set.");
 				return false;
 			}
 			case providers -> {
