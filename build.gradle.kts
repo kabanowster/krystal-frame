@@ -6,7 +6,7 @@ plugins {
 }
 
 group = "io.krystal"
-version = "1.10.0"
+version = "1.11.1"
 
 java {
 //    withJavadocJar()
