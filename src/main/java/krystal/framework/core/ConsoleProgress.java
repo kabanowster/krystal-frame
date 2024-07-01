@@ -8,10 +8,9 @@ import lombok.AllArgsConstructor;
 import lombok.NoArgsConstructor;
 import lombok.extern.log4j.Log4j2;
 import org.apache.logging.log4j.Level;
+import org.jsoup.nodes.Element;
 
-import javax.swing.text.BadLocationException;
-import javax.swing.text.Element;
-import java.io.IOException;
+import java.awt.EventQueue;
 import java.util.Optional;
 
 @Log4j2
@@ -61,45 +60,34 @@ public class ConsoleProgress extends ProgressRenderer {
 	
 	@Override
 	public ConsoleProgress render() {
-		getDocElement().ifPresentOrElse(
-				element -> {
-					try {
-						console.getDoc().setOuterHTML(element, toString());
-					} catch (BadLocationException | IOException | NullPointerException e) {
-						log.error("ProgressRenderer: Unable to update body. {}", e.getMessage());
-					}
-				},
-				() -> {
-					try {
+		EventQueue.invokeLater(() -> {
+			getDocElement().ifPresentOrElse(
+					element -> element.html(toString()),
+					() -> {
 						switch (position) {
-							case after -> console.getDoc().insertAfterEnd(console.getContent(), toString());
-							case before -> console.getDoc().insertBeforeStart(console.getContent(), toString());
-							case append -> console.getDoc().insertBeforeEnd(console.getContent(), toString());
+							case after -> console.getContent().after(toString());
+							case before -> console.getContent().before(toString());
+							case append -> console.getContent().append(toString());
 							case logger -> log.log(Optional.ofNullable(loggerLevel).orElse(LoggingWrapper.ROOT_LOGGER.getLevel()), toString());
 						}
-					} catch (BadLocationException | IOException | NullPointerException e) {
-						log.error("ProgressRenderer: Unable to insert body. {}", e.getMessage());
 					}
-				}
-		);
+			);
+			console.revalidate();
+		});
 		return this;
 	}
 	
 	@Override
 	public void dispose() {
-		getDocElement().ifPresent(
-				e -> {
-					try {
-						console.getDoc().remove(e.getStartOffset(), e.getEndOffset() - e.getStartOffset());
-					} catch (NullPointerException | BadLocationException _) {
-					}
-				}
-		);
+		EventQueue.invokeLater(() -> {
+			getDocElement().ifPresent(Element::remove);
+			console.revalidate();
+		});
 	}
 	
 	private Optional<Element> getDocElement() {
 		if (console == null) return Optional.empty();
-		return Optional.ofNullable(console.getDoc().getElement(getId()));
+		return Optional.ofNullable(console.getDoc().getElementById(getId()));
 	}
 	
 	public enum Position {
