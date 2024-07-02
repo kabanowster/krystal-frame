@@ -32,6 +32,10 @@ public class ConsoleProgress extends ProgressRenderer {
 		setTarget(targetValue);
 	}
 	
+	public ConsoleProgress(String unit) {
+		setUnit(unit);
+	}
+	
 	public ConsoleProgress console(ConsoleView console) {
 		this.console = console;
 		return this;
