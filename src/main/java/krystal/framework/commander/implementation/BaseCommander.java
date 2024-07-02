@@ -51,9 +51,12 @@ public class BaseCommander implements CommanderInterface {
 				return true;
 			}
 			case loglvl -> {
-				logConsole(">>> Set logger level");
-				LoggingWrapper.setRootLevel(arguments.isEmpty() ? null : arguments.getFirst());
-				logConsole("    New level: " + log().getLevel().name());
+				if (arguments.isEmpty()) {
+					logConsole(">>> Current logger level: " + log().getLevel().name());
+					return true;
+				}
+				LoggingWrapper.setRootLevel(arguments.getFirst());
+				logConsole(">>> New logger level: " + log().getLevel().name());
 				return true;
 			}
 			case log -> {
