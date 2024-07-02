@@ -23,6 +23,7 @@ import org.apache.logging.log4j.core.layout.PatternLayout;
 import org.springframework.context.ApplicationContext;
 import org.springframework.context.annotation.AnnotationConfigApplicationContext;
 
+import javax.annotation.Nullable;
 import java.time.format.DateTimeFormatter;
 import java.util.*;
 import java.util.stream.Collectors;
@@ -261,15 +262,23 @@ public class KrystalFramework {
 	 *
 	 * @see ConsoleView
 	 */
-	public void startConsole() {
+	public void startConsole(@Nullable String windowTitle) {
 		disposeConsole();
 		console = new ConsoleView(
+				windowTitle,
 				LoggingWrapper.ROOT_LOGGER,
 				PatternLayout.newBuilder()
 				             .setPattern(loggingPattern)
 				             .build(),
 				command -> CommanderInterface.getInstance().ifPresent(ci -> ci.parseCommand(command))
 		);
+	}
+	
+	/**
+	 * @see #startConsole(String)
+	 */
+	public void startConsole() {
+		startConsole(null);
 	}
 	
 	// TODO startNativeConsole (cmd line listener for native console input)
