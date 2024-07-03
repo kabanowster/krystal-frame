@@ -111,6 +111,10 @@ public interface PropertiesInterface extends LoggingInterface {
 	
 	String name();
 	
+	static PropertiesInterface of(String name) {
+		return () -> name;
+	}
+	
 	/**
 	 * @return Optional property's value.
 	 */
