@@ -5,7 +5,7 @@ import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 
 /**
- * Convenient way to access {@link Logger}.
+ * Convenient way to access {@link Logger} from interfaces.
  *
  * @see #log()
  * @see #logTest(String)
