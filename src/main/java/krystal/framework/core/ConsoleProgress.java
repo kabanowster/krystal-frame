@@ -91,7 +91,7 @@ public class ConsoleProgress extends ProgressRenderer {
 	
 	private Optional<Element> getDocElement() {
 		if (console == null) return Optional.empty();
-		return Optional.ofNullable(console.getDoc().getElementById(getId()));
+		return Optional.ofNullable(console.getContentDocument().getElementById(getId()));
 	}
 	
 	public enum Position {
