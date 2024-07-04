@@ -37,7 +37,7 @@ import java.util.stream.Collectors;
  * </ol>
  *
  * @see #primaryInitialization(String...)
- * @see #frameSpringConsole(List, String...)
+ * @see #frameSpringConsole(String, List, String...)
  * @see #frameSpringJavaFX(List, String...)
  * @see #startTomcatServer(TomcatProperties)
  */
@@ -144,7 +144,10 @@ public class KrystalFramework {
 	 * @see TomcatFactory
 	 */
 	private @Getter Tomcat tomcat;
-	
+	/**
+	 * Splash string to output upon initialization.
+	 */
+	private @Getter @Setter @Nullable String initializationSplash = getDefaultSplash();
 	/*
 	 * Launch modules
 	 */
@@ -166,27 +169,15 @@ public class KrystalFramework {
 	 * @see #setProvidersPool(List)
 	 * @see #selectDefaultImplementations(DefaultImplementation...)
 	 * @see #selectAllDefaultImplementationsExcept(DefaultImplementation...)
+	 * @see #setInitializationSplash(String)
 	 * @see #getSpringContext()
 	 * @see #getJfxApplication()
 	 * @see #getTomcat()
 	 */
 	public void primaryInitialization(String... args) {
-		//@formatter:off
-		log.fatal("""
-
-
-*@@@@* *@@@*   *@@@***@@m  *@@@*   *@@* m@***@m@@@@**@@**@@@      @@      *@@@@*         *@@@***@@@*@@@***@@m        @@      *@@@@m     m@@@**@@@***@@@
-\s\s@@   m@*       @@   *@@m   @@@   m@  m@@    *@@*   @@   *@     m@@m       @@             @@    *@  @@   *@@m      m@@m       @@@@    @@@@    @@    *@
-\s\s@@ m@*         @@   m@@     @@@ m@   *@@@m         @@         m@*@@!      @@             @@   @    @@   m@@      m@*@@!      @ @@   m@ @@    @@   @
-\s\s@@@@@m         !@@@@@@       @!@@      *@@@@@m     !@        m@  *@@      @@             @@**@@    !@@@@@@      m@  *@@      @  @!  @* @@    @@@@@@
-\s\s!@  @@!        !@  @@m        !@           *@@     !@        @@@!@!@@     @!     m       !@   @    !@  @@m      @@@!@!@@     !  @!m@*  @@    @@   @  m
-\s\s!@   *!!m      !@   *!@       !@     @@     @@     !@       !*      @@    @!    :@       !@        !@   *!@    !*      @@    !  *!@*   @@    @!     m@
-\s\s!!    !:!      !@  ! !!       !@     !     *@!     !@        !!!!@!!@     !!     !       !!        !@  ! !!     !!!!@!!@     !  !!!!*  !!    !!   !  !
-\s\s!!     :!!!    !!   *!!!      !!     !!     !!     !!       !*      !!    !:    !!       :!        !!   *!!!   !*      !!    :  *!!*   !!    !!     !!
-: : :      : : : :!:  : : :   : :::    :!: : :!    : :!::   : : :   : ::: : :: !: :      :!: :     : :!:  : : :: : :   : ::: : ::: :   : ::: : :::!: : :
-				          """);
-		//@formatter:on
+		Optional.ofNullable(initializationSplash).ifPresent(log::fatal);
 		
+		// not defined on declaration because of dependency on exposedDirPath
 		if (appPropertiesFile == null) appPropertiesFile = exposedDirPath + "/application.properties";
 		if (commanderFile == null) commanderFile = exposedDirPath + "/commander.txt";
 		if (cssCustomFile == null) cssCustomFile = exposedDirPath + "/style.css";
@@ -310,12 +301,15 @@ public class KrystalFramework {
 	/**
 	 * Frame simple Swing console-log output, backed by Spring annotation context.
 	 */
-	public void frameSpringConsole(List<Class<?>> springContextRootClasses, String... args) {
-		startConsole();
+	public void frameSpringConsole(@Nullable String consoleWindowTitle, List<Class<?>> springContextRootClasses, String... args) {
+		startConsole(consoleWindowTitle);
 		primaryInitialization(args);
 		startSpringCore(springContextRootClasses);
 	}
 	
+	public void frameSpringConsole(List<Class<?>> springContextRootClasses, String... args) {
+		frameSpringConsole(null, springContextRootClasses, args);
+	}
 	/*
 	 * Utilities
 	 */
@@ -392,6 +386,32 @@ public class KrystalFramework {
 		map.put("selectedDefaultImplementations", selectedDefaultImplementations.stream().map(Enum::toString).toList());
 		
 		return JSON.from(map).toString(4);
+	}
+	
+	private String getDefaultSplash() {
+		//@formatter:off
+		return """
+
+
+ /\\  /\\  /\\  /\\  /\\  /\\  /\\  /\\  /\\  /\\  /\\  /\\  /\\  /\\  /\\  /\\  /\\  /\\  /\\  /\\  /\\  /\\\s
+//\\\\//\\\\//\\\\//\\\\//\\\\//\\\\//\\\\//\\\\//\\\\//\\\\//\\\\//\\\\//\\\\//\\\\//\\\\//\\\\//\\\\//\\\\//\\\\//\\\\//\\\\//\\\\
+\\\\//\\\\//\\\\//\\\\//\\\\//\\\\//\\\\//\\\\//\\\\//\\\\//\\\\//\\\\//\\\\//\\\\//\\\\//\\\\//\\\\//\\\\//\\\\//\\\\//\\\\//\\\\//
+ \\/  \\/  \\/  \\/  \\/  \\/  \\/  \\/  \\/  \\/  \\/  \\/  \\/  \\/  \\/  \\/  \\/  \\/  \\/  \\/  \\/  \\/\s
+ /\\                                                                                  /\\\s
+//\\\\        __ __                 __        __   ______                             //\\\\
+\\\\//       / //_/_______  _______/ /_____ _/ /  / ____/________ _____ ___  ___      \\\\//
+ \\/       / ,<  / ___/ / / / ___/ __/ __ `/ /  / /_  / ___/ __ `/ __ `__ \\/ _ \\      \\/\s
+ /\\      / /| |/ /  / /_/ (__  ) /_/ /_/ / /  / __/ / /  / /_/ / / / / / /  __/      /\\\s
+//\\\\    /_/ |_/_/   \\__, /____/\\__/\\__,_/_/  /_/   /_/   \\__,_/_/ /_/ /_/\\___/      //\\\\
+\\\\//               /____/                                                           \\\\//
+ \\/                                                                                  \\/\s
+ /\\  /\\  /\\  /\\  /\\  /\\  /\\  /\\  /\\  /\\  /\\  /\\  /\\  /\\  /\\  /\\  /\\  /\\  /\\  /\\  /\\  /\\\s
+//\\\\//\\\\//\\\\//\\\\//\\\\//\\\\//\\\\//\\\\//\\\\//\\\\//\\\\//\\\\//\\\\//\\\\//\\\\//\\\\//\\\\//\\\\//\\\\//\\\\//\\\\//\\\\
+\\\\//\\\\//\\\\//\\\\//\\\\//\\\\//\\\\//\\\\//\\\\//\\\\//\\\\//\\\\//\\\\//\\\\//\\\\//\\\\//\\\\//\\\\//\\\\//\\\\//\\\\//\\\\//
+ \\/  \\/  \\/  \\/  \\/  \\/  \\/  \\/  \\/  \\/  \\/  \\/  \\/  \\/  \\/  \\/  \\/  \\/  \\/  \\/  \\/  \\/
+ 
+ 				          """;
+		//@formatter:on
 	}
 	
 }
