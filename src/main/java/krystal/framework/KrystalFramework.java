@@ -226,6 +226,8 @@ public class KrystalFramework {
 	public void startSpringCore(List<Class<?>> contextRootClasses) {
 		val classes = new ArrayList<>(contextRootClasses);
 		// classes.addFirst(KrystalFramework.class);
+		if (selectedDefaultImplementations == null)
+			selectDefaultImplementations();
 		classes.addAll(selectedDefaultImplementations.stream().map(i -> i.implementation).toList());
 		springContext = new AnnotationConfigApplicationContext(classes.toArray(Class[]::new));
 	}
@@ -323,17 +325,17 @@ public class KrystalFramework {
 	 * Choose the {@link DefaultImplementation default implementations} of core framework components, to be loaded during Spring component scan.
 	 *
 	 * @param selectedImplementations
-	 * 		If Null, all default implementations will be loaded.
+	 * 		If none, all default implementations will be loaded.
 	 */
 	public void selectDefaultImplementations(DefaultImplementation... selectedImplementations) {
-		selectedDefaultImplementations = new HashSet<>(Set.of(selectedImplementations.length == 0 ? DefaultImplementation.values() : selectedImplementations));
+		selectedDefaultImplementations = Set.of(selectedImplementations.length == 0 ? DefaultImplementation.values() : selectedImplementations);
 	}
 	
 	/**
 	 * Choose all {@link DefaultImplementation default implementations} of core framework components, except selected, to be loaded during Spring component scan.
 	 *
 	 * @param excludedImplementations
-	 * 		If Null, all default implementations will be loaded.
+	 * 		If none, all default implementations will be loaded.
 	 */
 	public void selectAllDefaultImplementationsExcept(DefaultImplementation... excludedImplementations) {
 		selectedDefaultImplementations = new HashSet<>(Set.of(DefaultImplementation.values()));
