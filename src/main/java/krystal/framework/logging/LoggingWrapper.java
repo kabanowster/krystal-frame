@@ -7,12 +7,15 @@ import krystal.framework.core.PropertiesInterface;
 import lombok.experimental.UtilityClass;
 import org.apache.logging.log4j.Level;
 import org.apache.logging.log4j.LogManager;
+import org.apache.logging.log4j.core.AbstractLifeCycle;
 import org.apache.logging.log4j.core.Logger;
 import org.apache.logging.log4j.core.appender.RollingFileAppender;
 import org.apache.logging.log4j.core.appender.rolling.DefaultRolloverStrategy;
 import org.apache.logging.log4j.core.appender.rolling.SizeBasedTriggeringPolicy;
 import org.apache.logging.log4j.core.config.Configurator;
 import org.apache.logging.log4j.core.layout.PatternLayout;
+
+import java.util.Optional;
 
 /**
  * Simple logging wrapper around log4j. Use {@link LoggingInterface} to attach {@link LoggingInterface#log() log()} method to classes. Call {@link #initialize()} to load properties from {@link PropertiesInterface} and start file appender if the
@@ -29,7 +32,7 @@ import org.apache.logging.log4j.core.layout.PatternLayout;
  * Additional log levels: {@link #TEST}, {@link #CONSOLE}
  *
  * @see LoggingInterface
- * @see #startFileAppender()
+ * @see #initFileAppender()
  * @see #setRootLevel(String)
  * @see #parseLogLevel(String)
  */
@@ -62,7 +65,7 @@ public class LoggingWrapper {
 		// Start file appender if not suspended by cmdArgs
 		if ((Boolean) PropertiesAndArguments.logtofile.value().orElse(false))
 			try {
-				startFileAppender();
+				initFileAppender();
 			} catch (IllegalStateException ex) {
 				ROOT_LOGGER.fatal("=== Logging to file - failed initiation. Check directory access.");
 			}
@@ -92,7 +95,7 @@ public class LoggingWrapper {
 	/**
 	 * Builds and (re)starts default {@link RollingFileAppender} including loaded {@link PropertiesAndArguments} - <i>logfile</i> and <i>logdir</i>.
 	 */
-	private void startFileAppender() {
+	public void initFileAppender() {
 		if (fileAppender != null) {
 			fileAppender.stop();
 			ROOT_LOGGER.removeAppender(fileAppender);
@@ -125,6 +128,14 @@ public class LoggingWrapper {
 		ROOT_LOGGER.addAppender(fileAppender);
 		fileAppender.start();
 		ROOT_LOGGER.fatal("=== Logging to file started at level {}{}", ROOT_LOGGER.getLevel(), PropertiesInterface.areAny() ? ", with App properties: " + PropertiesInterface.printAll() : ".");
+	}
+	
+	public void stopFileAppender() {
+		Optional.ofNullable(fileAppender).ifPresentOrElse(AbstractLifeCycle::stop, () -> ROOT_LOGGER.warn("=== Logging to file can not be stopped, because file appender was not initialized. Use 'logfa init' to initialize it first."));
+	}
+	
+	public void startFileAppender() {
+		Optional.ofNullable(fileAppender).ifPresentOrElse(AbstractLifeCycle::start, () -> ROOT_LOGGER.warn("=== Logging to file can not be started, because file appender was not initialized. Use 'logfa init' to initialize it first."));
 	}
 	
 }
