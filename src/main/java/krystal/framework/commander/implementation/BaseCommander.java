@@ -1,5 +1,6 @@
 package krystal.framework.commander.implementation;
 
+import com.google.common.base.Strings;
 import krystal.ConsoleView;
 import krystal.JSON;
 import krystal.Tools;
@@ -14,9 +15,11 @@ import lombok.val;
 import org.apache.catalina.LifecycleException;
 import org.springframework.stereotype.Service;
 
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Optional;
+import java.util.concurrent.atomic.AtomicReference;
 import java.util.stream.Collectors;
 
 /**
@@ -30,7 +33,7 @@ public class BaseCommander implements CommanderInterface {
 	@Override
 	public boolean executeCommand(CommandInterface command, List<String> arguments) {
 		
-		logConsole(">>>>%s %s".formatted(command.name(), String.join(" ", arguments)));
+		logConsole(">>>>%s [%s]".formatted(command.name(), String.join(" ", arguments)));
 		
 		BaseCommands acceptedCommand;
 		try {
@@ -43,112 +46,144 @@ public class BaseCommander implements CommanderInterface {
 			case exit -> {
 				log().fatal(">>> EXIT COMMAND");
 				if (!arguments.isEmpty()) {
-					getValueIfArgumentIs(arguments.getFirst(), "-m", "msg").ifPresent(
-							s -> log().fatal("--> WITH MESSAGE: {}", s)
-					);
+					CommanderInterface.getValueIfArgumentMatches(arguments.getFirst(), "m", "msg").ifPresent(s -> log().fatal("--> WITH MESSAGE: {}", s));
 				}
 				KrystalFramework.quit();
 				return true;
 			}
-			case loglvl -> {
+			case log -> {
 				if (arguments.isEmpty()) {
 					logConsole(">>> Current logger level: " + log().getLevel().name());
 					return true;
 				}
-				LoggingWrapper.setRootLevel(arguments.getFirst());
-				logConsole(">>> New logger level: " + log().getLevel().name());
-				return true;
-			}
-			case log -> {
-				if (arguments.isEmpty()) {
-					logConsole(">>> To log a message - provide arguments: -m the_message, and optionally -l the_logging_level.");
-					return true;
-				}
-				var lvl = LoggingWrapper.CONSOLE;
-				String msg = null;
 				
+				String lvlArg = null;
+				boolean print = false;
+				val printArgs = new ArrayList<String>();
 				for (var arg : arguments) {
-					if (argumentMatches(arg, "-m", "msg")) {
-						msg = getArgumentValue(arg);
+					if (CommanderInterface.argumentMatches(arg, "?", "h", "help")) {
+						logConsole("""
+						           <h2>log arguments</h2>
+						           <dl>
+						           	<dt><b><i>lvl</i></b> new_level</dt><dd>Set a new root logger level.</dd>
+						           	<dt><b><i>print</i></b> [args]</dt><dd>
+						           		Print to logging stream. Use "-m", "-msg", "--" or put your message in quotes. Use "-l" argument to set a level for the message, CONSOLE by default.
+						           	</dd>
+						           </dl>
+						           """);
+						return true;
+					}
+				}
+				for (var arg : arguments) {
+					if (CommanderInterface.argumentMatches(arg, "lvl")) {
+						lvlArg = arg;
 						continue;
 					}
 					
-					if (argumentMatches(arg, "-l", "lvl")) {
-						lvl = LoggingWrapper.parseLogLevel(getArgumentValue(arg));
-						continue;
+					if (CommanderInterface.argumentMatches(arg, "print")) {
+						print = true;
+					} else {
+						printArgs.add(arg);
 					}
-					
-					msg = arg;
 				}
 				
-				if (msg == null) return false;
+				if (lvlArg != null) {
+					LoggingWrapper.setRootLevel(CommanderInterface.getArgumentValue(lvlArg));
+					logConsole(">>> New logger level: " + log().getLevel().name());
+				}
 				
-				log().log(lvl, msg);
+				if (print) {
+					var lvl = new AtomicReference<>(LoggingWrapper.CONSOLE);
+					val msg = new StringBuilder();
+					for (var arg : printArgs) {
+						CommanderInterface.getValueIfArgumentMatches(arg, "", "m", "msg").ifPresent(msg::append);
+						CommanderInterface.getValueIfArgumentIsEnclosed(arg, EnclosingType.QUOTES).ifPresent(msg::append);
+						CommanderInterface.getValueIfArgumentMatches(arg, "l").map(LoggingWrapper::parseLogLevel).ifPresent(lvl::set);
+					}
+					
+					if (!msg.isEmpty()) {
+						log().log(lvl.get(), msg.toString());
+					}
+				}
+				
 				return true;
 			}
 			case console -> {
 				KrystalFramework.startConsole();
 				return true;
 			}
-			case cls, clear -> {
+			case cls -> {
 				Optional.ofNullable(KrystalFramework.getConsole()).ifPresent(ConsoleView::clear);
 				return true;
 			}
 			case props -> {
-				for (var arg : arguments) {
-					if (argumentMatches(arg, "-l")) {
-						logConsole(">>> Stored Properties: " + PropertiesInterface.printAll());
-						return true;
-					}
-					
-					if (argumentMatches(arg, "-r")) {
-						val prop = getArgumentValue(arg);
-						PropertiesInterface.properties.remove(prop);
-						logConsole(">>> Property removed: \"%s\".".formatted(prop));
-						return true;
-					}
-					
-					val props = arg.split(" ", 2);
-					val prop = props[0];
-					
-					switch (props.length) {
-						case 1 -> {
-							if (PropertiesInterface.properties.containsKey(prop)) {
-								logConsole(">>> Current value for property \"%s\": %s".formatted(prop, PropertiesInterface.properties.get(prop)));
-							} else {
-								logConsole(">>> Property \"%s\" is not set.".formatted(prop));
-							}
-							return true;
-						}
-						case 2 -> {
-							PropertiesInterface.properties.put(prop, props[1]);
-							logConsole(">>> Set value for property \"%s\": %s".formatted(prop, props[1]));
-							return true;
-						}
-						default -> {
-							return false;
-						}
-					}
+				if (arguments.isEmpty()) {
+					logConsole("""
+					           <h2>application properties management</h2>
+					           <p>Specify the arguments of the props command (can repeat within command):</p>
+					           <dl>
+					           <dt><b><i>l, list</i></b></dt><dd>Lists all properties derived from <code>application.properties</code> and command line args.</dd>
+					           <dt><b><i>rm</i></b> property_name</dt><dd>Removes property.</dd>
+					           <dt><b><i>-[-]property_name</i></b> property_value</dt><dd>If only name provided, lists property value. If value provided - sets as new.</dd>
+					           </dl>
+					           """);
 				}
 				
-				logConsole("??? Specify the arguments of the props command: -l to list all properties, -r to remove a property, [name] to return property or [name] [value] to set.");
-				return false;
+				// for enquoted values
+				val prevProp = new AtomicReference<PropertiesInterface>();
+				
+				for (var arg : arguments) {
+					
+					if (CommanderInterface.argumentIsEnclosed(arg, EnclosingType.QUOTES)) {
+						val pp = prevProp.get();
+						if (pp != null) {
+							Optional.ofNullable(CommanderInterface.getEnclosedValue(arg)).ifPresent(v -> {
+								logConsole(">>> Set value for property \"%s\": %s".formatted(pp.name(), v));
+								pp.set(v);
+								prevProp.set(null);
+							});
+						}
+						continue;
+					}
+					
+					if (CommanderInterface.argumentMatches(arg, "l", "list")) {
+						logConsole(">>> Stored Properties: " + PropertiesInterface.printAll());
+						continue;
+					}
+					
+					if (CommanderInterface.argumentMatches(arg, "rm")) {
+						Optional.ofNullable(CommanderInterface.getArgumentValue(arg)).ifPresentOrElse(p -> {
+							if (PropertiesInterface.properties.remove(p) != null) {
+								logConsole(">>> Property removed: \"%s\".".formatted(p));
+							} else {
+								logConsole(">>> Property \"%s\" is not set.".formatted(p));
+							}
+						}, () -> logConsole(">>> Property name missing for remove command."));
+						continue;
+					}
+					
+					val prop = PropertiesInterface.of(CommanderInterface.getArgumentName(arg));
+					Optional.ofNullable(CommanderInterface.getArgumentValue(arg)).ifPresentOrElse(value -> {
+						prop.set(value);
+						logConsole(">>> Set value for property \"%s\": %s".formatted(prop.name(), value));
+					}, () -> {
+						prevProp.set(prop); // if value was provided in quotes - deal in next iter
+						prop.value().ifPresentOrElse(v -> logConsole(">>> Current value for property \"%s\": %s".formatted(prop.name(), v)), () -> logConsole(">>> Property \"%s\" is not set.".formatted(prop.name())));
+					});
+				}
+				
+				return true;
 			}
 			case providers -> {
 				QueryExecutorInterface.getInstance().ifPresent(q -> logConsole(">>> Loaded DefaultProviders properties:\n%s".formatted(JSON.from(q.getConnectionProperties()).toString(4))));
 				return true;
 			}
 			case help -> {
-				logConsole(">>> List of basic commands: %s".formatted(
-						Arrays.stream(BaseCommands.values()).map(Enum::toString).collect(Collectors.joining(KrystalFramework.getDefaultDelimeter()))
-				));
+				logConsole(">>> List of basic commands: %s".formatted(Arrays.stream(BaseCommands.values()).map(Enum::toString).collect(Collectors.joining(KrystalFramework.getDefaultDelimeter()))));
 				return true;
 			}
 			case spring -> {
-				Optional.ofNullable(KrystalFramework.getSpringContext()).ifPresent(c -> logConsole(">>> Loaded %s Spring Beans:\n\n%s".formatted(
-						c.getBeanDefinitionCount(),
-						String.join("\n", c.getBeanDefinitionNames())
-				)));
+				Optional.ofNullable(KrystalFramework.getSpringContext()).ifPresent(c -> logConsole(">>> Loaded %s Spring Beans:\n\n%s".formatted(c.getBeanDefinitionCount(), String.join("\n", c.getBeanDefinitionNames()))));
 				return true;
 			}
 			case krystal -> {
@@ -163,21 +198,25 @@ public class BaseCommander implements CommanderInterface {
 				}
 				
 				try {
+					val name = new AtomicReference<String>();
+					val source = new AtomicReference<String>();
+					boolean app = false;
+					
 					for (var arg : arguments) {
-						if (argumentMatches(arg, "-s", "stop")) {
+						if (CommanderInterface.argumentMatches(arg, "stop")) {
 							tomcat.stop();
 							logConsole(">>> Tomcat stopped.");
 							return true;
 						}
 						
-						if (argumentMatches(arg, "-i", "start")) {
+						if (CommanderInterface.argumentMatches(arg, "start")) {
 							tomcat.start();
 							tomcat.getConnector();
 							logConsole(">>> Tomcat started.");
 							return true;
 						}
 						
-						if (argumentMatches(arg, "-r", "restart")) {
+						if (CommanderInterface.argumentMatches(arg, "restart")) {
 							tomcat.stop();
 							tomcat.start();
 							tomcat.getConnector();
@@ -185,28 +224,29 @@ public class BaseCommander implements CommanderInterface {
 							return true;
 						}
 						
-						if (argumentMatches(arg, "-a", "app")) {
-							var app = getArgumentValue(arg).split("\\s", 2);
-							if (app.length != 2) {
-								logConsole(">>> Tomcat --app command takes exactly 2 arguments separated with space: appName and appSrc.");
-								return false;
-							}
-							
-							for (var a : app) {
-								if (a.isEmpty()) {
-									logConsole(">>> Tomcat --app arguments must not be empty.");
-									return false;
-								}
-							}
-							
-							if (Tools.getResource(app[1]).isEmpty()) {
-								logConsole(">>> Provided appSrc not found.");
-								return false;
-							}
-							
-							TomcatFactory.addApp(tomcat, app[0], app[1]);
+						if (CommanderInterface.argumentMatches(arg, "a", "app")) {
+							app = true;
 						}
+						
+						CommanderInterface.getValueIfArgumentMatches(arg, "n", "name").ifPresent(name::set);
+						CommanderInterface.getValueIfArgumentMatches(arg, "s", "source").ifPresent(source::set);
+						CommanderInterface.getValueIfArgumentIsEnclosed(arg, EnclosingType.QUOTES).ifPresent(source::set);
+						
 					}
+					
+					if (!app) return true;
+					if (Strings.isNullOrEmpty(name.get()) || Strings.isNullOrEmpty(source.get())) {
+						log().warn(">>> Tomcat app command requires two arguments: -[-n]ame and -[-s]source to be provided.");
+						return true;
+					}
+					
+					if (Tools.getResource(source.get()).isEmpty()) {
+						log().warn(">>> Provided app source not found.");
+						return false;
+					}
+					
+					TomcatFactory.addApp(tomcat, name.get(), source.get());
+					
 				} catch (LifecycleException e) {
 					log().fatal("!!! Tomcat broke with exception:\n{}", e.getMessage());
 				}
