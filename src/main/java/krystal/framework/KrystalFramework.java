@@ -4,10 +4,14 @@ import javafx.application.Application;
 import krystal.ConsoleView;
 import krystal.JSON;
 import krystal.framework.commander.CommanderInterface;
+import krystal.framework.core.NativeConsoleReader;
 import krystal.framework.core.PropertiesAndArguments;
 import krystal.framework.core.PropertiesInterface;
+import krystal.framework.core.flow.FlowControlInterface;
 import krystal.framework.core.jfxApp;
+import krystal.framework.database.abstraction.ConnectionPoolInterface;
 import krystal.framework.database.abstraction.ProviderInterface;
+import krystal.framework.database.abstraction.QueryExecutorInterface;
 import krystal.framework.database.implementation.DefaultProviders;
 import krystal.framework.logging.LoggingWrapper;
 import krystal.framework.tomcat.TomcatFactory;
@@ -20,6 +24,7 @@ import lombok.val;
 import org.apache.catalina.LifecycleException;
 import org.apache.catalina.startup.Tomcat;
 import org.apache.logging.log4j.core.layout.PatternLayout;
+import org.springframework.beans.BeansException;
 import org.springframework.context.ApplicationContext;
 import org.springframework.context.annotation.AnnotationConfigApplicationContext;
 
@@ -274,8 +279,6 @@ public class KrystalFramework {
 		startConsole(null);
 	}
 	
-	// TODO startNativeConsole (cmd line listener for native console input)
-	
 	/**
 	 * Destroys the Swing console-log view.
 	 *
@@ -285,6 +288,19 @@ public class KrystalFramework {
 		if (console != null)
 			console.dispose();
 		console = null;
+	}
+	
+	/**
+	 * @return {@link NativeConsoleReader} loaded into Spring context.
+	 * @see #selectDefaultImplementations(DefaultImplementation...)
+	 * @see #startSpringCore(List)
+	 */
+	public Optional<NativeConsoleReader> getNativeConsoleReader() {
+		try {
+			return Optional.of(springContext.getBean(NativeConsoleReader.class));
+		} catch (BeansException e) {
+			return Optional.empty();
+		}
 	}
 	
 	/*
@@ -348,16 +364,18 @@ public class KrystalFramework {
 	 *
 	 * @see #selectDefaultImplementations(DefaultImplementation...)
 	 * @see #selectAllDefaultImplementationsExcept(DefaultImplementation...)
-	 * @see krystal.framework.database.abstraction.QueryExecutorInterface QueryExecutorInterface
-	 * @see krystal.framework.core.flow.FlowControlInterface FlowControlInterface
-	 * @see krystal.framework.commander.CommanderInterface CommanderInterface
-	 * @see krystal.framework.database.abstraction.ConnectionPoolInterface ConnectionPoolInterface
+	 * @see QueryExecutorInterface QueryExecutorInterface
+	 * @see FlowControlInterface FlowControlInterface
+	 * @see CommanderInterface CommanderInterface
+	 * @see ConnectionPoolInterface ConnectionPoolInterface
+	 * @see NativeConsoleReader
 	 */
 	public enum DefaultImplementation {
 		FlowControl(krystal.framework.core.flow.implementation.FlowControl.class),
 		QueryExecutor(krystal.framework.database.implementation.QueryExecutor.class),
 		BaseCommander(krystal.framework.commander.implementation.BaseCommander.class),
-		ConnectionPool(krystal.framework.database.implementation.ConnectionPool.class);
+		ConnectionPool(krystal.framework.database.implementation.ConnectionPool.class),
+		NativeConsole(NativeConsoleReader.class);
 		
 		public final Class<?> implementation;
 		
