@@ -55,7 +55,7 @@ public interface PropertiesInterface extends LoggingInterface {
 							Object value = null;
 							try {
 								value = properlyCast(props.getProperty(prop));
-							} catch (NullPointerException ignored) {
+							} catch (NullPointerException _) {
 							}
 							properties.put(prop, value);
 						}
@@ -80,25 +80,24 @@ public interface PropertiesInterface extends LoggingInterface {
 	 * Tries to cast the String to Integer, Long, Double or Boolean
 	 */
 	private static Object properlyCast(String arg) {
-		try {
+		
+		if (arg.matches("\\d*[,.]\\d+")) {
+			return Double.parseDouble(arg.replace(",", "."));
+		}
+		
+		if (arg.matches("\\d{1,9}")) {
 			return Integer.parseInt(arg);
-		} catch (Exception ignored) {
 		}
 		
-		try {
+		if (arg.matches("\\d+")) {
 			return Long.parseLong(arg);
-		} catch (Exception ignored) {
 		}
 		
-		try {
-			return Double.parseDouble(arg);
-		} catch (Exception ignored) {
+		if (arg.matches("[yn]|yes|no|true|false")) {
+			return Boolean.parseBoolean(arg);
 		}
 		
-		return switch (arg) {
-			case "y", "n", "yes", "no", "true", "false" -> Boolean.parseBoolean(arg);
-			default -> arg;
-		};
+		return arg;
 	}
 	
 	static String printAll() {
@@ -123,10 +122,26 @@ public interface PropertiesInterface extends LoggingInterface {
 	}
 	
 	/**
-	 * @return True if the command is present in the line.
+	 * @return True if the property has been listed.
 	 */
 	default boolean isPresent() {
 		return properties.containsKey(name());
+	}
+	
+	/**
+	 * Equivalent of {@link Map#put(Object, Object)}, sets the value for this property.
+	 */
+	default Object set(Object value) {
+		return properties.put(name(), value);
+	}
+	
+	/**
+	 * Does value casting before putting to the list.
+	 *
+	 * @see #properlyCast(String)
+	 */
+	default Object set(String value) {
+		return set(properlyCast(value));
 	}
 	
 }
