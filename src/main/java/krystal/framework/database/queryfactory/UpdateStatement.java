@@ -12,7 +12,7 @@ import java.util.stream.Stream;
 
 public class UpdateStatement extends Query implements WhereClauseInterface {
 	
-	private final Set<ColumnsPairingInterface> columnSetPairs;
+	private final Set<ColumnsComparisonInterface> columnSetPairs;
 	private final TableInterface table;
 	
 	public UpdateStatement(TableInterface table) {
@@ -21,7 +21,7 @@ public class UpdateStatement extends Query implements WhereClauseInterface {
 		this.table = table;
 	}
 	
-	public UpdateStatement(TableInterface table, ColumnsPairingInterface... columnSetPairs) {
+	public UpdateStatement(TableInterface table, ColumnsComparisonInterface... columnSetPairs) {
 		this(table);
 		this.columnSetPairs.addAll(Stream.of(columnSetPairs).toList());
 	}
@@ -30,7 +30,7 @@ public class UpdateStatement extends Query implements WhereClauseInterface {
 		return new UpdateStatement(table);
 	}
 	
-	public UpdateStatement set(ColumnsPairingInterface... columnSetPairs) {
+	public UpdateStatement set(ColumnsComparisonInterface... columnSetPairs) {
 		this.columnSetPairs.addAll(Stream.of(columnSetPairs).toList());
 		return this;
 	}

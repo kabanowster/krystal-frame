@@ -11,16 +11,16 @@ import java.util.stream.Stream;
 @Getter
 public class WhereClauseInnerBlock {
 	
-	private final Set<ColumnsPairingInterface> columnIsPairs = new HashSet<>();
+	private final Set<ColumnsComparisonInterface> columnIsPairs = new HashSet<>();
 	@Setter
 	private WhereClauseDelimiter delimiter;
 	
-	public WhereClauseInnerBlock(WhereClauseDelimiter delimiter, ColumnsPairingInterface... columnIsPairs) {
+	public WhereClauseInnerBlock(WhereClauseDelimiter delimiter, ColumnsComparisonInterface... columnIsPairs) {
 		this.delimiter = delimiter;
 		setPairs(columnIsPairs);
 	}
 	
-	public void setPairs(ColumnsPairingInterface... columnIsPairs) {
+	public void setPairs(ColumnsComparisonInterface... columnIsPairs) {
 		this.columnIsPairs.addAll(Stream.of(columnIsPairs).toList());
 	}
 	

@@ -30,7 +30,7 @@ public interface TableInterface {
 		return new SelectStatement(this, columns);
 	}
 	
-	default UpdateStatement update(ColumnsPairingInterface... columnSetPairs) {
+	default UpdateStatement update(ColumnsComparisonInterface... columnSetPairs) {
 		return new UpdateStatement(this, columnSetPairs);
 	}
 	
@@ -46,11 +46,11 @@ public interface TableInterface {
 		return () -> "%s %s".formatted(getSqlName(), alias);
 	}
 	
-	default TableInterface join(JoinTypes joinType, TableInterface table, ColumnsPairingInterface... on) {
+	default TableInterface join(JoinTypes joinType, TableInterface table, ColumnsComparisonInterface... on) {
 		return () -> {
 			val result = new StringBuilder("%s %s JOIN %s ON 1=1".formatted(getSqlName(), joinType, table.getSqlName()));
 			for (var cpi : on)
-				result.append(" AND ").append(cpi.pairTogether());
+				result.append(" AND ").append(cpi.getComparison());
 			return result.toString();
 		};
 	}

@@ -3,12 +3,12 @@ package krystal.framework.database.queryfactory;
 /**
  * Used to pair columns with values in different query parts.
  *
- * @see ColumnSetPair
- * @see ColumnIsPair
+ * @see ColumnSetValueComparison
+ * @see ColumnToValueComparison
  */
 @FunctionalInterface
-public interface ColumnsPairingInterface {
+public interface ColumnsComparisonInterface {
 	
-	String pairTogether();
+	String getComparison();
 	
 }

@@ -2,6 +2,8 @@ package krystal.framework.database.abstraction;
 
 import krystal.framework.database.queryfactory.*;
 
+import java.util.List;
+
 /**
  * Represents the database column instance. Attach to enum to create a convenient column access when building queries.
  */
@@ -17,35 +19,35 @@ public interface ColumnInterface {
 	/**
 	 * @implNote To check for {@code NULL} either leave the list empty or type in {@code "null"}.
 	 */
-	default ColumnsPairingInterface is(Object... values) {
-		return ColumnIsPair.of(this, ColumnOperators.In, ColumnIsPair.parseValues(values));
+	default ColumnsComparisonInterface is(Object... values) {
+		return ColumnToValueComparison.of(this, ColumnsComparisonOperator.IN, values);
 	}
 	
 	/**
 	 * @implNote To check for {@code NULL} either leave the list empty or type in {@code "null"}.
 	 */
-	default ColumnsPairingInterface isNot(Object... values) {
-		return ColumnIsPair.of(this, ColumnOperators.notIn, ColumnIsPair.parseValues(values));
+	default ColumnsComparisonInterface isNot(Object... values) {
+		return ColumnToValueComparison.of(this, ColumnsComparisonOperator.NOT_IN, values);
 	}
 	
-	default ColumnsPairingInterface isBetween(Object left, Object right) {
-		return ColumnIsPair.of(this, ColumnOperators.Between, ColumnIsPair.parseValues(left, right));
+	default ColumnsComparisonInterface isBetween(Object left, Object right) {
+		return ColumnToValueComparison.of(this, ColumnsComparisonOperator.BETWEEN, List.of(left, right));
 	}
 	
-	default ColumnsPairingInterface is(ColumnOperators operator, Object to) {
-		return ColumnIsPair.of(this, operator, ColumnIsPair.parseValues(to));
+	default ColumnsComparisonInterface is(ColumnsComparisonOperator operator, Object to) {
+		return ColumnToValueComparison.of(this, operator, to);
 	}
 	
-	default ColumnsPairingInterface set(Object value) {
-		return ColumnSetPair.of(this, value);
+	default ColumnsComparisonInterface set(Object value) {
+		return ColumnSetValueComparison.of(this, value);
 	}
 	
-	default ColumnsPairingInterface is(ColumnOperators operator, ColumnInterface to) {
-		return ColumnPair.of(this, operator, to);
+	default ColumnsComparisonInterface is(ColumnsComparisonOperator operator, ColumnInterface to) {
+		return ColumnToColumnComparison.of(this, operator, to);
 	}
 	
-	default ColumnsPairingInterface is(ColumnInterface equalTo) {
-		return ColumnPair.of(this, ColumnOperators.Equal, equalTo);
+	default ColumnsComparisonInterface is(ColumnInterface equalTo) {
+		return ColumnToColumnComparison.of(this, ColumnsComparisonOperator.EQUAL, equalTo);
 	}
 	
 	default ColumnInterface as(String alias) {

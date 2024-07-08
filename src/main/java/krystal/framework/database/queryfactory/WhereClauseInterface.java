@@ -7,14 +7,14 @@ interface WhereClauseInterface {
 	
 	Query pack();
 	
-	default WhereClause where(WhereClauseDelimiter delimiter, ColumnsPairingInterface... columnsAre) {
+	default WhereClause where(WhereClauseDelimiter delimiter, ColumnsComparisonInterface... columnsAre) {
 		return new WhereClause(pack(), delimiter, columnsAre);
 	}
 	
 	/**
 	 * By default, the values are linked with AND keyword.
 	 */
-	default WhereClause where(ColumnsPairingInterface... columnsAre) {
+	default WhereClause where(ColumnsComparisonInterface... columnsAre) {
 		return new WhereClause(pack(), WhereClauseDelimiter.AND, columnsAre);
 	}
 	

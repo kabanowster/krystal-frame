@@ -356,10 +356,10 @@ public interface PersistenceInterface extends LoggingInterface {
 		             ));
 	}
 	
-	private ColumnsPairingInterface[] getKeyPairs(Set<Field> keys, Map<Field, ColumnInterface> fieldsColumns, Map<Field, Object> fieldsValues) {
+	private ColumnsComparisonInterface[] getKeyPairs(Set<Field> keys, Map<Field, ColumnInterface> fieldsColumns, Map<Field, Object> fieldsValues) {
 		return keys.stream()
-		           .map(field -> new ColumnIsPair(fieldsColumns.get(field), ColumnOperators.In, List.of(fieldsValues.get(field))))
-		           .toArray(ColumnsPairingInterface[]::new);
+		           .map(field -> new ColumnToValueComparison(fieldsColumns.get(field), ColumnsComparisonOperator.IN, List.of(fieldsValues.get(field))))
+		           .toArray(ColumnsComparisonInterface[]::new);
 	}
 	
 	private boolean keysHaveNoValues(boolean nonIncrementalOnly, Set<Field> keys, Map<Field, Object> fieldsValues) {
@@ -447,7 +447,7 @@ public interface PersistenceInterface extends LoggingInterface {
 		
 		val fieldsColumns = getFieldsColumns();
 		
-		ColumnsPairingInterface[] keysPairs = getKeyPairs(keys, fieldsColumns, fieldsValues);
+		ColumnsComparisonInterface[] keysPairs = getKeyPairs(keys, fieldsColumns, fieldsValues);
 		
 		val table = getTable();
 		
@@ -464,7 +464,7 @@ public interface PersistenceInterface extends LoggingInterface {
 	/**
 	 * Load persistence object from database.
 	 */
-	private Optional<? extends PersistenceInterface> load(TableInterface table, ColumnsPairingInterface[] keysPairs, Map<Field, ColumnInterface> fieldsColumns) {
+	private Optional<? extends PersistenceInterface> load(TableInterface table, ColumnsComparisonInterface[] keysPairs, Map<Field, ColumnInterface> fieldsColumns) {
 		var query = getSelectQuery();
 		if (query == null) {
 			val clazz = getClass();
@@ -497,7 +497,7 @@ public interface PersistenceInterface extends LoggingInterface {
 	/**
 	 * Load persistence object or create a new record if none found.
 	 */
-	private void instantiate(TableInterface table, ColumnsPairingInterface[] keysPairs, Map<Field, ColumnInterface> fieldsColumns, Map<Field, Object> fieldsValues) {
+	private void instantiate(TableInterface table, ColumnsComparisonInterface[] keysPairs, Map<Field, ColumnInterface> fieldsColumns, Map<Field, Object> fieldsValues) {
 		load(table, keysPairs, fieldsColumns)
 				.ifPresentOrElse(
 						this::copyFrom,
@@ -511,7 +511,7 @@ public interface PersistenceInterface extends LoggingInterface {
 	/**
 	 * In case of {@link Vertical} - rewrites the object, with consequences for all {@link Incremental} fields. Otherwise, check if object is persisted - update its values, or instantiate a new record.
 	 */
-	private void save(TableInterface table, ColumnsPairingInterface[] keysPairs, Map<Field, ColumnInterface> fieldsColumns, Map<Field, Object> fieldsValues) {
+	private void save(TableInterface table, ColumnsComparisonInterface[] keysPairs, Map<Field, ColumnInterface> fieldsColumns, Map<Field, Object> fieldsValues) {
 		if (getClass().isAnnotationPresent(Vertical.class)) {
 			delete(table, keysPairs);
 			insertAndConsume(table, fieldsColumns, fieldsValues);
@@ -520,8 +520,8 @@ public interface PersistenceInterface extends LoggingInterface {
 					.ifPresentOrElse(
 							_ -> table.update(fieldsValues.entrySet().stream()
 							                              .filter(e -> !e.getKey().isAnnotationPresent(Key.class))
-							                              .map(e -> ColumnSetPair.of(fieldsColumns.get(e.getKey()), e.getValue()))
-							                              .toArray(ColumnSetPair[]::new))
+							                              .map(e -> ColumnSetValueComparison.of(fieldsColumns.get(e.getKey()), e.getValue()))
+							                              .toArray(ColumnSetValueComparison[]::new))
 							          .where(keysPairs)
 							          .setProvider(getProvider())
 							          .promise()
@@ -551,7 +551,7 @@ public interface PersistenceInterface extends LoggingInterface {
 	/**
 	 * Delete persistence record from database.
 	 */
-	private void delete(TableInterface table, ColumnsPairingInterface[] keysPairs) {
+	private void delete(TableInterface table, ColumnsComparisonInterface[] keysPairs) {
 		val deleted = Long.parseLong(String.valueOf(
 				table.delete().where(keysPairs).setProvider(getProvider()).promise()
 				     .join()

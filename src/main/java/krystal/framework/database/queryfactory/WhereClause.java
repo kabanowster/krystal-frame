@@ -13,27 +13,27 @@ public class WhereClause extends Query implements OrderByInterface, GroupByInter
 	
 	private final List<WhereClauseOuterBlock> where = Collections.synchronizedList(new LinkedList<>());
 	
-	public WhereClause(Query query, WhereClauseDelimiter delimiter, ColumnsPairingInterface... columnsAre) {
+	public WhereClause(Query query, WhereClauseDelimiter delimiter, ColumnsComparisonInterface... columnsAre) {
 		super(query);
 		where.add(new WhereClauseOuterBlock(WhereClauseDelimiter.NULL, new WhereClauseInnerBlock(delimiter, columnsAre)));
 	}
 	
-	public WhereClause orWhere(WhereClauseDelimiter delimiter, ColumnsPairingInterface... columnsAre) {
+	public WhereClause orWhere(WhereClauseDelimiter delimiter, ColumnsComparisonInterface... columnsAre) {
 		where.add(new WhereClauseOuterBlock(WhereClauseDelimiter.OR, new WhereClauseInnerBlock(delimiter, columnsAre)));
 		return this;
 	}
 	
-	public WhereClause orWhere(ColumnsPairingInterface columnIs) {
+	public WhereClause orWhere(ColumnsComparisonInterface columnIs) {
 		where.add(new WhereClauseOuterBlock(WhereClauseDelimiter.OR, new WhereClauseInnerBlock(WhereClauseDelimiter.NULL, columnIs)));
 		return this;
 	}
 	
-	public WhereClause andWhere(WhereClauseDelimiter delimiter, ColumnsPairingInterface... columnsAre) {
+	public WhereClause andWhere(WhereClauseDelimiter delimiter, ColumnsComparisonInterface... columnsAre) {
 		where.add(new WhereClauseOuterBlock(WhereClauseDelimiter.AND, new WhereClauseInnerBlock(delimiter, columnsAre)));
 		return this;
 	}
 	
-	public WhereClause andWhere(ColumnsPairingInterface columnIs) {
+	public WhereClause andWhere(ColumnsComparisonInterface columnIs) {
 		where.add(new WhereClauseOuterBlock(WhereClauseDelimiter.AND, new WhereClauseInnerBlock(WhereClauseDelimiter.NULL, columnIs)));
 		return this;
 	}

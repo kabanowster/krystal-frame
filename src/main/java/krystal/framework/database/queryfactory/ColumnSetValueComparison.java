@@ -6,20 +6,20 @@ import krystal.framework.database.abstraction.Query;
 /**
  * Pairing column with value for SET in UPDATE statement.
  */
-public record ColumnSetPair(ColumnInterface column, Object value) implements ColumnsPairingInterface {
+public record ColumnSetValueComparison(ColumnInterface column, Object value) implements ColumnsComparisonInterface {
 	
 	@Override
-	public String pairTogether() {
+	public String getComparison() {
 		return String.format("%s = %s", column.getSqlName(), Query.parseValueForSQL(value));
 	}
 	
 	@Override
 	public String toString() {
-		return pairTogether();
+		return getComparison();
 	}
 	
-	public static ColumnSetPair of(ColumnInterface column, Object value) {
-		return new ColumnSetPair(column, value);
+	public static ColumnSetValueComparison of(ColumnInterface column, Object value) {
+		return new ColumnSetValueComparison(column, value);
 	}
 	
 }
