@@ -14,11 +14,7 @@ import java.util.stream.Stream;
 public record ColumnToValueComparison(ColumnInterface column, ColumnsComparisonOperator is, List<Object> values) implements ColumnsComparisonInterface {
 	
 	public ColumnToValueComparison {
-		values = parseValues(values.toArray());
-	}
-	
-	public static List<Object> parseValues(Object... values) {
-		return Query.parseValuesForSQL(values).filter(val -> !"NULL".equals(val) && val != null).toList();
+		values = Query.parseValuesForSQL(values.toArray()).filter(val -> !"NULL".equals(val) && val != null).toList();
 	}
 	
 	@Override

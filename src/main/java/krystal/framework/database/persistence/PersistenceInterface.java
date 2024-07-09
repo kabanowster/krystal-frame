@@ -356,9 +356,11 @@ public interface PersistenceInterface extends LoggingInterface {
 		             ));
 	}
 	
-	private ColumnsComparisonInterface[] getKeyPairs(Set<Field> keys, Map<Field, ColumnInterface> fieldsColumns, Map<Field, Object> fieldsValues) {
+	private ColumnsComparisonInterface[] getKeyValuePairs(Set<Field> keys, Map<Field, ColumnInterface> fieldsColumns, Map<Field, Object> fieldsValues) {
+		val includeIfNull = Optional.ofNullable(getClass().getAnnotation(SeparateKeys.class)).map(SeparateKeys::includeIfNull).orElse(true);
 		return keys.stream()
 		           .map(field -> new ColumnToValueComparison(fieldsColumns.get(field), ColumnsComparisonOperator.IN, List.of(fieldsValues.get(field))))
+		           .filter(cvc -> cvc.values().isEmpty() ? includeIfNull : true)
 		           .toArray(ColumnsComparisonInterface[]::new);
 	}
 	
@@ -449,7 +451,7 @@ public interface PersistenceInterface extends LoggingInterface {
 		
 		val fieldsColumns = getFieldsColumns();
 		
-		ColumnsComparisonInterface[] keysPairs = getKeyPairs(keys, fieldsColumns, fieldsValues);
+		ColumnsComparisonInterface[] keysPairs = getKeyValuePairs(keys, fieldsColumns, fieldsValues);
 		
 		val table = getTable();
 		
