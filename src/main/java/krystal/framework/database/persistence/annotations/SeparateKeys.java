@@ -6,10 +6,10 @@ import java.lang.annotation.RetentionPolicy;
 import java.lang.annotation.Target;
 
 /**
- * Marks fields that will be used as keys in persistence executions. Always create the keys and instantiate them, at least with dummy values, unless {@link SeparateKeys @SeparateKeys}.
+ * If applied, the presence of any {@link Key @Key} field passes the key presence check for persistence operation. Otherwise, <b>all</b> keys are required to be set.
  */
-@Target(ElementType.FIELD)
+@Target(ElementType.TYPE)
 @Retention(RetentionPolicy.RUNTIME)
-public @interface Key {
+public @interface SeparateKeys {
 
 }

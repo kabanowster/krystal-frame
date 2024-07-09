@@ -362,10 +362,12 @@ public interface PersistenceInterface extends LoggingInterface {
 		           .toArray(ColumnsComparisonInterface[]::new);
 	}
 	
-	private boolean keysHaveNoValues(boolean nonIncrementalOnly, Set<Field> keys, Map<Field, Object> fieldsValues) {
-		for (Field f : keys.stream().filter(f -> !nonIncrementalOnly || !f.isAnnotationPresent(Incremental.class)).toList())
-			if (Optional.ofNullable(fieldsValues.get(f)).isEmpty()) return true;
-		return false;
+	private boolean keysAreMissingValues(boolean nonIncrementalOnly, Set<Field> keys, Map<Field, Object> fieldsValues) {
+		val finalKeys = keys.stream().filter(f -> !nonIncrementalOnly || !f.isAnnotationPresent(Incremental.class)).toList();
+		int i = finalKeys.size();
+		for (Field f : finalKeys)
+			if (Optional.ofNullable(fieldsValues.get(f)).isEmpty()) --i;
+		return getClass().isAnnotationPresent(SeparateKeys.class) ? i == 0 : i != finalKeys.size();
 	}
 	
 	/*
@@ -442,7 +444,7 @@ public interface PersistenceInterface extends LoggingInterface {
 		val keys = getKeys();
 		val fieldsValues = getFieldsValues();
 		
-		if (keysHaveNoValues(false, keys, fieldsValues))
+		if (keysAreMissingValues(false, keys, fieldsValues))
 			throw logFatalAndThrow(String.format("Keys for %s.class have no values. Aborting %s.", getClass().getSimpleName(), execution));
 		
 		val fieldsColumns = getFieldsColumns();
@@ -542,7 +544,7 @@ public interface PersistenceInterface extends LoggingInterface {
 		if (keys.stream().noneMatch(f -> f.isAnnotationPresent(Incremental.class)))
 			throw logFatalAndThrow(String.format("%s.class does not have @Incremental keys, thus copying amd saving would result in ambiguity.", getClass().getSimpleName()));
 		
-		if (keysHaveNoValues(true, keys, fieldsValues))
+		if (keysAreMissingValues(true, keys, fieldsValues))
 			throw logFatalAndThrow(String.format("Obligatory keys have no values. Aborting creation of %s.class.", getClass().getSimpleName()));
 		
 		insertAndConsume(table, fieldsColumns, fieldsValues);
