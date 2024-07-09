@@ -28,11 +28,11 @@ public interface PropertiesInterface extends LoggingInterface {
 	Map<String, Object> properties = new HashMap<>();
 	
 	/**
-	 * Loads given arguments to {@link #properties} map. Each argument must begin with "--", and values can be pointed either by "=" or single space (i.e. --argument=value or --argument value).
+	 * Loads given arguments to {@link #properties} map. Each argument must begin with {@code --}, and values can be pointed either by {@code space}, {@code =} or {@code :} (i.e. --argument=value).
 	 */
 	static void loadCmdLnArgs(String... args) {
 		Stream.of(String.join(" ", args).split("--")).skip(1).forEach(s -> {
-			val parts = s.strip().split("[\\s=]", 2);
+			val parts = s.strip().split("[\\s=:]+", 2);
 			Object value = null;
 			try {
 				value = properlyCast(parts[1]);
