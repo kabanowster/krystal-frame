@@ -13,6 +13,7 @@ import krystal.framework.logging.LoggingWrapper;
 import krystal.framework.tomcat.TomcatFactory;
 import lombok.val;
 import org.apache.catalina.LifecycleException;
+import org.apache.logging.log4j.core.AbstractLifeCycle;
 import org.springframework.stereotype.Service;
 
 import java.util.ArrayList;
@@ -75,6 +76,26 @@ public class BaseCommander implements CommanderInterface {
 					}
 				}
 				for (var arg : arguments) {
+					if (CommanderInterface.argumentMatches(arg, "fa")) {
+						Optional.ofNullable(CommanderInterface.getArgumentValue(arg)).ifPresentOrElse(
+								fa -> {
+									switch (fa) {
+										case "init" -> LoggingWrapper.initFileAppender();
+										case "start" -> LoggingWrapper.startFileAppender();
+										case "stop" -> LoggingWrapper.stopFileAppender();
+										default -> logConsole(">>> Unidentified logging file appender command.");
+									}
+								},
+								() -> logConsole(">>> Logging to file status: %s.".formatted(
+										Optional.ofNullable(LoggingWrapper.fileAppender)
+										        .map(AbstractLifeCycle::getState)
+										        .map(Enum::name)
+										        .map(n -> "%s. Target file: %s".formatted(n, LoggingWrapper.fileAppender.getFileName()))
+										        .orElse("not initialized")))
+						);
+						continue;
+					}
+					
 					if (CommanderInterface.argumentMatches(arg, "lvl")) {
 						lvlArg = arg;
 						continue;

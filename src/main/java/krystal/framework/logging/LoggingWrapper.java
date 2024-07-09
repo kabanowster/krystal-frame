@@ -7,7 +7,6 @@ import krystal.framework.core.PropertiesInterface;
 import lombok.experimental.UtilityClass;
 import org.apache.logging.log4j.Level;
 import org.apache.logging.log4j.LogManager;
-import org.apache.logging.log4j.core.AbstractLifeCycle;
 import org.apache.logging.log4j.core.Logger;
 import org.apache.logging.log4j.core.appender.RollingFileAppender;
 import org.apache.logging.log4j.core.appender.rolling.DefaultRolloverStrategy;
@@ -127,15 +126,25 @@ public class LoggingWrapper {
 		
 		ROOT_LOGGER.addAppender(fileAppender);
 		fileAppender.start();
-		ROOT_LOGGER.fatal("=== Logging to file started at level {}{}", ROOT_LOGGER.getLevel(), PropertiesInterface.areAny() ? ", with App properties: " + PropertiesInterface.printAll() : ".");
+		ROOT_LOGGER.fatal("=== Logging to file started at level {}, to file: {}", ROOT_LOGGER.getLevel(), fileAppender.getFileName());
 	}
 	
 	public void stopFileAppender() {
-		Optional.ofNullable(fileAppender).ifPresentOrElse(AbstractLifeCycle::stop, () -> ROOT_LOGGER.warn("=== Logging to file can not be stopped, because file appender was not initialized. Use 'logfa init' to initialize it first."));
+		Optional.ofNullable(fileAppender).ifPresentOrElse(
+				rfa -> {
+					rfa.stop();
+					ROOT_LOGGER.warn("=== Logging to file stopped. Use <b><i>start</i></b> command to bring it back.");
+				},
+				() -> ROOT_LOGGER.warn("=== Logging to file can not be stopped, because file appender was not initialized. Use 'log -fa init' to initialize it first."));
 	}
 	
 	public void startFileAppender() {
-		Optional.ofNullable(fileAppender).ifPresentOrElse(AbstractLifeCycle::start, () -> ROOT_LOGGER.warn("=== Logging to file can not be started, because file appender was not initialized. Use 'logfa init' to initialize it first."));
+		Optional.ofNullable(fileAppender).ifPresentOrElse(
+				rfa -> {
+					rfa.start();
+					ROOT_LOGGER.warn("=== Logging to file started.");
+				},
+				() -> ROOT_LOGGER.warn("=== Logging to file can not be started, because file appender was not initialized. Use 'log -fa init' to initialize it first."));
 	}
 	
 }
