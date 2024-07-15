@@ -12,27 +12,16 @@ public interface TasksSchedulerInterface {
 	
 	ScheduledExecutorService SCHEDULER = new ScheduledThreadPoolExecutor(1);
 	
-	Map<ScheduledTask, ScheduledFuture<?>> getScheduledTasks();
+	Map<ScheduledTaskInterface, ScheduledFuture<?>> getScheduledTasks();
 	
-	default void startSchedule(ScheduledTask scheduledTask, Runnable taskRunnable, long interval, TimeUnit unit) {
+	default void startSchedule(ScheduledTaskInterface scheduledTask, Runnable taskRunnable, long interval, TimeUnit unit) {
 		cancelSchedule(scheduledTask);
 		getScheduledTasks().put(scheduledTask, SCHEDULER.scheduleAtFixedRate(taskRunnable, 0, interval, unit));
 	}
 	
-	default void cancelSchedule(ScheduledTask scheduledAction) {
+	default void cancelSchedule(ScheduledTaskInterface scheduledAction) {
 		Optional.ofNullable(getScheduledTasks().remove(scheduledAction))
 		        .ifPresent(action -> action.cancel(true));
-	}
-	
-	@FunctionalInterface
-	interface ScheduledTask {
-		
-		String name();
-		
-		default boolean equals(ScheduledTask other) {
-			return this.name().equals(other.name());
-		}
-		
 	}
 	
 }

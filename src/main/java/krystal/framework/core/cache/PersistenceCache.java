@@ -1,8 +1,9 @@
-package krystal.framework.core;
+package krystal.framework.core.cache;
 
 import krystal.Tools;
 import krystal.VirtualPromise;
 import krystal.framework.KrystalFramework;
+import krystal.framework.core.flow.ScheduledTaskInterface;
 import krystal.framework.core.flow.TasksSchedulerInterface;
 import krystal.framework.database.persistence.PersistenceInterface;
 import krystal.framework.database.persistence.annotations.Key;
@@ -15,10 +16,6 @@ import lombok.val;
 import org.springframework.beans.factory.NoSuchBeanDefinitionException;
 
 import javax.annotation.Nullable;
-import java.lang.annotation.ElementType;
-import java.lang.annotation.Retention;
-import java.lang.annotation.RetentionPolicy;
-import java.lang.annotation.Target;
 import java.lang.reflect.AccessibleObject;
 import java.lang.reflect.Field;
 import java.lang.reflect.InvocationTargetException;
@@ -82,12 +79,6 @@ public abstract class PersistenceCache implements TasksSchedulerInterface {
 	
 	private Stream<Field> getMaps() {
 		return cacheCollectionsSelector().get().filter(f -> Map.class.isAssignableFrom(f.getType()));
-	}
-	
-	@Target({ElementType.FIELD})
-	@Retention(RetentionPolicy.RUNTIME)
-	@interface CacheCollection {
-	
 	}
 	
 	/*
@@ -254,7 +245,7 @@ public abstract class PersistenceCache implements TasksSchedulerInterface {
 		startSchedule(defaultCacheTask, runnable, interval, unit);
 	}
 	
-	public enum DefaultCacheTask implements ScheduledTask {
+	public enum DefaultCacheTask implements ScheduledTaskInterface {
 		AUTO_CLEAR;
 	}
 	
