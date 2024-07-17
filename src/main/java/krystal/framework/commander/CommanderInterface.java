@@ -93,7 +93,7 @@ public interface CommanderInterface extends LoggingInterface {
 	 * Use pattern recognition regex to split the provided line of arguments into argument-value pairs or single arguments/values.
 	 */
 	static List<String> getArguments(String argumentsLine) {
-		return Stream.of(argumentsLine.splitWithDelimiters("([\"'].+[\"'])|([[({<].+[\\\\])}>])|(-{1,2}\\w+(-\\w+)*[ =:]+\\w*)|(-- .*)", 0))
+		return Stream.of(argumentsLine.splitWithDelimiters("([\"'].+[\"'])|([[({<].+[\\\\])}>])|(-{1,2}\\w+(-\\w+)*[ =:]+(\\w+[,;|]*)*)|(-- .*)", 0))
 		             .map(String::strip)
 		             .map(s -> s.replaceAll("^-{1,2}(?=.*?)", ""))
 		             .filter(s -> !Strings.isNullOrEmpty(s))
@@ -133,7 +133,7 @@ public interface CommanderInterface extends LoggingInterface {
 	
 	static boolean argumentValid(@Nullable String argument) {
 		if (argument == null) return false;
-		return argument.matches("\\w+(-\\w+)*[ =:]+\\w*");
+		return argument.matches("\\w+(-\\w+)*[ =:]+(\\w+,*)*");
 	}
 	
 	/**
