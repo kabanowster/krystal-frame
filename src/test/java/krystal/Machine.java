@@ -8,7 +8,7 @@ import krystal.framework.database.persistence.annotations.ColumnsMapping;
 import krystal.framework.database.persistence.annotations.Filter;
 import krystal.framework.database.persistence.annotations.Loader;
 import krystal.framework.database.persistence.annotations.Reader;
-import krystal.framework.database.queryfactory.ColumnOperators;
+import krystal.framework.database.queryfactory.ColumnsComparisonOperator;
 import krystal.framework.database.queryfactory.SelectStatement;
 import krystal.framework.database.queryfactory.WhereClause;
 import lombok.Getter;
@@ -53,7 +53,7 @@ public class Machine implements PersistenceInterface {
 	
 	@Filter
 	private Function<SelectStatement, WhereClause> filter() {
-		return WhereClause.filter(s -> s.where(Columns.linia.is(ColumnOperators.Less, 9000)));
+		return WhereClause.filter(s -> s.where(Columns.linia.is(ColumnsComparisonOperator.LESS, 9000)));
 	}
 	
 	@Override

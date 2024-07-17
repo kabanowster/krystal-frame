@@ -1,5 +1,6 @@
 package krystal;
 
+import krystal.Machine.Columns;
 import krystal.VirtualPromise.ExceptionsHandler;
 import krystal.framework.KrystalFramework;
 import krystal.framework.core.ConsoleProgress;
@@ -16,6 +17,7 @@ import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 
 import java.util.List;
+import java.util.Objects;
 
 public class TestClass implements LoggingInterface {
 	
@@ -47,12 +49,14 @@ public class TestClass implements LoggingInterface {
 	
 	@Test
 	void generalTest() {
-		PersistenceInterface.promiseAll(Machine.class)
-		                    .map(s -> s.map(Machine::render).toList())
-		                    .map(StringRenderer::renderMaps)
-		                    .accept(this::logTest)
-		                    .joinThrow();
-		
+		// PersistenceInterface.promiseAll(Machine.class)
+		//                     .map(s -> s.map(Machine::render).toList())
+		//                     .map(StringRenderer::renderMaps)
+		//                     .accept(this::logTest)
+		//                     .joinThrow();
+		new Machine().getTable().select().where(Columns.nazwa.is("Serac")).promise()
+		             .map(Objects::toString)
+		             .accept(this::logTest);
 	}
 	
 	@Test
@@ -65,10 +69,7 @@ public class TestClass implements LoggingInterface {
 		                    .catchThrow()
 		                    .map(s -> s.map(Machine::render).toList())
 		                    .map(StringRenderer::renderMaps)
-		                    .apply(r -> {
-			                    log().fatal("Will wait now for the other guy");
-			                    return r;
-		                    })
+		                    .apply(_ -> log().fatal("Will wait now for the other guy"))
 		                    .mirror(() -> other)
 		                    .accept(this::logTest);
 		

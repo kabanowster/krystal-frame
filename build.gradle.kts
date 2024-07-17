@@ -6,7 +6,7 @@ plugins {
 }
 
 group = "io.krystal"
-version = "1.14.1"
+version = "1.16.9"
 
 java {
 //    withJavadocJar()
@@ -16,7 +16,7 @@ java {
 dependencies {
     // impl
     jdbc()
-    processing()
+    http()
 
     // api
     api(project(":tools"))
