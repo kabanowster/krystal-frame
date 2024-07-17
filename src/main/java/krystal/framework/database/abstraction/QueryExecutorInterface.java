@@ -78,7 +78,7 @@ public interface QueryExecutorInterface extends LoggingInterface {
 							if (mandatories.size() != MandatoryProperties.values().length)
 								throw new IllegalArgumentException("Mandatory provider properties not found.");
 							
-							connectionStrings.put(provider, provider.dbcDriver().getConnectionStringBase() + String.join("/", mandatories));
+							connectionStrings.put(provider, provider.getDriver().getConnectionStringBase() + String.join("/", mandatories));
 							
 						} catch (IOException | IllegalArgumentException ex) {
 							log().fatal(String.format("!!! Exception while loading '%s' provider properties file at '%s'. Skipping. %s", provider.name(), path.getPath(), ex.getMessage()));
@@ -103,7 +103,7 @@ public interface QueryExecutorInterface extends LoggingInterface {
 		              .stream()
 		              .flatMap(e -> {
 			              val provider = e.getKey();
-			              val driver = provider.dbcDriver();
+			              val driver = provider.getDriver();
 			              
 			              log().trace("--> Querying database: " + provider.name());
 			              

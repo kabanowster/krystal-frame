@@ -84,7 +84,7 @@ public class InsertStatement extends Query {
 				!columns.isEmpty() ? String.format(" (%s)", Tools.concat(", ", columns.stream().map(ColumnInterface::getSqlName))) : ""
 		));
 		
-		val drv = provider.dbcDriver();
+		val drv = provider.getDriver();
 		if (DBCDrivers.jdbcSQLServer.equals(drv)) {
 			query.append(String.format(
 					" OUTPUT %s",
@@ -103,7 +103,7 @@ public class InsertStatement extends Query {
 				      .collect(Collectors.joining(", ")))
 		);
 		
-		if (DBCDrivers.jdbcAS400.equals(provider.dbcDriver())) {
+		if (DBCDrivers.jdbcAS400.equals(provider.getDriver())) {
 			query.append(String.format("SELECT * FROM FINAL TABLE (%s)", query));
 		}
 	}

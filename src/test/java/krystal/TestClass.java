@@ -28,7 +28,7 @@ public class TestClass implements LoggingInterface {
 		}
 		
 		@Override
-		public DBCDriverInterface dbcDriver() {
+		public DBCDriverInterface getDriver() {
 			return DBCDrivers.jdbcSQLServer;
 		}
 	};

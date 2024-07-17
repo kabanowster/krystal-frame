@@ -73,8 +73,8 @@ public class SelectStatement extends Query implements WhereClauseInterface, Orde
 		// TODO LAST if negative
 		var limitString = "";
 		if (limit > 0) {
-			// val drv = provider.dbcDriver();
-			switch (provider.dbcDriver()) {
+			// val drv = provider.getDriver();
+			switch (provider.getDriver()) {
 				case DBCDrivers.jdbcSQLServer -> limitString = " TOP " + limit;
 				case DBCDrivers.jdbcMySQL -> appendLast.add("LIMIT " + limit);
 				default -> appendLast.add("FETCH FIRST %s ROWS ONLY".formatted(limit));

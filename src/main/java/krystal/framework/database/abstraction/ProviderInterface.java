@@ -18,10 +18,10 @@ public interface ProviderInterface {
 	
 	String name();
 	
-	DBCDriverInterface dbcDriver();
+	DBCDriverInterface getDriver();
 	
 	default boolean equals(ProviderInterface provider) {
-		return this.dbcDriver().getConnectionStringBase().equals(provider.dbcDriver().getConnectionStringBase());
+		return this.getDriver().getConnectionStringBase().equals(provider.getDriver().getConnectionStringBase());
 	}
 	
 }
