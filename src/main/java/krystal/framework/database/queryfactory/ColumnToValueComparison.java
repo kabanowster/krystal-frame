@@ -5,7 +5,9 @@ import krystal.framework.KrystalFramework;
 import krystal.framework.database.abstraction.ColumnInterface;
 import krystal.framework.database.abstraction.Query;
 
+import java.util.Arrays;
 import java.util.List;
+import java.util.Objects;
 import java.util.stream.Stream;
 
 /**
@@ -14,7 +16,11 @@ import java.util.stream.Stream;
 public record ColumnToValueComparison(ColumnInterface column, ColumnsComparisonOperator is, List<Object> values) implements ColumnsComparisonInterface {
 	
 	public ColumnToValueComparison {
-		values = Query.parseValuesForSQL(values.toArray()).filter(val -> !"NULL".equals(val) && val != null).toList();
+		values = Query.parseValuesForSQL(values.toArray()).filter(val -> val != null && !"null".equalsIgnoreCase(String.valueOf(val))).toList();
+	}
+	
+	public ColumnToValueComparison(ColumnInterface column, ColumnsComparisonOperator is, Object... values) {
+		this(column, is, Arrays.stream(values).filter(Objects::nonNull).toList());
 	}
 	
 	@Override
