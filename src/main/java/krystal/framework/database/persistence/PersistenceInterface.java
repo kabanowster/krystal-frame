@@ -317,26 +317,28 @@ public interface PersistenceInterface extends LoggingInterface {
 				      m.getName().toLowerCase().matches("^write.*?")
 						      || m.isAnnotationPresent(Writer.class)))
 		      .forEach(m -> {
+			      val fld = Arrays.stream(getClass().getDeclaredFields())
+			                      .filter(f -> {
+				                              val name = f.getName();
+				                              return m.getName().toLowerCase().replace("write", "").equalsIgnoreCase(name)
+						                                     || Optional.ofNullable(m.getAnnotation(Writer.class)).map(a -> a.fieldName().equalsIgnoreCase(name)).orElse(false);
+			                              }
+			                      )
+			                      .findFirst().orElseThrow(() -> {
+						      val exception = new NoSuchElementException("PersistenceInterface: Could not find field corresponding to writer method (case-insensitive): %s.".formatted(m.getName()));
+						      log().error(exception.getMessage());
+						      return exception;
+					      });
+			      Object value = null;
 			      try {
-				      map.put(
-						      Arrays.stream(getClass().getDeclaredFields())
-						            .filter(f -> {
-							                    val name = f.getName();
-							                    return m.getName().toLowerCase().replace("write", "").equalsIgnoreCase(name)
-									                           || Optional.ofNullable(m.getAnnotation(Writer.class)).map(a -> a.fieldName().equalsIgnoreCase(name)).orElse(false);
-						                    }
-						            )
-						            .findFirst().orElseThrow(() -> {
-							            val exception = new NoSuchElementException("PersistenceInterface: Could not find field corresponding to writer method (case-insensitive): %s.".formatted(m.getName()));
-							            log().error(exception.getMessage());
-							            return exception;
-						            }),
-						      m.invoke(this)
-				      );
+				      value = m.invoke(this);
 			      } catch (IllegalAccessException _) {
 			      } catch (InvocationTargetException e) {
-				      throw logFatalAndThrow("PersistenceInterface: %s writer method throws exception: %s.".formatted(m.getName(), e.getCause().getMessage()));
+				      val cause = e.getCause();
+				      if (!(cause instanceof NullPointerException))
+					      throw logFatalAndThrow("PersistenceInterface: %s writer method throws exception: %s.".formatted(m.getName(), cause.getMessage()));
 			      }
+			      map.put(fld, value);
 		      });
 		
 		return map;
@@ -461,7 +463,7 @@ public interface PersistenceInterface extends LoggingInterface {
 		val fieldsValues = getFieldsValues();
 		
 		if (keysAreMissingValues(false, keys, fieldsValues)) {
-			if (!(execution == PersistenceExecutions.instantiate && !keysAreMissingValues(true, keys, fieldsValues)))
+			if (!((execution == PersistenceExecutions.instantiate || execution == PersistenceExecutions.save) && !keysAreMissingValues(true, keys, fieldsValues)))
 				throw logFatalAndThrow(String.format("Keys for %s.class have no values. Aborting %s.", getClass().getSimpleName(), execution));
 		}
 		
