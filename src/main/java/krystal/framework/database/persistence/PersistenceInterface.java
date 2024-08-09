@@ -31,7 +31,15 @@ import java.util.stream.Stream;
 /**
  * TODO JDoc :)
  *
+ * @see TableInterface
+ * @see Vertical
+ * @see ColumnsMapping
+ * @see Loader
+ * @see Filter
+ * @see Reader
+ * @see Writer
  * @see #promiseAll(Class, QueryExecutorInterface, UnaryOperator, Object)
+ * @see ReadOnly
  */
 @FunctionalInterface
 public interface PersistenceInterface extends LoggingInterface {
@@ -301,33 +309,37 @@ public interface PersistenceInterface extends LoggingInterface {
 	}
 	
 	default Map<Field, Object> getWriters() {
-		return Stream.of(getClass().getDeclaredMethods())
-		             .filter(m -> m.trySetAccessible() && (
-				             m.getName().toLowerCase().matches("^write.*?")
-						             || m.isAnnotationPresent(Writer.class)))
-		             .collect(Collectors.toMap(
-				             m -> Arrays.stream(getClass().getDeclaredFields())
-				                        .filter(f -> {
-					                                val name = f.getName();
-					                                return m.getName().toLowerCase().replace("write", "").equalsIgnoreCase(name)
-							                                       || Optional.ofNullable(m.getAnnotation(Writer.class)).map(a -> a.fieldName().equalsIgnoreCase(name)).orElse(false);
-				                                }
-				                        )
-				                        .findFirst().orElseThrow(() -> {
-							             val exception = new NoSuchElementException("PersistenceInterface: Could not find field corresponding to writer method (case-insensitive): %s.".formatted(m.getName()));
-							             log().error(exception.getMessage());
-							             return exception;
-						             }),
-				             m -> {
-					             try {
-						             return Optional.ofNullable(m.invoke(this)).orElse("null");
-					             } catch (InvocationTargetException e) {
-						             return "null";
-					             } catch (IllegalAccessException e) {
-						             throw logFatalAndThrow(e.getMessage());
-					             }
-				             }
-		             ));
+		val map = new HashMap<Field, Object>();
+		
+		// collector does not allow null values -> foreach loop
+		Stream.of(getClass().getDeclaredMethods())
+		      .filter(m -> m.trySetAccessible() && (
+				      m.getName().toLowerCase().matches("^write.*?")
+						      || m.isAnnotationPresent(Writer.class)))
+		      .forEach(m -> {
+			      try {
+				      map.put(
+						      Arrays.stream(getClass().getDeclaredFields())
+						            .filter(f -> {
+							                    val name = f.getName();
+							                    return m.getName().toLowerCase().replace("write", "").equalsIgnoreCase(name)
+									                           || Optional.ofNullable(m.getAnnotation(Writer.class)).map(a -> a.fieldName().equalsIgnoreCase(name)).orElse(false);
+						                    }
+						            )
+						            .findFirst().orElseThrow(() -> {
+							            val exception = new NoSuchElementException("PersistenceInterface: Could not find field corresponding to writer method (case-insensitive): %s.".formatted(m.getName()));
+							            log().error(exception.getMessage());
+							            return exception;
+						            }),
+						      m.invoke(this)
+				      );
+			      } catch (IllegalAccessException _) {
+			      } catch (InvocationTargetException e) {
+				      throw logFatalAndThrow("PersistenceInterface: %s writer method throws exception: %s.".formatted(m.getName(), e.getCause().getMessage()));
+			      }
+		      });
+		
+		return map;
 	}
 	
 	/**
@@ -337,30 +349,32 @@ public interface PersistenceInterface extends LoggingInterface {
 	 */
 	default Map<Field, Object> getFieldsValues() {
 		val m = getWriters();
-		return Stream.of(getClass().getDeclaredFields())
-		             .filter(f -> !Tools.isSkipped(f, SkipTypes.persistence))
-		             .collect(Collectors.toMap(
-				             f -> f,
-				             f -> Optional.ofNullable(m.get(f)).orElseGet(
-						             () -> {
-							             try {
-								             f.setAccessible(true);
-								             return Optional.ofNullable(f.get(this)).orElse("null");
-							             } catch (IllegalAccessException e) {
-								             throw new RuntimeException(e);
-							             }
-						             }
-				             ),
-				             (f, _) -> f,
-				             LinkedHashMap::new
-		             ));
+		val map = new HashMap<Field, Object>();
+		
+		// collector does not allow null values -> foreach loop
+		Stream.of(getClass().getDeclaredFields())
+		      .filter(f -> !Tools.isSkipped(f, SkipTypes.persistence))
+		      .forEach(f -> {
+			      map.put(f, Optional.ofNullable(m.get(f)).orElseGet(
+					      () -> {
+						      try {
+							      f.setAccessible(true);
+							      return f.get(this);
+						      } catch (IllegalAccessException e) {
+							      throw new RuntimeException(e);
+						      }
+					      }
+			      ));
+		      });
+		
+		return map;
 	}
 	
-	private ColumnsComparisonInterface[] getKeyValuePairs(Set<Field> keys, Map<Field, ColumnInterface> fieldsColumns, Map<Field, Object> fieldsValues) {
-		val includeIfNull = Optional.ofNullable(getClass().getAnnotation(SeparateKeys.class)).map(SeparateKeys::includeIfNull).orElse(true);
+	private ColumnsComparisonInterface[] getKeyValuePairs(Set<Field> keys, Map<Field, ColumnInterface> fieldsColumns, Map<Field, Object> fieldsValues, boolean includeIfNull) {
+		boolean finalIncludeIfNull = Optional.ofNullable(getClass().getAnnotation(SeparateKeys.class)).map(SeparateKeys::includeIfNull).orElse(includeIfNull);
 		return keys.stream()
-		           .map(field -> new ColumnToValueComparison(fieldsColumns.get(field), ColumnsComparisonOperator.IN, List.of(fieldsValues.get(field))))
-		           .filter(cvc -> cvc.values().isEmpty() ? includeIfNull : true)
+		           .map(field -> new ColumnToValueComparison(fieldsColumns.get(field), ColumnsComparisonOperator.IN, fieldsValues.get(field)))
+		           .filter(cvc -> !cvc.values().isEmpty() || finalIncludeIfNull)
 		           .toArray(ColumnsComparisonInterface[]::new);
 	}
 	
@@ -446,12 +460,14 @@ public interface PersistenceInterface extends LoggingInterface {
 		val keys = getKeys();
 		val fieldsValues = getFieldsValues();
 		
-		if (keysAreMissingValues(false, keys, fieldsValues))
-			throw logFatalAndThrow(String.format("Keys for %s.class have no values. Aborting %s.", getClass().getSimpleName(), execution));
+		if (keysAreMissingValues(false, keys, fieldsValues)) {
+			if (!(execution == PersistenceExecutions.instantiate && !keysAreMissingValues(true, keys, fieldsValues)))
+				throw logFatalAndThrow(String.format("Keys for %s.class have no values. Aborting %s.", getClass().getSimpleName(), execution));
+		}
 		
 		val fieldsColumns = getFieldsColumns();
 		
-		ColumnsComparisonInterface[] keysPairs = getKeyValuePairs(keys, fieldsColumns, fieldsValues);
+		ColumnsComparisonInterface[] keysPairs = getKeyValuePairs(keys, fieldsColumns, fieldsValues, execution != PersistenceExecutions.instantiate);
 		
 		val table = getTable();
 		
