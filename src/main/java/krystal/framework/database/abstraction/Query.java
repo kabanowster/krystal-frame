@@ -66,15 +66,18 @@ public abstract class Query implements QueryExecutionInterface, LoggingInterface
 		String senq = "'%s'";
 		
 		if (value == null || String.valueOf(value).equalsIgnoreCase("null")) return "NULL";
-		if (value instanceof String val) return String.format(senq, val);
-		if (value instanceof LocalDateTime val) return String.format(senq, val.format(KrystalFramework.getDatetimeFormat()));
-		if (value instanceof LocalDate val) return String.format(senq, val.format(KrystalFramework.getDateFormat()));
-		if (value instanceof Double val) return String.valueOf(val).replace(",", ".");
-		if (value instanceof Integer val) return String.valueOf(val);
-		if (value instanceof Boolean val) return val.equals(true) ? "1" : "0";
+		return switch (value) {
+			case String val -> String.format(senq, val);
+			case LocalDateTime val -> String.format(senq, val.format(KrystalFramework.getDatetimeFormat()));
+			case LocalDate val -> String.format(senq, val.format(KrystalFramework.getDateFormat()));
+			case Double val -> String.valueOf(val).replace(",", ".");
+			case Integer val -> String.valueOf(val);
+			case Boolean val -> val.equals(true) ? "1" : "0";
+			default ->
+				// else
+					String.format(senq, value);
+		};
 		
-		// else
-		return String.format(senq, value);
 	}
 	
 	/**
@@ -119,10 +122,10 @@ public abstract class Query implements QueryExecutionInterface, LoggingInterface
 	
 	public Query union(boolean all, Query query) {
 		return Query.of("""
-				                %s
-				                UNION%s
-				                %s
-				                """.formatted(pack().sqlQuery(), all ? " ALL" : "", query.pack().sqlQuery()));
+		                %s
+		                UNION%s
+		                %s
+		                """.formatted(pack().sqlQuery(), all ? " ALL" : "", query.pack().sqlQuery()));
 	}
 	
 	public VirtualPromise<Stream<QueryResultInterface>> promise(QueryExecutorInterface executor) {
