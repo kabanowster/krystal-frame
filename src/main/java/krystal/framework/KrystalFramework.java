@@ -405,7 +405,7 @@ public class KrystalFramework {
 		map.put("console", console != null ? "established" : "n/a");
 		map.put("selectedDefaultImplementations", selectedDefaultImplementations.stream().map(Enum::toString).toList());
 		
-		return JSON.from(map).toString(4);
+		return JSON.fromObject(map).toString(4);
 	}
 	
 	private String getDefaultSplash() {

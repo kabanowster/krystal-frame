@@ -49,7 +49,7 @@ public interface PersistenceInterface extends LoggingInterface {
 	 */
 	
 	/**
-	 * Get all persisted objects from the database of particular type. The class must declare empty (no arguments) constructor. Use {@link QueryExecutorInterface} for initial dependency injection. Use {@link WhereClause#filter(Function)} for
+	 * Get all persisted objects from the database of particular type. The class must declare empty (no arguments) constructor. Use {@link QueryExecutorInterface} for initial dependency injection. Use {@link Filter @Filter} for
 	 * filtering the {@link Loader loading} query. Utilises {@link VirtualPromise} for fetching the data and parallel mapping of objects.
 	 *
 	 * @param optionalDummyType
@@ -683,7 +683,7 @@ public interface PersistenceInterface extends LoggingInterface {
 	 * Serialize to JSON, using {@link JSON io.krystal.JSON}
 	 */
 	default JSONObject toJSON() {
-		return JSON.from(this);
+		return JSON.fromObject(this);
 	}
 	
 	/**

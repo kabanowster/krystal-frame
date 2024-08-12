@@ -1,13 +1,11 @@
 package krystal.framework.database.queryfactory;
 
 import krystal.framework.database.abstraction.Query;
-import krystal.framework.database.persistence.annotations.Filter;
 
 import java.util.Collections;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.Set;
-import java.util.function.Function;
 
 public class WhereClause extends Query implements OrderByInterface, GroupByInterface {
 	
@@ -42,13 +40,6 @@ public class WhereClause extends Query implements OrderByInterface, GroupByInter
 	public void build(StringBuilder query, Set<String> appendLast) {
 		query.append(" WHERE ");
 		where.forEach(query::append);
-	}
-	
-	/**
-	 * Factory method for {@link Function} used as {@link Filter @Filter}.
-	 */
-	public static Function<SelectStatement, WhereClause> filter(Function<SelectStatement, WhereClause> where) {
-		return where;
 	}
 	
 }

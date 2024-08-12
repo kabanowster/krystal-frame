@@ -196,7 +196,7 @@ public class BaseCommander implements CommanderInterface {
 				return true;
 			}
 			case providers -> {
-				QueryExecutorInterface.getInstance().ifPresent(q -> logConsole(">>> Loaded DefaultProviders properties:\n%s".formatted(JSON.from(q.getConnectionProperties()).toString(4))));
+				QueryExecutorInterface.getInstance().ifPresent(q -> logConsole(">>> Loaded DefaultProviders properties:\n%s".formatted(JSON.fromObject(q.getConnectionProperties()).toString(4))));
 				return true;
 			}
 			case help -> {
