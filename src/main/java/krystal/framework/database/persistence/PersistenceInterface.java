@@ -607,6 +607,9 @@ public interface PersistenceInterface extends LoggingInterface {
 		      .ifPresent(this::copyFrom);
 	}
 	
+	/**
+	 * @apiNote Is a {@link List} because handles {@link Vertical}.
+	 */
 	private List<Map<ColumnInterface, Object>> columnsToValues(Map<Field, ColumnInterface> fieldsColumns, Map<Field, Object> fieldsValues) {
 		val clazz = getClass();
 		if (clazz.isAnnotationPresent(Vertical.class)) {
@@ -616,10 +619,14 @@ public interface PersistenceInterface extends LoggingInterface {
 			                                                                             .filter(e -> PersistenceInterface.getPersistenceSetupAnnotationsExcluding(Key.class).stream().noneMatch(e.getKey()::isAnnotationPresent))
 			                                                                             .collect(Collectors.partitioningBy(e -> !e.getKey().isAnnotationPresent(Key.class)));
 			
-			Map<ColumnInterface, Object> groupFields = splitFields.get(false).stream().collect(Collectors.toMap(Entry::getValue, e -> fieldsValues.get(e.getKey()), (_, b) -> b, LinkedHashMap::new));
+			// null not allowed in Collectors.toMap merge function
+			val groupFields = new LinkedHashMap<ColumnInterface, Object>(splitFields.get(false).size());
+			splitFields.get(false).forEach(e -> groupFields.put(e.getValue(), fieldsValues.get(e.getKey())));
 			
-			Map<Field, ColumnInterface> pivotFields = splitFields.get(true).stream().collect(Collectors.toMap(Entry::getKey, Entry::getValue, (_, b) -> b, LinkedHashMap::new));
+			val pivotFields = new LinkedHashMap<Field, ColumnInterface>(splitFields.get(true).size());
+			splitFields.get(true).forEach(e -> pivotFields.put(e.getKey(), e.getValue()));
 			
+			// many rows of data
 			return pivotFields.entrySet().stream()
 			                  .map(p -> {
 				                  Map<ColumnInterface, Object> group = new LinkedHashMap<>(groupFields);
@@ -629,15 +636,13 @@ public interface PersistenceInterface extends LoggingInterface {
 			                  })
 			                  .toList();
 		} else {
-			return List.of(fieldsColumns.entrySet()
-			                            .stream()
-			                            .filter(e -> PersistenceInterface.getPersistenceSetupAnnotationsExcluding(Key.class).stream().noneMatch(e.getKey()::isAnnotationPresent))
-			                            .collect(Collectors.toMap(
-					                            Entry::getValue,
-					                            e -> fieldsValues.get(e.getKey()),
-					                            (a, _) -> a,
-					                            LinkedHashMap::new
-			                            )));
+			// single row of data
+			val result = new LinkedHashMap<ColumnInterface, Object>();
+			fieldsColumns.entrySet()
+			             .stream()
+			             .filter(e -> PersistenceInterface.getPersistenceSetupAnnotationsExcluding(Key.class).stream().noneMatch(e.getKey()::isAnnotationPresent))
+			             .forEach(e -> result.put(e.getValue(), fieldsValues.get(e.getKey())));
+			return List.of(result);
 		}
 		
 	}
