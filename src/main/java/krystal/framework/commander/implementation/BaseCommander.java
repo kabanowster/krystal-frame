@@ -12,8 +12,10 @@ import krystal.framework.database.abstraction.QueryExecutorInterface;
 import krystal.framework.logging.LoggingWrapper;
 import krystal.framework.tomcat.TomcatFactory;
 import lombok.val;
+import org.apache.catalina.Context;
 import org.apache.catalina.LifecycleException;
 import org.apache.logging.log4j.core.AbstractLifeCycle;
+import org.json.JSONObject;
 import org.springframework.stereotype.Service;
 
 import java.util.ArrayList;
@@ -219,6 +221,34 @@ public class BaseCommander implements CommanderInterface {
 				}
 				
 				try {
+					if (arguments.isEmpty()) {
+						val host = tomcat.getHost();
+						logConsole("""
+						           <h2>Tomcat settings:</h2>
+						           <pre>%s</pre>
+						           <h3>Mappings:</h3>
+						           <dl>
+						           %s
+						           </dl>
+						           """.formatted(
+								new JSONObject()
+										.put("host", host.getName())
+										.put("appBase", host.getAppBase())
+										.toString(4),
+								Arrays.stream(host.findChildren())
+								      .map(Context.class::cast)
+								      .map(context -> """
+								                      <dt><strong>%s</strong></dt>
+								                      <dd>%s</dd>
+								                      """.formatted(
+										      context.getPath(),
+										      Arrays.stream(context.findServletMappings())
+										            .collect(Collectors.joining(KrystalFramework.getDefaultDelimeter()))
+								      )).collect(Collectors.joining(System.lineSeparator()))
+						));
+						return true;
+					}
+					
 					val name = new AtomicReference<String>();
 					val source = new AtomicReference<String>();
 					boolean app = false;
