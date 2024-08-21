@@ -188,7 +188,7 @@ public interface PersistenceInterface extends LoggingInterface {
 			               });
 		} catch (InvocationTargetException | InstantiationException | IllegalAccessException | NoSuchMethodException e) {
 			
-			throw new RuntimeException("Class %s requires no args constructor, to perform annotated parameters loading.".formatted(clazz.getSimpleName()));
+			throw new RuntimeException("Class %s requires no args constructor, to perform annotated parameters loading.".formatted(clazz.getSimpleName()), e);
 		}
 	}
 	
@@ -230,8 +230,7 @@ public interface PersistenceInterface extends LoggingInterface {
 			             .orElse(s -> s.where1is1());
 			
 		} catch (InvocationTargetException | InstantiationException | IllegalAccessException | NoSuchMethodException e) {
-			
-			throw new RuntimeException("Class %s requires no args constructor, to perform annotated parameters loading.".formatted(clazz.getSimpleName()));
+			throw new RuntimeException("Class %s requires no args constructor, to perform annotated parameters loading.".formatted(clazz.getSimpleName()), e);
 		}
 	}
 	
@@ -259,7 +258,7 @@ public interface PersistenceInterface extends LoggingInterface {
 			}
 			return result;
 		} catch (NoSuchMethodException | InstantiationException | IllegalAccessException | InvocationTargetException e) {
-			throw LoggingInterface.logFatalAndThrow(LoggingInterface.logger(), "Class %s requires no args constructor, to perform annotated parameters loading.".formatted(clazz.getSimpleName()));
+			throw new RuntimeException("Class %s requires no args constructor, to perform annotated parameters loading.".formatted(clazz.getSimpleName()), e);
 		}
 	}
 	
@@ -336,7 +335,7 @@ public interface PersistenceInterface extends LoggingInterface {
 			      } catch (InvocationTargetException e) {
 				      val cause = e.getCause();
 				      if (!(cause instanceof NullPointerException))
-					      throw logFatalAndThrow("PersistenceInterface: %s writer method throws exception: %s.".formatted(m.getName(), cause.getMessage()));
+					      throw new RuntimeException("PersistenceInterface: %s writer method throws exception: %s.".formatted(m.getName(), cause.getMessage()), e);
 			      }
 			      map.put(fld, value);
 		      });
@@ -454,17 +453,17 @@ public interface PersistenceInterface extends LoggingInterface {
 		log().trace(">>> Performing persistence execution: {}", execution.toString());
 		
 		if (!classHasKeys(getClass()))
-			throw logFatalAndThrow(String.format("%s.class is missing @Keys - can not perform single persistence operations.", getClass().getSimpleName()));
+			throw new RuntimeException(String.format("%s.class is missing @Keys - can not perform single persistence operations.", getClass().getSimpleName()));
 		
 		if (execution != PersistenceExecutions.load && classIsReadOnly(getClass()))
-			throw logFatalAndThrow(String.format("%s.class is marked as @ReadOnly.", getClass().getSimpleName()));
+			throw new RuntimeException(String.format("%s.class is marked as @ReadOnly.", getClass().getSimpleName()));
 		
 		val keys = getKeys();
 		val fieldsValues = getFieldsValues();
 		
 		if (keysAreMissingValues(false, keys, fieldsValues)) {
 			if (!((execution == PersistenceExecutions.instantiate || execution == PersistenceExecutions.save) && !keysAreMissingValues(true, keys, fieldsValues)))
-				throw logFatalAndThrow(String.format("Keys for %s.class have no values. Aborting %s.", getClass().getSimpleName(), execution));
+				throw new RuntimeException(String.format("Keys for %s.class have no values. Aborting %s.", getClass().getSimpleName(), execution));
 		}
 		
 		val fieldsColumns = getFieldsColumns();
@@ -562,10 +561,10 @@ public interface PersistenceInterface extends LoggingInterface {
 	 */
 	private void copyAsNew(TableInterface table, Set<Field> keys, Map<Field, ColumnInterface> fieldsColumns, Map<Field, Object> fieldsValues) {
 		if (keys.stream().noneMatch(f -> f.isAnnotationPresent(Incremental.class)))
-			throw logFatalAndThrow(String.format("%s.class does not have @Incremental keys, thus copying amd saving would result in ambiguity.", getClass().getSimpleName()));
+			throw new RuntimeException(String.format("%s.class does not have @Incremental keys, thus copying amd saving would result in ambiguity.", getClass().getSimpleName()));
 		
 		if (keysAreMissingValues(true, keys, fieldsValues))
-			throw logFatalAndThrow(String.format("Obligatory keys have no values. Aborting creation of %s.class.", getClass().getSimpleName()));
+			throw new RuntimeException(String.format("Obligatory keys have no values. Aborting creation of %s.class.", getClass().getSimpleName()));
 		
 		insertAndConsume(table, fieldsColumns, fieldsValues);
 	}
@@ -722,7 +721,7 @@ public interface PersistenceInterface extends LoggingInterface {
 		             .collect(Collectors.toMap(
 				             a -> a,
 				             a -> Optional.ofNullable(Tools.getFirstAnnotatedValue(a, ColumnInterface.class, clazz, null))
-				                          .orElseThrow(() -> LoggingInterface.logFatalAndThrow(LoggingInterface.logger(), "Vertical Persistence: %s is missing PivotColumn or ValuesColumn annotation.".formatted(clazz.getSimpleName())))
+				                          .orElseThrow(() -> new RuntimeException("Vertical Persistence: %s is missing PivotColumn or ValuesColumn annotation.".formatted(clazz.getSimpleName())))
 		             ));
 	}
 	

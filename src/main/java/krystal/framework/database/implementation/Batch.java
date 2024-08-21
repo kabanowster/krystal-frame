@@ -39,7 +39,7 @@ public class Batch implements QueryExecutionInterface, LoggingInterface {
 	 */
 	public @Nullable Map<? extends Class<?>, ? extends List<?>> toListsOf(Class<?>... clazzes) {
 		if (clazzes.length != queries.size())
-			throw logFatalAndThrow("The queries count must be equal with the classes count in the toStreamOf() method of the Batch.");
+			throw new RuntimeException("The queries count must be equal with the classes count in the toStreamOf() method of the Batch.");
 		
 		return promise().map(s -> s.toArray(QueryResultInterface[]::new))
 		                .joinThrow()

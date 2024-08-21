@@ -200,7 +200,7 @@ public interface QueryExecutorInterface extends LoggingInterface {
 			                              try {
 				                              return c.getJDBCConnection(provider);
 			                              } catch (SQLException e) {
-				                              throw logFatalAndThrow(e);
+				                              throw new RuntimeException(e);
 			                              }
 		                              })
 		                              .orElse(DriverManager.getConnection(getConnectionStrings().get(provider), getConnectionProperties().get(provider)));
