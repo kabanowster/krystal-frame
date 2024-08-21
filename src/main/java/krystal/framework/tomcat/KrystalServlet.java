@@ -22,6 +22,7 @@ import org.json.JSONObject;
 import javax.annotation.Nullable;
 import java.io.IOException;
 import java.lang.reflect.InvocationTargetException;
+import java.nio.charset.StandardCharsets;
 import java.util.*;
 import java.util.function.BiFunction;
 import java.util.function.Consumer;
@@ -84,14 +85,16 @@ public class KrystalServlet extends HttpServlet implements LoggingInterface {
 	 */
 	
 	public static KrystalServlet getPersistenceServlet(String context, String name, Set<PersistenceMappingInterface> mappings) {
-		return KrystalServlet.builder()
-		                     .servletName(name)
-		                     .servletContextString(context)
-		                     .addPersistenceMappings(mappings)
-		                     .serveGetPersistenceMappings(mappings)
-		                     .servePostPersistenceMappings(mappings)
-		                     .serveDeletePersistenceMappings(mappings)
-		                     .build();
+		val headers = Map.of("Access-Control-Allow-Origin", "*");
+		return KrystalServlet
+				       .builder()
+				       .servletName(name)
+				       .servletContextString(context)
+				       .addPersistenceMappings(mappings)
+				       .serveGetPersistenceMappings(mappings, headers)
+				       .servePostPersistenceMappings(mappings, headers)
+				       .serveDeletePersistenceMappings(mappings)
+				       .build();
 	}
 	
 	public static class KrystalServletBuilder {
@@ -112,6 +115,7 @@ public class KrystalServlet extends HttpServlet implements LoggingInterface {
 		public KrystalServletBuilder serveDeletePersistenceMappings(Collection<PersistenceMappingInterface> mappings) {
 			return this.serveDelete(
 					(req, resp) -> VirtualPromise.supply(() -> new RequestInfo(req, mappings))
+					                             .monitor(promise -> RequestInfo.validate(promise, resp))
 					                             .accept(info -> {
 						                             // TODO check for auth flag
 						                             
@@ -123,22 +127,12 @@ public class KrystalServlet extends HttpServlet implements LoggingInterface {
 						                             }
 						                             try {
 							                             if (info.patternIsPlural) {
-								                             val statement = info.mapping.getPersistenceClass()
-								                                                         .getDeclaredConstructor()
-								                                                         .newInstance()
-								                                                         .getTable()
-								                                                         .delete()
-								                                                         .where1is1();
+								                             val statement = info.mapping.getPersistenceClass().getDeclaredConstructor().newInstance().getTable().delete().where1is1();
 								                             val params = req.getParameterMap();
-								                             if (!params.isEmpty())
-									                             params.forEach((k, v) -> statement.andWhere(Q.c(k).is((Object[]) v)));
-								                             statement.promise()
-								                                      .joinThrow();
+								                             if (!params.isEmpty()) params.forEach((k, v) -> statement.andWhere(Q.c(k).is((Object[]) v)));
+								                             statement.promise().joinThrow();
 							                             } else {
-								                             info.mapping.getPersistenceClass()
-								                                         .getDeclaredConstructor(String.class)
-								                                         .newInstance(req.getHttpServletMapping().getMatchValue())
-								                                         .delete();
+								                             info.mapping.getPersistenceClass().getDeclaredConstructor(String.class).newInstance(req.getHttpServletMapping().getMatchValue()).delete();
 							                             }
 						                             } catch (NumberFormatException e) {
 							                             log.debug(e);
@@ -150,39 +144,66 @@ public class KrystalServlet extends HttpServlet implements LoggingInterface {
 					                             }));
 		}
 		
-		public KrystalServletBuilder servePostPersistenceMappings(Collection<PersistenceMappingInterface> mappings) {
+		public KrystalServletBuilder servePostPersistenceMappings(Collection<PersistenceMappingInterface> mappings, Map<String, String> responseHeaders) {
 			return this.servePost(
 					(req, resp) -> VirtualPromise.supply(() -> new RequestInfo(req, mappings))
+					                             .monitor(promise -> RequestInfo.validate(promise, resp))
 					                             .accept(info -> {
 						                             // TODO check for auth flag
 						                             
-						                             if (!info.patternIsMapping) {
-							                             // pattern is plural or with matching-value ("/*")
-							                             log.debug("Invalid POST request pattern: %s".formatted(req.getHttpServletMapping().getPattern()));
-							                             resp.setStatus(HttpServletResponse.SC_BAD_REQUEST);
-							                             return;
-						                             }
+						                             // prep response
+						                             resp.setContentType("application/json");
+						                             resp.setCharacterEncoding(StandardCharsets.UTF_8);
+						                             responseHeaders.forEach(resp::addHeader);
+						                             
 						                             try {
-							                             val body = new JSONObject(req.getReader().lines().collect(Collectors.joining()));
-							                             if (JSON.into(body, info.mapping.getPersistenceClass()) instanceof PersistenceInterface obj)
-								                             obj.save();
-							                             else throw new ClassCastException("Can not perform saving execution - %s is not a PersistenceInterface.".formatted(info.mapping.getPersistenceClass()));
+							                             val str = req.getReader().lines().collect(Collectors.joining());
+							                             val clazz = info.mapping.getPersistenceClass();
+							                             val error = new ClassCastException("Can not perform saving execution - %s is not a PersistenceInterface.".formatted(clazz));
+							                             
+							                             if (info.patternIsPlural) {
+								                             val body = new JSONArray(str);
+								                             val results = new ArrayList<PersistenceInterface>(body.length());
+								                             body.forEach(o -> {
+									                             try {
+										                             if (JSON.into(o, clazz) instanceof PersistenceInterface obj) {
+											                             obj.save();
+											                             results.add(obj);
+										                             } else throw error;
+									                             } catch (JSONException | ClassCastException e) {
+										                             log.debug(e);
+									                             }
+								                             });
+								                             resp.getWriter().write(JSON.fromObjects(results).toString());
+							                             } else {
+								                             val body = new JSONObject(str);
+								                             if (JSON.into(body, clazz) instanceof PersistenceInterface obj) {
+									                             obj.save();
+									                             resp.getWriter().write(obj.toJSON().toString());
+								                             } else throw error;
+							                             }
 						                             } catch (JSONException | ClassCastException e) {
 							                             log.debug(e);
 							                             resp.setStatus(HttpServletResponse.SC_BAD_REQUEST);
-						                             } catch (Exception e) {
+						                             } catch (IOException e) {
 							                             log.error(e);
 							                             resp.setStatus(HttpServletResponse.SC_INTERNAL_SERVER_ERROR);
 						                             }
 					                             }));
 		}
 		
-		public KrystalServletBuilder serveGetPersistenceMappings(Collection<PersistenceMappingInterface> mappings) {
+		public KrystalServletBuilder serveGetPersistenceMappings(Collection<PersistenceMappingInterface> mappings, Map<String, String> responseHeaders) {
 			return this.serveGet(
 					(req, resp) -> VirtualPromise.supply(() -> new RequestInfo(req, mappings))
+					                             .monitor(promise -> RequestInfo.validate(promise, resp))
 					                             .accept(info -> {
 						                             // TODO check for auth flag
+						                             
+						                             // prep response
 						                             resp.setContentType("application/json");
+						                             resp.setCharacterEncoding(StandardCharsets.UTF_8);
+						                             responseHeaders.forEach(resp::addHeader);
+						                             
 						                             if (info.patternIsMapping) {
 							                             // pattern is singular with no matching-value
 							                             log.debug("Invalid GET request - singular pattern without value: %s".formatted(req.getHttpServletMapping().getPattern()));
@@ -195,13 +216,11 @@ public class KrystalServlet extends HttpServlet implements LoggingInterface {
 								                                                 params.forEach((k, v) -> w.andWhere(Q.c(k).is((Object[]) v)));
 								                                                 return w;
 							                                                 })
-							                                                 .map(Stream::toList)
-							                                                 .monitor(v -> {
-								                                                 if (v.peek().isEmpty()) {
-									                                                 resp.setStatus(HttpServletResponse.SC_NO_CONTENT);
-									                                                 v.cancelAndDrop();
-								                                                 }
+							                                                 .map(stream -> {
+								                                                 val invoke = info.mapping.getInvokedOnLoadFunction();
+								                                                 return invoke == null ? stream : stream.map(invoke);
 							                                                 })
+							                                                 .map(Stream::toList)
 							                                                 .map(JSON::fromObjects)
 							                                                 .map(JSONArray::toString)
 							                                                 .accept(result -> {
@@ -211,16 +230,14 @@ public class KrystalServlet extends HttpServlet implements LoggingInterface {
 									                                                 log.error(e);
 									                                                 resp.setStatus(HttpServletResponse.SC_INTERNAL_SERVER_ERROR);
 								                                                 }
-							                                                 })
-							                                                 .joinThrow();
+							                                                 }).joinThrow();
 						                             } else {
 							                             try {
 								                             val id = req.getHttpServletMapping().getMatchValue();
-								                             val result = info.mapping.getPersistenceClass().getDeclaredConstructor(String.class).newInstance(id);
-								                             if (result.noneIsNull())
-									                             resp.getWriter().write(result.toJSON().toString());
-								                             else resp.setStatus(HttpServletResponse.SC_NOT_FOUND);
-								                             
+								                             var result = info.mapping.getPersistenceClass().getDeclaredConstructor(String.class).newInstance(id);
+								                             val invoke = info.mapping.getInvokedOnLoadFunction();
+								                             if (invoke != null) result = invoke.apply(result);
+								                             if (result.noneIsNull()) resp.getWriter().write(result.toJSON().toString());
 							                             } catch (NumberFormatException e) {
 								                             log.debug(e);
 								                             resp.setStatus(HttpServletResponse.SC_BAD_REQUEST);
@@ -244,11 +261,19 @@ public class KrystalServlet extends HttpServlet implements LoggingInterface {
 				String pattern = request.getHttpServletMapping().getPattern();
 				patternIsPlural = pattern.matches("^/\\w+s$");
 				patternIsMapping = !pattern.matches("^/\\w+(s|\\W+)$");
-				val patternName = pattern.splitWithDelimiters("(?<=/)\\w+[^s\\W]", 0)[1].toLowerCase();
-				mapping = mappings.stream()
-				                  .filter(m -> m.name().equals(patternName))
-				                  .findAny()
-				                  .orElseThrow(NoSuchElementException::new);
+				val patternName = pattern.splitWithDelimiters("(?<=/)\\w+[^s\\W]", 0)[1];
+				mapping = mappings.stream().filter(m -> m.name().equalsIgnoreCase(patternName)).findAny().orElseThrow(NoSuchElementException::new);
+			}
+			
+			public static void validate(VirtualPromise<RequestInfo> info, HttpServletResponse response) {
+				if (!info.hasException()) return;
+				val ex = info.getException();
+				if (ex instanceof NoSuchElementException) response.setStatus(HttpServletResponse.SC_NOT_FOUND);
+				else {
+					log.error(ex);
+					response.setStatus(HttpServletResponse.SC_INTERNAL_SERVER_ERROR);
+				}
+				info.cancelAndDrop();
 			}
 			
 		}
@@ -290,49 +315,42 @@ public class KrystalServlet extends HttpServlet implements LoggingInterface {
 	
 	@Override
 	protected void doGet(HttpServletRequest req, HttpServletResponse resp) throws ServletException, IOException {
-		if (!serveAsync(req, resp, serveGet))
-			super.doGet(req, resp);
+		if (!serveAsync(req, resp, serveGet)) super.doGet(req, resp);
 	}
 	
 	@Override
 	protected void doPatch(HttpServletRequest req, HttpServletResponse resp) throws ServletException, IOException {
-		if (!serveAsync(req, resp, servePatch))
-			super.doPatch(req, resp);
+		if (!serveAsync(req, resp, servePatch)) super.doPatch(req, resp);
 	}
 	
 	@Override
 	protected void doPost(HttpServletRequest req, HttpServletResponse resp) throws ServletException, IOException {
-		if (!serveAsync(req, resp, servePost))
-			super.doPost(req, resp);
+		if (!serveAsync(req, resp, servePost)) super.doPost(req, resp);
 	}
 	
 	@Override
 	protected void doPut(HttpServletRequest req, HttpServletResponse resp) throws ServletException, IOException {
-		if (!serveAsync(req, resp, servePut))
-			super.doPut(req, resp);
+		if (!serveAsync(req, resp, servePut)) super.doPut(req, resp);
 	}
 	
 	@Override
 	protected void doDelete(HttpServletRequest req, HttpServletResponse resp) throws ServletException, IOException {
-		if (!serveAsync(req, resp, serveDelete))
-			super.doDelete(req, resp);
+		if (!serveAsync(req, resp, serveDelete)) super.doDelete(req, resp);
 	}
 	
 	private boolean serveAsync(HttpServletRequest req, HttpServletResponse resp, @Nullable BiFunction<HttpServletRequest, HttpServletResponse, VirtualPromise<Void>> serveAsyncAction) {
-		if (serveAsyncAction == null)
-			return false;
+		if (serveAsyncAction == null) return false;
 		
 		val asyncContext = req.startAsync();
 		serveAsyncAction.apply(req, resp)
 		                .catchRun(ex -> {
-			                log().fatal(ex.getMessage());
+			                log().fatal(ex.getMessage(), ex);
 			                try {
 				                resp.sendError(HttpServletResponse.SC_INTERNAL_SERVER_ERROR);
 			                } catch (IOException ignored) {
 			                }
 		                })
 		                .thenRun(asyncContext::complete);
-		
 		return true;
 	}
 	
