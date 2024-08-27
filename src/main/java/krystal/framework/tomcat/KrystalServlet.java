@@ -70,6 +70,8 @@ public class KrystalServlet extends HttpServlet implements LoggingInterface {
 	private BiFunction<HttpServletRequest, HttpServletResponse, VirtualPromise<Void>> servePost;
 	private BiFunction<HttpServletRequest, HttpServletResponse, VirtualPromise<Void>> servePut;
 	private BiFunction<HttpServletRequest, HttpServletResponse, VirtualPromise<Void>> serveDelete;
+	private BiFunction<HttpServletRequest, HttpServletResponse, VirtualPromise<Void>> serveOptions;
+	private BiFunction<HttpServletRequest, HttpServletResponse, VirtualPromise<Void>> serveHead;
 	/**
 	 * @see KrystalServlet
 	 */
@@ -84,16 +86,29 @@ public class KrystalServlet extends HttpServlet implements LoggingInterface {
 	 * Builder expansion for persistence methods
 	 */
 	
-	public static KrystalServlet getPersistenceServlet(String context, String name, Set<PersistenceMappingInterface> mappings) {
-		val headers = Map.of("Access-Control-Allow-Origin", "*");
+	public static KrystalServlet getPersistenceServlet(String context, String name, Set<PersistenceMappingInterface> mappings, String allowOrigin) {
+		val origin = Map.of(
+				"Access-Control-Allow-Origin", allowOrigin,
+				"Access-Control-Allow-Credentials", "true"
+		);
+		val options = Map.of(
+				"Access-Control-Allow-Origin", allowOrigin,
+				"Access-Control-Allow-Methods", "GET, POST, DELETE, OPTIONS",
+				"Access-Control-Allow-Headers", "Origin, Content-Type, Accept, Authorization"
+		);
+		
 		return KrystalServlet
 				       .builder()
 				       .servletName(name)
 				       .servletContextString(context)
 				       .addPersistenceMappings(mappings)
-				       .serveGetPersistenceMappings(mappings, headers)
-				       .servePostPersistenceMappings(mappings, headers)
+				       .serveGetPersistenceMappings(mappings, origin)
+				       .servePostPersistenceMappings(mappings, origin)
 				       .serveDeletePersistenceMappings(mappings)
+				       .serveOptions((req, resp) -> VirtualPromise.run(() -> {
+					       options.forEach(resp::setHeader);
+					       resp.setStatus(HttpServletResponse.SC_NO_CONTENT);
+				       }))
 				       .build();
 	}
 	
@@ -154,7 +169,7 @@ public class KrystalServlet extends HttpServlet implements LoggingInterface {
 						                             // prep response
 						                             resp.setContentType("application/json");
 						                             resp.setCharacterEncoding(StandardCharsets.UTF_8);
-						                             responseHeaders.forEach(resp::addHeader);
+						                             responseHeaders.forEach(resp::setHeader);
 						                             
 						                             try {
 							                             val str = req.getReader().lines().collect(Collectors.joining());
@@ -202,7 +217,7 @@ public class KrystalServlet extends HttpServlet implements LoggingInterface {
 						                             // prep response
 						                             resp.setContentType("application/json");
 						                             resp.setCharacterEncoding(StandardCharsets.UTF_8);
-						                             responseHeaders.forEach(resp::addHeader);
+						                             responseHeaders.forEach(resp::setHeader);
 						                             
 						                             if (info.patternIsMapping) {
 							                             // pattern is singular with no matching-value
@@ -336,6 +351,16 @@ public class KrystalServlet extends HttpServlet implements LoggingInterface {
 	@Override
 	protected void doDelete(HttpServletRequest req, HttpServletResponse resp) throws ServletException, IOException {
 		if (!serveAsync(req, resp, serveDelete)) super.doDelete(req, resp);
+	}
+	
+	@Override
+	protected void doOptions(HttpServletRequest req, HttpServletResponse resp) throws ServletException, IOException {
+		if (!serveAsync(req, resp, serveOptions)) super.doOptions(req, resp);
+	}
+	
+	@Override
+	protected void doHead(HttpServletRequest req, HttpServletResponse resp) throws ServletException, IOException {
+		if (!serveAsync(req, resp, serveHead)) super.doHead(req, resp);
 	}
 	
 	private boolean serveAsync(HttpServletRequest req, HttpServletResponse resp, @Nullable BiFunction<HttpServletRequest, HttpServletResponse, VirtualPromise<Void>> serveAsyncAction) {
