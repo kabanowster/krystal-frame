@@ -224,6 +224,13 @@ public class BaseCommander implements CommanderInterface {
 					if (arguments.isEmpty()) {
 						val host = tomcat.getHost();
 						logConsole("""
+						           <h2>Tomcat Commands</h2>
+						           <dl>
+						            <dt>start, stop, restart</dt>
+						            <dd><dd>
+						            <dt>app, -a</dt>
+						            <dd>Load app from provided [-n]ame and [-s]ource destination.</dd>
+						           </dl>
 						           <h2>Tomcat settings:</h2>
 						           <pre>%s</pre>
 						           <h3>Mappings:</h3>
@@ -287,7 +294,7 @@ public class BaseCommander implements CommanderInterface {
 					
 					if (!app) return true;
 					if (Strings.isNullOrEmpty(name.get()) || Strings.isNullOrEmpty(source.get())) {
-						log().warn(">>> Tomcat app command requires two arguments: -[-n]ame and -[-s]source to be provided.");
+						log().warn(">>> Tomcat app command requires two arguments: -[-n]ame and -[-s]ource to be provided.");
 						return true;
 					}
 					
