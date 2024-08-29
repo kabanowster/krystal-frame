@@ -231,10 +231,6 @@ public class KrystalServlet extends HttpServlet implements LoggingInterface {
 								                                                 params.forEach((k, v) -> w.andWhere(Q.c(k).is((Object[]) v)));
 								                                                 return w;
 							                                                 })
-							                                                 .map(stream -> {
-								                                                 val invoke = info.mapping.getInvokedOnLoadFunction();
-								                                                 return invoke == null ? stream : stream.map(invoke);
-							                                                 })
 							                                                 .map(Stream::toList)
 							                                                 .map(JSON::fromObjects)
 							                                                 .map(JSONArray::toString)
@@ -250,8 +246,6 @@ public class KrystalServlet extends HttpServlet implements LoggingInterface {
 							                             try {
 								                             val id = req.getHttpServletMapping().getMatchValue();
 								                             var result = info.mapping.getPersistenceClass().getDeclaredConstructor(String.class).newInstance(id);
-								                             val invoke = info.mapping.getInvokedOnLoadFunction();
-								                             if (invoke != null) result = invoke.apply(result);
 								                             if (result.noneIsNull()) resp.getWriter().write(result.toJSON().toString());
 							                             } catch (NumberFormatException e) {
 								                             log.debug(e);
@@ -375,7 +369,8 @@ public class KrystalServlet extends HttpServlet implements LoggingInterface {
 			                } catch (IOException ignored) {
 			                }
 		                })
-		                .thenRun(asyncContext::complete);
+		                .thenRun(asyncContext::complete)
+		                .thenRun(System::gc);
 		return true;
 	}
 	

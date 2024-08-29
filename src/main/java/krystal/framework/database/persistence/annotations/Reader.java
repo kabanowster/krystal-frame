@@ -12,10 +12,12 @@ import java.lang.annotation.Target;
 /**
  * Marks constructor used to parse data from {@link QueryResultInterface QueryResultInterface}. The constructor's parameters types must match the {@link ColumnInterface columns} types, as well as their order. Use custom methods to map incoming values with
  * actual fields types, by matching i.e. {@link lombok.AllArgsConstructor @AllArgsConstructor}.
+ * <p>
+ * Methods of type {@code void}, marked with this annotation, will be invoked after the constructor.
  *
  * @see PersistenceInterface#mapQueryResult(QueryResultInterface, Class) PersistenceInterface.mapQueryResult()
  */
-@Target(ElementType.CONSTRUCTOR)
+@Target({ElementType.CONSTRUCTOR, ElementType.METHOD})
 @Retention(RetentionPolicy.RUNTIME)
 public @interface Reader {
 

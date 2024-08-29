@@ -64,7 +64,8 @@ public interface PersistenceInterface extends LoggingInterface {
 		return (filter == null ? query : filter.apply(query))
 				       .promise(queryExecutor)
 				       .map(s -> s.findFirst().orElse(QueryResultInterface.empty()))
-				       .compose(qr -> qr.toStreamOf(clazz));
+				       .compose(qr -> qr.toStreamOf(clazz))
+				       .map(s -> s.peek(o -> Tools.runAnnotatedMethods(Reader.class, o)));
 	}
 	
 	/**
@@ -316,6 +317,7 @@ public interface PersistenceInterface extends LoggingInterface {
 				      m.getName().toLowerCase().matches("^write.*?")
 						      || m.isAnnotationPresent(Writer.class)))
 		      .forEach(m -> {
+			      if (m.getReturnType().equals(void.class)) return;
 			      val fld = Arrays.stream(getClass().getDeclaredFields())
 			                      .filter(f -> {
 				                              val name = f.getName();
@@ -341,6 +343,18 @@ public interface PersistenceInterface extends LoggingInterface {
 		      });
 		
 		return map;
+	}
+	
+	default void runReaders() {
+		Tools.runAnnotatedMethods(Reader.class, this);
+	}
+	
+	default void runWriters() {
+		Tools.runAnnotatedMethods(Writer.class, this);
+	}
+	
+	default void runRemovers() {
+		Tools.runAnnotatedMethods(Remover.class, this);
 	}
 	
 	/**
@@ -473,7 +487,10 @@ public interface PersistenceInterface extends LoggingInterface {
 		val table = getTable();
 		
 		switch (execution) {
-			case load -> load(table, keysPairs, fieldsColumns).ifPresentOrElse(this::copyFrom, () -> log().trace(String.format("  ! No record found for persistence to load %s.class.", getClass().getSimpleName())));
+			case load -> load(table, keysPairs, fieldsColumns).ifPresentOrElse(another -> {
+				copyFrom(another);
+				runReaders();
+			}, () -> log().trace(String.format("  ! No record found for persistence to load %s.class.", getClass().getSimpleName())));
 			case instantiate -> instantiate(table, keysPairs, fieldsColumns, fieldsValues);
 			case delete -> delete(table, keysPairs);
 			case save -> save(table, keysPairs, fieldsColumns, fieldsValues);
@@ -521,7 +538,10 @@ public interface PersistenceInterface extends LoggingInterface {
 	private void instantiate(TableInterface table, ColumnsComparisonInterface[] keysPairs, Map<Field, ColumnInterface> fieldsColumns, Map<Field, Object> fieldsValues) {
 		load(table, keysPairs, fieldsColumns)
 				.ifPresentOrElse(
-						this::copyFrom,
+						another -> {
+							copyFrom(another);
+							runReaders();
+						},
 						() -> {
 							log().trace(String.format("  ! No record found for persistence to load. Creating new %s.class persisted object.", getClass().getSimpleName()));
 							insertAndConsume(table, fieldsColumns, fieldsValues);
@@ -546,6 +566,7 @@ public interface PersistenceInterface extends LoggingInterface {
 							          .where(keysPairs)
 							          .setProvider(getProvider())
 							          .promise()
+							          .thenRun(this::runWriters)
 							          .thenRun(() -> log().trace("    Record updated."))
 							          .joinThrow(),
 							() -> insertAndConsume(table, fieldsColumns, fieldsValues)
@@ -578,9 +599,10 @@ public interface PersistenceInterface extends LoggingInterface {
 				     .join()
 				     .flatMap(QueryResultInterface::getResult)
 				     .orElse(0L)));
-		if (deleted > 0)
+		if (deleted > 0) {
+			runRemovers();
 			log().trace("  ! Persisted object deleted from database. Deleted rows: {}", deleted);
-		else
+		} else
 			log().trace("  ! Persisted object not deleted from database.");
 	}
 	
@@ -605,6 +627,7 @@ public interface PersistenceInterface extends LoggingInterface {
 		      .joinThrow()
 		      .flatMap(Stream::findFirst)
 		      .ifPresent(this::copyFrom);
+		runWriters();
 	}
 	
 	/**
@@ -653,22 +676,22 @@ public interface PersistenceInterface extends LoggingInterface {
 	private <T> void copyFrom(T another) {
 		log().trace(String.format("  > Copy fields %s.class to %s.class...", another.getClass().getSimpleName(), getClass().getSimpleName()));
 		
-		Map<String, Field> anotherFields =
-				Arrays.stream(another.getClass().getDeclaredFields())
-				      .filter(AccessibleObject::trySetAccessible)
-				      .collect(Collectors.toMap(
-						      a -> a.getName().toLowerCase(),
-						      a -> a
-				      ));
+		val anotherFields = another.getClass().getDeclaredFields();
+		val values = new HashMap<String, Object>(anotherFields.length);
+		for (val f : anotherFields) {
+			if (!f.trySetAccessible()) continue;
+			try {
+				values.put(f.getName(), f.get(another));
+			} catch (IllegalAccessException _) {
+			}
+		}
 		
 		Stream.of(getClass().getDeclaredFields())
-		      .filter(f -> !Tools.isSkipped(f, SkipTypes.persistence) && f.trySetAccessible())
+		      .filter(AccessibleObject::trySetAccessible)
 		      .forEach(f -> {
 			      try {
-				      f.set(this, Optional.ofNullable(anotherFields.get(f.getName().toLowerCase())).orElseThrow(NoSuchFieldException::new).get(another));
-			      } catch (NoSuchFieldException e) {
-				      log().trace(String.format("    Field %s not found in %s.class. Skipped.", f.getName(), another.getClass().getSimpleName()));
-			      } catch (IllegalAccessException ignored) {
+				      f.set(this, values.get(f.getName()));
+			      } catch (IllegalAccessException _) {
 			      }
 		      });
 		log().trace("    Copy successful.");
