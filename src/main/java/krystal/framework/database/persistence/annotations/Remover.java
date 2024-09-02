@@ -8,7 +8,7 @@ import java.lang.annotation.RetentionPolicy;
 import java.lang.annotation.Target;
 
 /**
- * Deletion equivalent of the {@link Writer} void methods, as last step of {@link PersistenceInterface#delete()} execution.
+ * Deletion equivalent of the {@link Writer} void methods, as <b><i>first</i></b> step of {@link PersistenceInterface#delete()} execution.
  */
 @Target({ElementType.METHOD})
 @Retention(RetentionPolicy.RUNTIME)

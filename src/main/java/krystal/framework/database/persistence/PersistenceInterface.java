@@ -44,6 +44,8 @@ import java.util.stream.Stream;
 @FunctionalInterface
 public interface PersistenceInterface extends LoggingInterface {
 	
+	// TODO Foreigner annotation: Marks field for which the automatic Reader, Writer and Remover action will be performed based on provided link class and column interfaces
+	
 	/*
 	 * Persistence conversion
 	 */
@@ -594,16 +596,17 @@ public interface PersistenceInterface extends LoggingInterface {
 	 * Delete persistence record from database.
 	 */
 	private void delete(TableInterface table, ColumnsComparisonInterface[] keysPairs) {
-		val deleted = Long.parseLong(String.valueOf(
-				table.delete().where(keysPairs).setProvider(getProvider()).promise()
-				     .join()
-				     .flatMap(QueryResultInterface::getResult)
-				     .orElse(0L)));
-		if (deleted > 0) {
-			runRemovers();
-			log().trace("  ! Persisted object deleted from database. Deleted rows: {}", deleted);
-		} else
-			log().trace("  ! Persisted object not deleted from database.");
+		VirtualPromise.run(this::runRemovers)
+		              .compose(() -> table.delete().where(keysPairs).setProvider(getProvider()).promise())
+		              .map(QueryResultInterface::getResult)
+		              .accept(deleted -> {
+			              deleted.map(String::valueOf)
+			                     .map(Long::parseLong)
+			                     .ifPresentOrElse(
+					                     n -> log().trace("  ! Persisted object deleted from database. Deleted rows: {}", n),
+					                     () -> log().trace("  ! Persisted object not deleted from database.")
+			                     );
+		              }).join();
 	}
 	
 	/*
@@ -688,13 +691,13 @@ public interface PersistenceInterface extends LoggingInterface {
 		
 		Stream.of(getClass().getDeclaredFields())
 		      .filter(AccessibleObject::trySetAccessible)
-		      .forEach(f -> {
+		      .forEach(f -> Optional.ofNullable(values.get(f.getName())).ifPresent(value -> {
 			      try {
-				      f.set(this, values.get(f.getName()));
+				      f.set(this, value);
 			      } catch (IllegalAccessException _) {
 			      }
-		      });
-		log().trace("    Copy successful.");
+		      }));
+		log().trace("    Copy done.");
 	}
 	
 	/**
