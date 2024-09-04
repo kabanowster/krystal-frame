@@ -8,13 +8,10 @@ public interface PersistenceMappingInterface {
 	@NonNull
 	Class<? extends ImportantPersistenceInterface> getPersistenceClass();
 	
-	/**
-	 * @apiNote The mapping name is converted to lower-case!
-	 */
 	String name();
 	
 	default String mapping() {
-		return "/" + name().toLowerCase();
+		return "/" + name();
 	}
 	
 	default String single() {
