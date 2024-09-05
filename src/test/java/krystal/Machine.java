@@ -53,7 +53,7 @@ public class Machine implements PersistenceInterface {
 	
 	@Filter
 	private Function<SelectStatement, WhereClause> filter() {
-		return WhereClause.filter(s -> s.where(Columns.linia.is(ColumnsComparisonOperator.LESS, 9000)));
+		return s -> s.where(Columns.linia.is(ColumnsComparisonOperator.LESS, 9000));
 	}
 	
 	@Override
@@ -70,10 +70,14 @@ public class Machine implements PersistenceInterface {
 					             try {
 						             return String.valueOf(f.get(this));
 					             } catch (IllegalAccessException e) {
-						             throw logFatalAndThrow(e);
+						             throw new RuntimeException(e);
 					             }
 				             }
 		             ));
+	}
+	
+	private void writeNazwa() {
+		logTest("Machine Name: " + nazwa);
 	}
 	
 }

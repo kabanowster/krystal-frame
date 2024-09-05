@@ -1,9 +1,7 @@
 package krystal;
 
 import krystal.Machine.Columns;
-import krystal.VirtualPromise.ExceptionsHandler;
 import krystal.framework.KrystalFramework;
-import krystal.framework.core.ConsoleProgress;
 import krystal.framework.core.flow.implementation.Flows;
 import krystal.framework.database.abstraction.DBCDriverInterface;
 import krystal.framework.database.abstraction.ProviderInterface;
@@ -17,7 +15,6 @@ import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 
 import java.util.List;
-import java.util.Objects;
 
 public class TestClass implements LoggingInterface {
 	
@@ -54,73 +51,11 @@ public class TestClass implements LoggingInterface {
 		//                     .map(StringRenderer::renderMaps)
 		//                     .accept(this::logTest)
 		//                     .joinThrow();
-		new Machine().getTable().select().where(Columns.nazwa.is("Serac")).promise()
-		             .map(Objects::toString)
-		             .accept(this::logTest);
-	}
-	
-	@Test
-	void monitorTest() {
-		val other = VirtualPromise.run(() -> logTest("This is holding promise"))
-		                          .setOnHold()
-		                          .thenRun(() -> logTest("Holding promise is free again"));
-		
-		PersistenceInterface.promiseAll(Machine.class)
-		                    .catchThrow()
-		                    .map(s -> s.map(Machine::render).toList())
-		                    .map(StringRenderer::renderMaps)
-		                    .apply(_ -> log().fatal("Will wait now for the other guy"))
-		                    .mirror(() -> other)
-		                    .accept(this::logTest);
-		
-		VirtualPromise.run(() -> {
-			logTest("Setting holder timeout");
-			for (int i = 1; i <= 5; i++) {
-				try {
-					Thread.sleep(1000);
-				} catch (InterruptedException e) {
-					throw new RuntimeException(e);
-				}
-				logTest("elapsed time: " + i);
-			}
-			other.resumeNext();
-		});
-	}
-	
-	@Test
-	void joinTest() {
-		val other = VirtualPromise.run(() -> logTest("This primary promise"))
-		                          .monitor(_ -> {
-			                          for (int i = 0; i < 10; i++) {
-				                          if (i == 5) {
-					                          throw new RuntimeException("motherfuckr!");
-				                          }
-				                          try {
-					                          Thread.sleep(1000);
-				                          } catch (InterruptedException _) {
-				                          }
-				                          logTest("this is some logging: " + i);
-			                          }
-		                          })
-		                          .catchExceptions(new ExceptionsHandler(log()::fatal))
-		                          .thenRun(() -> logTest("Primary promise ended successfully"))
-		                          .catchRun(_ -> logTest("This one was caught later"));
-		
-	}
-	
-	@Test
-	void progressBarTest() throws InterruptedException {
-		val progress = new ConsoleProgress(20).level("info").render();
-		log().warn("Progress start under content.");
-		for (int i = 0; i <= progress.getTarget(); i += 10) {
-			Thread.sleep(1000);
-			log().info("this is some logging: {}", i);
-			progress.update(i);
-		}
-		log().warn("Progress end, dispose after 2s.");
-		Thread.sleep(2000);
-		progress.dispose();
-		log().warn("Progress disposed.");
+		val m = PersistenceInterface.promiseAll(Machine.class, w -> w.andWhere(Columns.nazwa.is("Serac")))
+		                            .joinThrow().orElseThrow()
+		                            .findFirst()
+		                            .orElseThrow()
+		                            .getWriters();
 	}
 	
 }

@@ -20,6 +20,7 @@ import java.util.Optional;
 @Log4j2
 @UtilityClass
 public class TomcatFactory {
+	// TODO allow properties from server.properties file
 	
 	/**
 	 * Default {@link Tomcat} implementation. Sets-up basic properties, attaches web-app if provided, with custom {@link KrystalServlet}s.
