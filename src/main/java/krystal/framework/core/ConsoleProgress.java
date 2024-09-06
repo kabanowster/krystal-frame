@@ -64,29 +64,25 @@ public class ConsoleProgress extends ProgressRenderer {
 	
 	@Override
 	public ConsoleProgress render() {
-		EventQueue.invokeLater(() -> {
-			getDocElement().ifPresentOrElse(
-					element -> element.html(toString()),
-					() -> {
-						switch (position) {
-							case after -> console.getContent().after(toString());
-							case before -> console.getContent().before(toString());
-							case append -> console.getContent().append(toString());
-							case logger -> log.log(Optional.ofNullable(loggerLevel).orElse(LoggingWrapper.ROOT_LOGGER.getLevel()), toString());
-						}
+		getDocElement().ifPresentOrElse(
+				element -> element.html(toString()),
+				() -> {
+					switch (position) {
+						case after -> console.getContent().after(toString());
+						case before -> console.getContent().before(toString());
+						case append -> console.getContent().append(toString());
+						case logger -> log.log(Optional.ofNullable(loggerLevel).orElse(LoggingWrapper.ROOT_LOGGER.getLevel()), toString());
 					}
-			);
-			console.revalidate();
-		});
+				}
+		);
+		EventQueue.invokeLater(() -> console.revalidate());
 		return this;
 	}
 	
 	@Override
 	public void dispose() {
-		EventQueue.invokeLater(() -> {
-			getDocElement().ifPresent(Element::remove);
-			console.revalidate();
-		});
+		getDocElement().ifPresent(Element::remove);
+		EventQueue.invokeLater(() -> console.revalidate());
 	}
 	
 	private Optional<Element> getDocElement() {
