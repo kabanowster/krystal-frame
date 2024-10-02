@@ -38,6 +38,14 @@ public interface ColumnInterface {
 		return ColumnToValueComparison.of(this, operator, to);
 	}
 	
+	default ColumnsComparisonInterface is(ColumnsComparisonOperator operator, List<Object> to) {
+		return ColumnToValueComparison.of(this, operator, to);
+	}
+	
+	default ColumnsComparisonInterface is(ColumnsComparisonOperator operator, Object[] to) {
+		return ColumnToValueComparison.of(this, operator, to);
+	}
+	
 	default ColumnsComparisonInterface set(Object value) {
 		return ColumnSetValueComparison.of(this, value);
 	}
