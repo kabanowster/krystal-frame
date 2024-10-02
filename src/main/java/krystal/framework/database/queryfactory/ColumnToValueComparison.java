@@ -8,7 +8,6 @@ import krystal.framework.database.abstraction.Query;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Objects;
-import java.util.stream.Stream;
 
 /**
  * Pairing column with values for different data comparisons in WHERE clauses.
@@ -49,8 +48,12 @@ public record ColumnToValueComparison(ColumnInterface column, ColumnsComparisonO
 		return new ColumnToValueComparison(column, operator, values);
 	}
 	
-	public static ColumnToValueComparison of(ColumnInterface column, ColumnsComparisonOperator operator, Object... values) {
-		return new ColumnToValueComparison(column, operator, Stream.of(values).toList());
+	public static ColumnToValueComparison of(ColumnInterface column, ColumnsComparisonOperator operator, Object value) {
+		return new ColumnToValueComparison(column, operator, List.of(value));
+	}
+	
+	public static ColumnToValueComparison of(ColumnInterface column, ColumnsComparisonOperator operator, Object[] values) {
+		return new ColumnToValueComparison(column, operator, Arrays.stream(values).toList());
 	}
 	
 }
