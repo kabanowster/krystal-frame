@@ -7,7 +7,6 @@ import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import krystal.JSON;
 import krystal.VirtualPromise;
-import krystal.framework.database.implementation.Q;
 import krystal.framework.database.persistence.PersistenceInterface;
 import krystal.framework.logging.LoggingInterface;
 import lombok.Builder;
@@ -104,7 +103,7 @@ public class KrystalServlet extends HttpServlet implements LoggingInterface {
 				       .addPersistenceMappings(mappings)
 				       .serveGetPersistenceMappings(mappings, origin)
 				       .servePostPersistenceMappings(mappings, origin)
-				       .serveDeletePersistenceMappings(mappings)
+				       .serveDeletePersistenceMappings(mappings, origin)
 				       .serveOptions((req, resp) -> VirtualPromise.run(() -> {
 					       options.forEach(resp::setHeader);
 					       resp.setStatus(HttpServletResponse.SC_NO_CONTENT);
@@ -127,110 +126,23 @@ public class KrystalServlet extends HttpServlet implements LoggingInterface {
 			return this;
 		}
 		
-		public KrystalServletBuilder serveDeletePersistenceMappings(Collection<PersistenceMappingInterface> mappings) {
-			return this.serveDelete(
-					(req, resp) -> VirtualPromise.supply(() -> new RequestInfo(req, mappings))
-					                             .monitor(promise -> RequestInfo.validate(promise, resp))
-					                             .accept(info -> {
-						                             // TODO check for auth flag
-						                             
-						                             if (info.patternIsMapping) {
-							                             // pattern is singular with no matching-value
-							                             log.debug("Invalid DELETE request - singular pattern without value: %s".formatted(req.getHttpServletMapping().getPattern()));
-							                             resp.setStatus(HttpServletResponse.SC_BAD_REQUEST);
-							                             return;
-						                             }
-						                             try {
-							                             if (info.patternIsPlural) {
-								                             val statement = info.mapping.getPersistenceClass().getDeclaredConstructor().newInstance().getTable().delete().where1is1();
-								                             val params = req.getParameterMap();
-								                             if (!params.isEmpty()) params.forEach((k, v) -> statement.andWhere(Q.c(k).is((Object[]) v)));
-								                             statement.promise().joinThrow();
-							                             } else {
-								                             info.mapping.getPersistenceClass().getDeclaredConstructor(String.class).newInstance(req.getHttpServletMapping().getMatchValue()).delete();
-							                             }
-						                             } catch (NumberFormatException e) {
-							                             log.debug(e);
-							                             resp.setStatus(HttpServletResponse.SC_BAD_REQUEST);
-						                             } catch (NoSuchMethodException | InstantiationException | IllegalAccessException | InvocationTargetException e) {
-							                             log.error(e);
-							                             resp.setStatus(HttpServletResponse.SC_INTERNAL_SERVER_ERROR);
-						                             }
-					                             }));
-		}
-		
-		public KrystalServletBuilder servePostPersistenceMappings(Collection<PersistenceMappingInterface> mappings, Map<String, String> responseHeaders) {
-			return this.servePost(
-					(req, resp) -> VirtualPromise.supply(() -> new RequestInfo(req, mappings))
-					                             .monitor(promise -> RequestInfo.validate(promise, resp))
-					                             .accept(info -> {
-						                             // TODO check for auth flag
-						                             
-						                             // prep response
-						                             resp.setContentType("application/json");
-						                             resp.setCharacterEncoding(StandardCharsets.UTF_8);
-						                             responseHeaders.forEach(resp::setHeader);
-						                             
-						                             try {
-							                             val str = req.getReader().lines().collect(Collectors.joining());
-							                             val clazz = info.mapping.getPersistenceClass();
-							                             val error = new ClassCastException("Can not perform saving execution - %s is not a PersistenceInterface.".formatted(clazz));
-							                             
-							                             if (info.patternIsPlural) {
-								                             val body = new JSONArray(str);
-								                             val results = new ArrayList<PersistenceInterface>(body.length());
-								                             body.forEach(o -> {
-									                             try {
-										                             if (JSON.into(o, clazz) instanceof PersistenceInterface obj) {
-											                             obj.save();
-											                             results.add(obj);
-										                             } else throw error;
-									                             } catch (JSONException | ClassCastException e) {
-										                             log.debug(e);
-									                             }
-								                             });
-								                             resp.getWriter().write(JSON.fromObjects(results).toString());
-							                             } else {
-								                             val body = new JSONObject(str);
-								                             if (JSON.into(body, clazz) instanceof PersistenceInterface obj) {
-									                             obj.save();
-									                             resp.getWriter().write(obj.toJSON().toString());
-								                             } else throw error;
-							                             }
-						                             } catch (JSONException | ClassCastException e) {
-							                             log.debug(e);
-							                             resp.setStatus(HttpServletResponse.SC_BAD_REQUEST);
-						                             } catch (IOException e) {
-							                             log.error(e);
-							                             resp.setStatus(HttpServletResponse.SC_INTERNAL_SERVER_ERROR);
-						                             }
-					                             }));
-		}
-		
 		public KrystalServletBuilder serveGetPersistenceMappings(Collection<PersistenceMappingInterface> mappings, Map<String, String> responseHeaders) {
 			return this.serveGet(
 					(req, resp) -> VirtualPromise.supply(() -> new RequestInfo(req, mappings))
 					                             .monitor(promise -> RequestInfo.validate(promise, resp))
 					                             .accept(info -> {
-						                             // TODO check for auth flag
-						                             
 						                             // prep response
-						                             resp.setContentType("application/json");
-						                             resp.setCharacterEncoding(StandardCharsets.UTF_8);
-						                             responseHeaders.forEach(resp::setHeader);
+						                             prepStandardResponseWithHeaders(resp, responseHeaders);
 						                             
 						                             if (info.patternIsMapping) {
-							                             // pattern is singular with no matching-value
+							                             // pattern is singular with no matching-value present
 							                             log.debug("Invalid GET request - singular pattern without value: %s".formatted(req.getHttpServletMapping().getPattern()));
 							                             resp.setStatus(HttpServletResponse.SC_BAD_REQUEST);
 							                             return;
 						                             }
 						                             if (info.patternIsPlural) {
 							                             val params = req.getParameterMap();
-							                             PersistenceInterface.promiseAll(info.mapping.getPersistenceClass(), params.isEmpty() ? null : w -> {
-								                                                 params.forEach((k, v) -> w.andWhere(Q.c(k).is((Object[]) v)));
-								                                                 return w;
-							                                                 })
+							                             PersistenceInterface.promiseAll(info.mapping.getPersistenceClass(), params.isEmpty() ? null : statement -> statement.filterWith(params))
 							                                                 .map(Stream::toList)
 							                                                 .map(JSON::fromObjects)
 							                                                 .map(JSONArray::toString)
@@ -245,7 +157,7 @@ public class KrystalServlet extends HttpServlet implements LoggingInterface {
 						                             } else {
 							                             try {
 								                             val id = req.getHttpServletMapping().getMatchValue();
-								                             var result = info.mapping.getPersistenceClass().getDeclaredConstructor(String.class).newInstance(id);
+								                             var result = info.mapping.getPersistenceClass().getDeclaredConstructor(String.class).newInstance(id); // TODO include doc explanation for String argument constructor required for persistence
 								                             if (result.noneIsNull()) resp.getWriter().write(result.toJSON().toString());
 							                             } catch (NumberFormatException e) {
 								                             log.debug(e);
@@ -258,13 +170,118 @@ public class KrystalServlet extends HttpServlet implements LoggingInterface {
 					                             }));
 		}
 		
+		public KrystalServletBuilder serveDeletePersistenceMappings(Collection<PersistenceMappingInterface> mappings, Map<String, String> responseHeaders) {
+			return this.serveDelete(
+					(req, resp) -> VirtualPromise.supply(() -> new RequestInfo(req, mappings))
+					                             .monitor(promise -> RequestInfo.validate(promise, resp))
+					                             .accept(info -> {
+						                             if (info.patternIsMapping) {
+							                             // pattern is singular with no matching-value
+							                             log.debug("Invalid DELETE request - singular pattern without value: %s".formatted(req.getHttpServletMapping().getPattern()));
+							                             resp.setStatus(HttpServletResponse.SC_BAD_REQUEST);
+							                             return;
+						                             }
+						                             // prep response
+						                             prepStandardResponseWithHeaders(resp, responseHeaders);
+						                             
+						                             try {
+							                             val clazz = info.mapping.getPersistenceClass();
+							                             
+							                             if (info.patternIsPlural) {
+								                             val params = req.getParameterMap();
+								                             if (!params.isEmpty()) {
+									                             // parameterized call
+									                             clazz.getDeclaredConstructor().newInstance().getTable()
+									                                  .delete()
+									                                  .filterWith(params)
+									                                  .promise()
+									                                  .joinThrow();
+								                             } else {
+									                             // objects posted
+									                             val str = req.getReader().lines().collect(Collectors.joining());
+									                             val results = processBodyOfArray(new JSONArray(str), clazz, PersistenceInterface::delete);
+									                             resp.getWriter().write(JSON.fromObjects(results).toString());
+								                             }
+								                             
+							                             } else {
+								                             // single object by /id
+								                             val obj = clazz.getDeclaredConstructor(String.class).newInstance(req.getHttpServletMapping().getMatchValue());
+								                             obj.delete();
+								                             resp.getWriter().write(obj.toJSON().toString());
+							                             }
+						                             } catch (NumberFormatException | JSONException e) {
+							                             log.debug(e);
+							                             resp.setStatus(HttpServletResponse.SC_BAD_REQUEST);
+						                             } catch (NoSuchMethodException | InstantiationException | IllegalAccessException | InvocationTargetException | IOException e) {
+							                             log.error(e);
+							                             resp.setStatus(HttpServletResponse.SC_INTERNAL_SERVER_ERROR);
+						                             }
+					                             }));
+		}
+		
+		public KrystalServletBuilder servePostPersistenceMappings(Collection<PersistenceMappingInterface> mappings, Map<String, String> responseHeaders) {
+			return this.servePost(
+					(req, resp) -> VirtualPromise.supply(() -> new RequestInfo(req, mappings))
+					                             .monitor(promise -> RequestInfo.validate(promise, resp))
+					                             .accept(info -> {
+						                             // prep response
+						                             prepStandardResponseWithHeaders(resp, responseHeaders);
+						                             
+						                             try {
+							                             val str = req.getReader().lines().collect(Collectors.joining());
+							                             val clazz = info.mapping.getPersistenceClass();
+							                             
+							                             if (info.patternIsPlural) {
+								                             val results = processBodyOfArray(new JSONArray(str), clazz, PersistenceInterface::save);
+								                             resp.getWriter().write(JSON.fromObjects(results).toString());
+							                             } else {
+								                             processSingleJsonElement(new JSONObject(str), clazz, element -> {
+									                             element.save();
+									                             try {
+										                             resp.getWriter().write(element.toJSON().toString());
+									                             } catch (IOException e) {
+										                             log.error(e);
+										                             resp.setStatus(HttpServletResponse.SC_INTERNAL_SERVER_ERROR);
+									                             }
+								                             });
+							                             }
+						                             } catch (JSONException | ClassCastException e) {
+							                             log.debug(e);
+							                             resp.setStatus(HttpServletResponse.SC_BAD_REQUEST);
+						                             } catch (IOException e) {
+							                             log.error(e);
+							                             resp.setStatus(HttpServletResponse.SC_INTERNAL_SERVER_ERROR);
+						                             }
+					                             }));
+		}
+		
+		private List<PersistenceInterface> processBodyOfArray(JSONArray jsonArray, Class<? extends PersistenceInterface> clazz, Consumer<PersistenceInterface> process) {
+			val results = new ArrayList<PersistenceInterface>(jsonArray.length());
+			jsonArray.forEach(o -> processSingleJsonElement(o, clazz, process.andThen(results::add)));
+			return results;
+		}
+		
+		private void processSingleJsonElement(Object json, Class<? extends PersistenceInterface> clazz, Consumer<PersistenceInterface> process) {
+			try {
+				if (JSON.into(json, clazz) instanceof PersistenceInterface obj) {
+					process.accept(obj);
+				} else throw new ClassCastException("Can not perform persistence execution on provided request's body element - %s is not a PersistenceInterface.".formatted(clazz));
+			} catch (JSONException | ClassCastException e) {
+				log.debug(e);
+			}
+		}
+		
+		private void prepStandardResponseWithHeaders(HttpServletResponse response, Map<String, String> headers) {
+			response.setContentType("application/json");
+			response.setCharacterEncoding(StandardCharsets.UTF_8);
+			headers.forEach(response::setHeader);
+		}
+		
 		private static class RequestInfo {
 			
 			private final PersistenceMappingInterface mapping;
 			private final boolean patternIsPlural;
 			private final boolean patternIsMapping;
-			
-			// TODO authorisation flags r-w-d
 			
 			public RequestInfo(HttpServletRequest request, Collection<PersistenceMappingInterface> mappings) {
 				String pattern = request.getHttpServletMapping().getPattern();
