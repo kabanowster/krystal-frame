@@ -285,10 +285,10 @@ public class KrystalServlet extends HttpServlet implements LoggingInterface {
 			
 			public RequestInfo(HttpServletRequest request, Collection<PersistenceMappingInterface> mappings) {
 				String pattern = request.getHttpServletMapping().getPattern();
-				patternIsPlural = pattern.matches("^/\\w+s$");
-				patternIsMapping = !pattern.matches("^/\\w+(s|\\W+)$");
-				val patternName = pattern.splitWithDelimiters("(?<=/)\\w+[^s\\W]", 0)[1];
-				mapping = mappings.stream().filter(m -> m.name().equalsIgnoreCase(patternName)).findAny().orElseThrow(NoSuchElementException::new);
+				mapping = mappings.stream().filter(m -> m.matches(pattern)).findAny().orElseThrow(NoSuchElementException::new);
+				
+				patternIsPlural = pattern.equals(mapping.plural());
+				patternIsMapping = pattern.equals(mapping.mapping());
 			}
 			
 			public static void validate(VirtualPromise<RequestInfo> info, HttpServletResponse response) {
