@@ -19,7 +19,14 @@ public interface PersistenceMappingInterface {
 	}
 	
 	default String plural() {
-		return mapping() + "s";
+		return mapping() + ('s' == name().charAt(name().length() - 1) ? "es" : "s");
+	}
+	
+	default boolean matches(String pattern) {
+		if (pattern == null) return false;
+		return pattern.equalsIgnoreCase(mapping())
+				       || pattern.equalsIgnoreCase(single())
+				       || pattern.equalsIgnoreCase(plural());
 	}
 	
 }
