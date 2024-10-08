@@ -147,18 +147,26 @@ public class KrystalServlet extends HttpServlet implements LoggingInterface {
 							                                                 .map(JSON::fromObjects)
 							                                                 .map(JSONArray::toString)
 							                                                 .accept(result -> {
-								                                                 try {
-									                                                 resp.getWriter().write(result);
-								                                                 } catch (IOException e) {
-									                                                 log.error(e);
-									                                                 resp.setStatus(HttpServletResponse.SC_INTERNAL_SERVER_ERROR);
+								                                                 if (result.length() > 2) {
+									                                                 try {
+										                                                 resp.getWriter().write(result);
+									                                                 } catch (IOException e) {
+										                                                 log.error(e);
+										                                                 resp.setStatus(HttpServletResponse.SC_INTERNAL_SERVER_ERROR);
+									                                                 }
+								                                                 } else {
+									                                                 resp.setStatus(HttpServletResponse.SC_NOT_FOUND);
 								                                                 }
-							                                                 }).joinThrow();
+							                                                 }).catchRun(e -> {
+								                                                 log.error(e);
+								                                                 resp.setStatus(HttpServletResponse.SC_INTERNAL_SERVER_ERROR);
+							                                                 }).join();
 						                             } else {
 							                             try {
 								                             val id = req.getHttpServletMapping().getMatchValue();
 								                             var result = info.mapping.getPersistenceClass().getDeclaredConstructor(String.class).newInstance(id); // TODO include doc explanation for String argument constructor required for persistence
 								                             if (result.noneIsNull()) resp.getWriter().write(result.toJSON().toString());
+								                             else resp.setStatus(HttpServletResponse.SC_NOT_FOUND);
 							                             } catch (NumberFormatException e) {
 								                             log.debug(e);
 								                             resp.setStatus(HttpServletResponse.SC_BAD_REQUEST);
@@ -195,21 +203,24 @@ public class KrystalServlet extends HttpServlet implements LoggingInterface {
 									                                  .delete()
 									                                  .filterWith(params)
 									                                  .promise()
-									                                  .joinThrow();
+									                                  .catchRun(e -> {
+										                                  log.error(e);
+										                                  resp.setStatus(HttpServletResponse.SC_INTERNAL_SERVER_ERROR);
+									                                  })
+									                                  .join();
 								                             } else {
 									                             // objects posted
 									                             val str = req.getReader().lines().collect(Collectors.joining());
 									                             val results = processBodyOfArray(new JSONArray(str), clazz, PersistenceInterface::delete);
 									                             resp.getWriter().write(JSON.fromObjects(results).toString());
 								                             }
-								                             
 							                             } else {
 								                             // single object by /id
 								                             val obj = clazz.getDeclaredConstructor(String.class).newInstance(req.getHttpServletMapping().getMatchValue());
 								                             obj.delete();
 								                             resp.getWriter().write(obj.toJSON().toString());
 							                             }
-						                             } catch (NumberFormatException | JSONException e) {
+						                             } catch (NumberFormatException | JSONException | ClassCastException e) {
 							                             log.debug(e);
 							                             resp.setStatus(HttpServletResponse.SC_BAD_REQUEST);
 						                             } catch (NoSuchMethodException | InstantiationException | IllegalAccessException | InvocationTargetException | IOException e) {
@@ -236,10 +247,10 @@ public class KrystalServlet extends HttpServlet implements LoggingInterface {
 								                             resp.getWriter().write(JSON.fromObjects(results).toString());
 							                             } else {
 								                             processSingleJsonElement(new JSONObject(str), clazz, element -> {
-									                             element.save();
 									                             try {
+										                             element.save();
 										                             resp.getWriter().write(element.toJSON().toString());
-									                             } catch (IOException e) {
+									                             } catch (Exception e) {
 										                             log.error(e);
 										                             resp.setStatus(HttpServletResponse.SC_INTERNAL_SERVER_ERROR);
 									                             }
@@ -255,20 +266,16 @@ public class KrystalServlet extends HttpServlet implements LoggingInterface {
 					                             }));
 		}
 		
-		private List<PersistenceInterface> processBodyOfArray(JSONArray jsonArray, Class<? extends PersistenceInterface> clazz, Consumer<PersistenceInterface> process) {
+		private List<PersistenceInterface> processBodyOfArray(JSONArray jsonArray, Class<? extends PersistenceInterface> clazz, Consumer<PersistenceInterface> process) throws JSONException, ClassCastException {
 			val results = new ArrayList<PersistenceInterface>(jsonArray.length());
-			jsonArray.forEach(o -> processSingleJsonElement(o, clazz, process.andThen(results::add)));
+			for (var json : jsonArray) processSingleJsonElement(json, clazz, process.andThen(results::add));
 			return results;
 		}
 		
-		private void processSingleJsonElement(Object json, Class<? extends PersistenceInterface> clazz, Consumer<PersistenceInterface> process) {
-			try {
-				if (JSON.into(json, clazz) instanceof PersistenceInterface obj) {
-					process.accept(obj);
-				} else throw new ClassCastException("Can not perform persistence execution on provided request's body element - %s is not a PersistenceInterface.".formatted(clazz));
-			} catch (JSONException | ClassCastException e) {
-				log.debug(e);
-			}
+		private void processSingleJsonElement(Object json, Class<? extends PersistenceInterface> clazz, Consumer<PersistenceInterface> process) throws JSONException, ClassCastException {
+			if (JSON.into(json, clazz) instanceof PersistenceInterface obj) {
+				process.accept(obj);
+			} else throw new ClassCastException("Can not perform persistence execution on provided request's body element - %s is not a PersistenceInterface.".formatted(clazz));
 		}
 		
 		private void prepStandardResponseWithHeaders(HttpServletResponse response, Map<String, String> headers) {
