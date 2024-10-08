@@ -250,6 +250,7 @@ public class BaseCommander implements CommanderInterface {
 								                      """.formatted(
 										      context.getPath(),
 										      Arrays.stream(context.findServletMappings())
+										            .sorted()
 										            .collect(Collectors.joining(KrystalFramework.getDefaultDelimeter()))
 								      )).collect(Collectors.joining(System.lineSeparator()))
 						));
