@@ -5,6 +5,7 @@ import krystal.Skip;
 import krystal.Skip.SkipTypes;
 import krystal.Tools;
 import krystal.VirtualPromise;
+import krystal.framework.KrystalFramework;
 import krystal.framework.database.abstraction.*;
 import krystal.framework.database.persistence.annotations.*;
 import krystal.framework.database.persistence.annotations.Vertical.PivotColumn;
@@ -38,58 +39,11 @@ import java.util.stream.Stream;
  * @see Filter
  * @see Reader
  * @see Writer
- * @see #promiseAll(Class, QueryExecutorInterface, UnaryOperator, Object)
+ * @see Persistence#promiseAll(Class, QueryExecutorInterface, UnaryOperator, Object)
  * @see ReadOnly
  */
 @FunctionalInterface
 public interface PersistenceInterface extends LoggingInterface {
-	
-	// TODO Foreigner annotation: Marks field for which the automatic Reader, Writer and Remover action will be performed based on provided link class and column interfaces
-	
-	/*
-	 * Persistence conversion
-	 */
-	
-	/**
-	 * Get all persisted objects from the database of particular type. The class must declare empty (no arguments) constructor. Use {@link QueryExecutorInterface} for initial dependency injection. Use {@link Filter @Filter} for
-	 * filtering the {@link Loader loading} query. Utilises {@link VirtualPromise} for fetching the data and parallel mapping of objects.
-	 *
-	 * @param optionalDummyType
-	 * 		If provided, will be taken as source for invoked methods in query construction. With, i.e. additional {@link Skip} fields as parameters, you can set up different conditional outputs
-	 * 		for key methods, like {@link #getTable()} or {@link #getSelectQuery()}.
-	 * @see Loader @Loader
-	 * @see Reader @Reader
-	 * @see ReadOnly @ReadOnly
-	 */
-	static <T> VirtualPromise<Stream<T>> promiseAll(Class<T> clazz, QueryExecutorInterface queryExecutor, @Nullable UnaryOperator<WhereClause> filter, @Nullable T optionalDummyType) {
-		val query = getFilterQuery(clazz, optionalDummyType).apply(getSelectQuery(clazz, optionalDummyType));
-		return (filter == null ? query : filter.apply(query))
-				       .promise(queryExecutor)
-				       .map(s -> s.findFirst().orElse(QueryResultInterface.empty()))
-				       .compose(qr -> qr.toStreamOf(clazz))
-				       .map(s -> s.peek(o -> Tools.runAnnotatedMethods(Reader.class, o)));
-	}
-	
-	/**
-	 * @see #promiseAll(Class, QueryExecutorInterface, UnaryOperator, Object)
-	 */
-	static <T> VirtualPromise<Stream<T>> promiseAll(Class<T> clazz) {
-		return promiseAll(clazz, QueryExecutorInterface.getInstance().orElseThrow(), null, null);
-	}
-	
-	/**
-	 * @see #promiseAll(Class, QueryExecutorInterface, UnaryOperator, Object)
-	 */
-	static <T> VirtualPromise<Stream<T>> promiseAll(Class<T> clazz, QueryExecutorInterface queryExecutor) {
-		return promiseAll(clazz, queryExecutor, null, null);
-	}
-	
-	/**
-	 * @see #promiseAll(Class, QueryExecutorInterface, UnaryOperator, Object)
-	 */
-	static <T> VirtualPromise<Stream<T>> promiseAll(Class<T> clazz, @Nullable UnaryOperator<WhereClause> filter) {
-		return promiseAll(clazz, QueryExecutorInterface.getInstance().orElseThrow(), filter, null);
-	}
 	
 	/**
 	 * Convert rows of {@link QueryResultInterface} data into stream of objects, using their {@link Reader @Reader} annotated constructors. The types of argument of particular constructor must match the data type of each column in the
@@ -131,6 +85,20 @@ public interface PersistenceInterface extends LoggingInterface {
 		                     });
 	}
 	
+	/**
+	 * If the values are missing, throws {@link RuntimeException}.
+	 */
+	static Map<Class<? extends Annotation>, ColumnInterface> getVerticalMandatoryAnnotations(Class<?> clazz) {
+		return Stream.of(PivotColumn.class, ValuesColumn.class)
+		             .collect(Collectors.toMap(
+				             a -> a,
+				             a -> Optional.ofNullable(Tools.getFirstAnnotatedValue(a, ColumnInterface.class, clazz, null))
+				                          .orElseThrow(() -> new RuntimeException("Vertical Persistence: %s are missing PivotColumn or ValuesColumn annotation.".formatted(clazz.getSimpleName())))
+		             ));
+	}
+	
+	// TODO Foreigner annotation: Marks field for which the automatic Reader, Writer and Remover action will be performed based on provided link class and column interfaces
+	
 	/*
 	 * Required setup
 	 */
@@ -145,7 +113,7 @@ public interface PersistenceInterface extends LoggingInterface {
 	TableInterface getTable();
 	
 	/**
-	 * Returns {@link ProviderInterface} used to load instance of an object of provided class.
+	 * Returns {@link ProviderInterface} used to loadFromDatabase instance of an object of provided class.
 	 *
 	 * @see Provider @Provider
 	 */
@@ -156,12 +124,12 @@ public interface PersistenceInterface extends LoggingInterface {
 	/**
 	 * Declared with {@link Provider @Provider}, or {@link krystal.framework.KrystalFramework#getDefaultProvider() KrystalFramework#getDefaultProvider()} as default.
 	 */
-	default @Nullable ProviderInterface getProvider() {
-		return Tools.getFirstAnnotatedValue(Provider.class, ProviderInterface.class, this);
+	default ProviderInterface getProvider() {
+		return Optional.ofNullable(Tools.getFirstAnnotatedValue(Provider.class, ProviderInterface.class, this)).orElse(KrystalFramework.getDefaultProvider());
 	}
 	
 	/**
-	 * Returns {@link SelectStatement} used to load instance of an object of provided class, or default, or throws error if for some reason it's missing.
+	 * Returns {@link SelectStatement} used to loadFromDatabase instance of an object of provided class, or default, or throws error if for some reason it's missing.
 	 *
 	 * @see Loader @Loader
 	 */
@@ -196,7 +164,7 @@ public interface PersistenceInterface extends LoggingInterface {
 	}
 	
 	/**
-	 * Returns first custom {@link Loader @Loader} query used to load this class or {@code null} if missing.
+	 * Returns first custom {@link Loader @Loader} query used to loadFromDatabase this class or {@code null} if missing.
 	 *
 	 * @see #getSelectQuery(Class, Object)
 	 */
@@ -272,15 +240,17 @@ public interface PersistenceInterface extends LoggingInterface {
 	 * @see ColumnsMapping @ColumnsMapping
 	 */
 	@SuppressWarnings("unchecked")
-	default <E extends Enum<?> & ColumnInterface> ColumnsMap getFieldsToColumnsMap() {
-		val clazz = getClass();
+	static <E extends Enum<?> & ColumnInterface> ColumnsMap getFieldsToColumnsMap(Class<?> clazz, @Nullable Object invokedOn) {
 		return Arrays.stream(clazz.getDeclaredClasses())
 		             .filter(c -> c.isAnnotationPresent(ColumnsMapping.class) && ColumnInterface.class.isAssignableFrom(c) && Enum.class.isAssignableFrom(c))
 		             .findFirst()
 		             .map(c -> ColumnsMap.fromColumnInterfaceEnum(clazz, (Class<E>) c))
-		             .orElseGet(() -> Tools.getFirstAnnotatedValue(ColumnsMapping.class, ColumnsMap.class, this));
+		             .orElseGet(() -> Tools.getFirstAnnotatedValue(ColumnsMapping.class, ColumnsMap.class, clazz, invokedOn));
 	}
 	
+	default ColumnsMap getFieldsToColumnsMap() {
+		return getFieldsToColumnsMap(getClass(), this);
+	}
 	/*
 	 * Collecting data
 	 */
@@ -371,18 +341,16 @@ public interface PersistenceInterface extends LoggingInterface {
 		// collector does not allow null values -> foreach loop
 		Stream.of(getClass().getDeclaredFields())
 		      .filter(f -> !Tools.isSkipped(f, SkipTypes.persistence))
-		      .forEach(f -> {
-			      map.put(f, Optional.ofNullable(m.get(f)).orElseGet(
-					      () -> {
-						      try {
-							      f.setAccessible(true);
-							      return f.get(this);
-						      } catch (IllegalAccessException e) {
-							      throw new RuntimeException(e);
-						      }
+		      .forEach(f -> map.put(f, Optional.ofNullable(m.get(f)).orElseGet(
+				      () -> {
+					      try {
+						      f.setAccessible(true);
+						      return f.get(this);
+					      } catch (IllegalAccessException e) {
+						      throw new RuntimeException(e);
 					      }
-			      ));
-		      });
+				      }
+		      )));
 		
 		return map;
 	}
@@ -390,7 +358,7 @@ public interface PersistenceInterface extends LoggingInterface {
 	private ColumnsComparisonInterface[] getKeyValuePairs(Set<Field> keys, Map<Field, ColumnInterface> fieldsColumns, Map<Field, Object> fieldsValues, boolean includeIfNull) {
 		boolean finalIncludeIfNull = Optional.ofNullable(getClass().getAnnotation(SeparateKeys.class)).map(SeparateKeys::includeIfNull).orElse(includeIfNull);
 		return keys.stream()
-		           .map(field -> new ColumnToValueComparison(fieldsColumns.get(field), ColumnsComparisonOperator.IN, fieldsValues.get(field)))
+		           .map(field -> new ColumnToValueComparison(fieldsColumns.get(field), ComparisonOperator.IN, fieldsValues.get(field)))
 		           .filter(cvc -> !cvc.values().isEmpty() || finalIncludeIfNull)
 		           .toArray(ColumnsComparisonInterface[]::new);
 	}
@@ -402,6 +370,7 @@ public interface PersistenceInterface extends LoggingInterface {
 			if (Optional.ofNullable(fieldsValues.get(f)).isEmpty()) --i;
 		return getClass().isAnnotationPresent(SeparateKeys.class) ? i == 0 : i != finalKeys.size();
 	}
+	
 	
 	/*
 	 * Validation
@@ -489,13 +458,18 @@ public interface PersistenceInterface extends LoggingInterface {
 		val table = getTable();
 		
 		switch (execution) {
-			case load -> load(table, keysPairs, fieldsColumns).ifPresentOrElse(another -> {
-				copyFrom(another);
-				runReaders();
-			}, () -> log().trace(String.format("  ! No record found for persistence to load %s.class.", getClass().getSimpleName())));
-			case instantiate -> instantiate(table, keysPairs, fieldsColumns, fieldsValues);
-			case delete -> delete(table, keysPairs);
-			case save -> save(table, keysPairs, fieldsColumns, fieldsValues);
+			case load -> PersistenceMemory.getInstance()
+			                              .filter(mem -> !getClass().isAnnotationPresent(Fresh.class))
+			                              .map(mem -> mem.get(hashKeys(getClass(), fieldsValues)))
+			                              .ifPresentOrElse(this::copyFrom,
+			                                               () -> loadFromDatabase(table, keysPairs, fieldsColumns)
+					                                                     .ifPresentOrElse(another -> {
+						                                                     copyFrom(another);
+						                                                     runReaders();
+					                                                     }, () -> log().trace(String.format("  ! No record found for persistence to loadFromDatabase %s.class.", getClass().getSimpleName()))));
+			case instantiate -> instantiateInDatabase(table, keysPairs, fieldsColumns, fieldsValues);
+			case delete -> deleteFromDatabase(table, keysPairs);
+			case save -> saveToDatabase(table, keysPairs, fieldsColumns, fieldsValues);
 			case copyAsNew -> copyAsNew(table, keys, fieldsColumns, fieldsValues);
 		}
 		
@@ -504,7 +478,7 @@ public interface PersistenceInterface extends LoggingInterface {
 	/**
 	 * Load persistence object from database.
 	 */
-	private Optional<? extends PersistenceInterface> load(TableInterface table, ColumnsComparisonInterface[] keysPairs, Map<Field, ColumnInterface> fieldsColumns) {
+	private Optional<? extends PersistenceInterface> loadFromDatabase(TableInterface table, ColumnsComparisonInterface[] keysPairs, Map<Field, ColumnInterface> fieldsColumns) {
 		var query = getSelectQuery();
 		if (query == null) {
 			val clazz = getClass();
@@ -537,16 +511,16 @@ public interface PersistenceInterface extends LoggingInterface {
 	/**
 	 * Load persistence object or create a new record if none found.
 	 */
-	private void instantiate(TableInterface table, ColumnsComparisonInterface[] keysPairs, Map<Field, ColumnInterface> fieldsColumns, Map<Field, Object> fieldsValues) {
-		load(table, keysPairs, fieldsColumns)
+	private void instantiateInDatabase(TableInterface table, ColumnsComparisonInterface[] keysPairs, Map<Field, ColumnInterface> fieldsColumns, Map<Field, Object> fieldsValues) {
+		loadFromDatabase(table, keysPairs, fieldsColumns)
 				.ifPresentOrElse(
 						another -> {
 							copyFrom(another);
 							runReaders();
 						},
 						() -> {
-							log().trace(String.format("  ! No record found for persistence to load. Creating new %s.class persisted object.", getClass().getSimpleName()));
-							insertAndConsume(table, fieldsColumns, fieldsValues);
+							log().trace(String.format("  ! No record found for persistence to loadFromDatabase. Creating new %s.class persisted object.", getClass().getSimpleName()));
+							insertInDatabaseAndConsume(table, fieldsColumns, fieldsValues);
 						}
 				);
 	}
@@ -554,12 +528,12 @@ public interface PersistenceInterface extends LoggingInterface {
 	/**
 	 * In case of {@link Vertical} - rewrites the object, with consequences for all {@link Incremental} fields. Otherwise, check if object is persisted - update its values, or instantiate a new record.
 	 */
-	private void save(TableInterface table, ColumnsComparisonInterface[] keysPairs, Map<Field, ColumnInterface> fieldsColumns, Map<Field, Object> fieldsValues) {
+	private void saveToDatabase(TableInterface table, ColumnsComparisonInterface[] keysPairs, Map<Field, ColumnInterface> fieldsColumns, Map<Field, Object> fieldsValues) {
 		if (getClass().isAnnotationPresent(Vertical.class)) {
-			delete(table, keysPairs);
-			insertAndConsume(table, fieldsColumns, fieldsValues);
+			deleteFromDatabase(table, keysPairs);
+			insertInDatabaseAndConsume(table, fieldsColumns, fieldsValues);
 		} else {
-			load(table, keysPairs, fieldsColumns)
+			loadFromDatabase(table, keysPairs, fieldsColumns)
 					.ifPresentOrElse(
 							_ -> table.update(fieldsValues.entrySet().stream()
 							                              .filter(e -> !e.getKey().isAnnotationPresent(Key.class))
@@ -571,7 +545,7 @@ public interface PersistenceInterface extends LoggingInterface {
 							          .thenRun(this::runWriters)
 							          .thenRun(() -> log().trace("    Record updated."))
 							          .joinThrow(),
-							() -> insertAndConsume(table, fieldsColumns, fieldsValues)
+							() -> insertInDatabaseAndConsume(table, fieldsColumns, fieldsValues)
 					);
 		}
 	}
@@ -589,24 +563,24 @@ public interface PersistenceInterface extends LoggingInterface {
 		if (keysAreMissingValues(true, keys, fieldsValues))
 			throw new RuntimeException(String.format("Obligatory keys have no values. Aborting creation of %s.class.", getClass().getSimpleName()));
 		
-		insertAndConsume(table, fieldsColumns, fieldsValues);
+		insertInDatabaseAndConsume(table, fieldsColumns, fieldsValues);
 	}
 	
 	/**
 	 * Delete persistence record from database.
 	 */
-	private void delete(TableInterface table, ColumnsComparisonInterface[] keysPairs) {
+	private void deleteFromDatabase(TableInterface table, ColumnsComparisonInterface[] keysPairs) {
 		VirtualPromise.run(this::runRemovers)
 		              .compose(() -> table.delete().where(keysPairs).setProvider(getProvider()).promise())
-		              .map(QueryResultInterface::getResult)
-		              .accept(deleted -> {
-			              deleted.map(String::valueOf)
-			                     .map(Long::parseLong)
-			                     .ifPresentOrElse(
-					                     n -> log().trace("  ! Persisted object deleted from database. Deleted rows: {}", n),
-					                     () -> log().trace("  ! Persisted object not deleted from database.")
-			                     );
-		              }).join();
+		              .map(qr -> {
+			              if (getProvider().getDriver().getSupportedOutputtingStatements().contains(QueryType.DELETE)) {
+				              return qr.renderAsStringTable();
+			              } else {
+				              return qr.getResult().map(String::valueOf);
+			              }
+		              })
+		              .accept(s -> log().trace("  ! Persisted object deleted from database. Deleted rows: {}", s))
+		              .join();
 	}
 	
 	/*
@@ -616,7 +590,7 @@ public interface PersistenceInterface extends LoggingInterface {
 	/**
 	 * Create persistence record and consume it.
 	 */
-	private void insertAndConsume(TableInterface table, Map<Field, ColumnInterface> fieldsColumns, Map<Field, Object> fieldsValues) {
+	private void insertInDatabaseAndConsume(TableInterface table, Map<Field, ColumnInterface> fieldsColumns, Map<Field, Object> fieldsValues) {
 		List<Map<ColumnInterface, Object>> values = columnsToValues(fieldsColumns, fieldsValues);
 		
 		val insert = table.insert()
@@ -631,6 +605,9 @@ public interface PersistenceInterface extends LoggingInterface {
 		      .flatMap(Stream::findFirst)
 		      .ifPresent(this::copyFrom);
 		runWriters();
+		if (!getClass().isAnnotationPresent(Fresh.class))
+			PersistenceMemory.getInstance()
+			                 .ifPresent(memory -> memory.put(hashKeys(getClass(), fieldsValues), this));
 	}
 	
 	/**
@@ -677,7 +654,7 @@ public interface PersistenceInterface extends LoggingInterface {
 	 * Copy fields values based on their names from another object. Passes through visibility restrictions. Any non-matching will be skipped.
 	 */
 	private <T> void copyFrom(T another) {
-		log().trace(String.format("  > Copy fields %s.class to %s.class...", another.getClass().getSimpleName(), getClass().getSimpleName()));
+		log().trace(String.format("  > Copy fields of %s.class to %s.class...", another.getClass().getSimpleName(), getClass().getSimpleName()));
 		
 		val anotherFields = another.getClass().getDeclaredFields();
 		val values = new HashMap<String, Object>(anotherFields.length);
@@ -716,6 +693,23 @@ public interface PersistenceInterface extends LoggingInterface {
 		return JSON.fromObject(this);
 	}
 	
+	static String hashKeys(Class<?> clazz, Map<Field, Object> fieldsValues) {
+		val str = new StringBuilder(clazz.getName()).append('>');
+		fieldsValues.entrySet()
+		            .stream()
+		            .filter(e -> e.getKey().isAnnotationPresent(Key.class))
+		            .forEach(e -> str.append(e.getKey().getName()).append('=').append(e.getValue()).append('|'));
+		return str.toString();
+	}
+	
+	default String hashKeys() {
+		return hashKeys(getClass(), getFieldsValues());
+	}
+	
+	default void memorize(PersistenceMemory persistenceMemory) {
+		persistenceMemory.add(this);
+	}
+	
 	/**
 	 * All Persistence-setup related annotations, values of which can be derived from fields or methods. Used mainly in fields-filtering during reflection.
 	 */
@@ -742,18 +736,6 @@ public interface PersistenceInterface extends LoggingInterface {
 		val list = getPersistenceSetupAnnotations();
 		list.removeAll(Arrays.stream(annotations).toList());
 		return list;
-	}
-	
-	/**
-	 * If the values are missing, throws {@link RuntimeException}.
-	 */
-	private static Map<Class<? extends Annotation>, ColumnInterface> getVerticalMandatoryAnnotations(Class<?> clazz) {
-		return Stream.of(PivotColumn.class, ValuesColumn.class)
-		             .collect(Collectors.toMap(
-				             a -> a,
-				             a -> Optional.ofNullable(Tools.getFirstAnnotatedValue(a, ColumnInterface.class, clazz, null))
-				                          .orElseThrow(() -> new RuntimeException("Vertical Persistence: %s is missing PivotColumn or ValuesColumn annotation.".formatted(clazz.getSimpleName())))
-		             ));
 	}
 	
 }

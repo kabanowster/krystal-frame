@@ -20,29 +20,29 @@ public interface ColumnInterface {
 	 * @implNote To check for {@code NULL} either leave the list empty or type in {@code "null"}.
 	 */
 	default ColumnsComparisonInterface is(Object... values) {
-		return ColumnToValueComparison.of(this, ColumnsComparisonOperator.IN, values);
+		return ColumnToValueComparison.of(this, ComparisonOperator.IN, values);
 	}
 	
 	/**
 	 * @implNote To check for {@code NULL} either leave the list empty or type in {@code "null"}.
 	 */
 	default ColumnsComparisonInterface isNot(Object... values) {
-		return ColumnToValueComparison.of(this, ColumnsComparisonOperator.NOT_IN, values);
+		return ColumnToValueComparison.of(this, ComparisonOperator.NOT_IN, values);
 	}
 	
 	default ColumnsComparisonInterface isBetween(Object left, Object right) {
-		return ColumnToValueComparison.of(this, ColumnsComparisonOperator.BETWEEN, List.of(left, right));
+		return ColumnToValueComparison.of(this, ComparisonOperator.BETWEEN, List.of(left, right));
 	}
 	
-	default ColumnsComparisonInterface is(ColumnsComparisonOperator operator, Object to) {
+	default ColumnsComparisonInterface is(ComparisonOperator operator, Object to) {
 		return ColumnToValueComparison.of(this, operator, to);
 	}
 	
-	default ColumnsComparisonInterface is(ColumnsComparisonOperator operator, List<Object> to) {
+	default ColumnsComparisonInterface is(ComparisonOperator operator, List<Object> to) {
 		return ColumnToValueComparison.of(this, operator, to);
 	}
 	
-	default ColumnsComparisonInterface is(ColumnsComparisonOperator operator, Object[] to) {
+	default ColumnsComparisonInterface is(ComparisonOperator operator, Object[] to) {
 		return ColumnToValueComparison.of(this, operator, to);
 	}
 	
@@ -50,12 +50,12 @@ public interface ColumnInterface {
 		return ColumnSetValueComparison.of(this, value);
 	}
 	
-	default ColumnsComparisonInterface is(ColumnsComparisonOperator operator, ColumnInterface to) {
+	default ColumnsComparisonInterface is(ComparisonOperator operator, ColumnInterface to) {
 		return ColumnToColumnComparison.of(this, operator, to);
 	}
 	
 	default ColumnsComparisonInterface is(ColumnInterface equalTo) {
-		return ColumnToColumnComparison.of(this, ColumnsComparisonOperator.EQUAL, equalTo);
+		return ColumnToColumnComparison.of(this, ComparisonOperator.EQUAL, equalTo);
 	}
 	
 	default ColumnInterface as(String alias) {

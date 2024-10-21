@@ -252,7 +252,7 @@ public class KrystalFramework {
 		} catch (LifecycleException e) {
 			log.fatal("!!! Tomcat broke with exception:\n" + e.getMessage());
 		}
-		log.fatal("  > Tomcat is running on: %1$s:%2$s".formatted(properties.getHostName(), properties.getPort()));
+		log.fatal("  > Tomcat are running on: %1$s:%2$s".formatted(properties.getHostName(), properties.getPort()));
 	}
 	
 	/**
@@ -364,18 +364,20 @@ public class KrystalFramework {
 	 *
 	 * @see #selectDefaultImplementations(DefaultImplementation...)
 	 * @see #selectAllDefaultImplementationsExcept(DefaultImplementation...)
-	 * @see QueryExecutorInterface QueryExecutorInterface
-	 * @see FlowControlInterface FlowControlInterface
-	 * @see CommanderInterface CommanderInterface
-	 * @see ConnectionPoolInterface ConnectionPoolInterface
+	 * @see QueryExecutorInterface
+	 * @see FlowControlInterface
+	 * @see CommanderInterface
+	 * @see ConnectionPoolInterface
 	 * @see NativeConsoleReader
+	 * @see krystal.framework.database.persistence.PersistenceMemory PersistenceMemory
 	 */
 	public enum DefaultImplementation {
 		FlowControl(krystal.framework.core.flow.implementation.FlowControl.class),
 		QueryExecutor(krystal.framework.database.implementation.QueryExecutor.class),
 		BaseCommander(krystal.framework.commander.implementation.BaseCommander.class),
 		ConnectionPool(krystal.framework.database.implementation.ConnectionPool.class),
-		NativeConsole(NativeConsoleReader.class);
+		NativeConsole(NativeConsoleReader.class),
+		PersistenceMemory(krystal.framework.database.persistence.PersistenceMemory.class);
 		
 		public final Class<?> implementation;
 		

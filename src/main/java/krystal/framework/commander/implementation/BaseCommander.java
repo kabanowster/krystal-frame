@@ -9,6 +9,7 @@ import krystal.framework.commander.CommandInterface;
 import krystal.framework.commander.CommanderInterface;
 import krystal.framework.core.PropertiesInterface;
 import krystal.framework.database.abstraction.QueryExecutorInterface;
+import krystal.framework.database.persistence.PersistenceMemory;
 import krystal.framework.logging.LoggingWrapper;
 import krystal.framework.tomcat.TomcatFactory;
 import lombok.val;
@@ -310,6 +311,45 @@ public class BaseCommander implements CommanderInterface {
 					log().fatal("!!! Tomcat broke with exception:\n{}", e.getMessage());
 				}
 				
+				return true;
+			}
+			case pmem -> {
+				PersistenceMemory.getInstance()
+				                 .ifPresentOrElse(mem -> {
+					                                  if (arguments.isEmpty()) {
+						                                  logConsole(mem.report());
+						                                  return;
+					                                  }
+					                                  for (var arg : arguments) {
+						                                  CommanderInterface.getValueIfArgumentMatches(arg, "i", "int", "interval")
+						                                                    .map(s -> {
+							                                                    try {
+								                                                    val i = Integer.parseInt(s);
+								                                                    logConsole("Persistence Memory intervals set to: %s ms.".formatted(i));
+								                                                    return i;
+							                                                    } catch (NumberFormatException e) {
+								                                                    return null;
+							                                                    }
+						                                                    })
+						                                                    .ifPresent(mem::setMonitorInterval);
+						                                  CommanderInterface.getValueIfArgumentMatches(arg, "c", "count")
+						                                                    .map(s -> {
+							                                                    try {
+								                                                    val i = Integer.parseInt(s);
+								                                                    logConsole("Persistence Memory intervals count set to: %s.".formatted(i));
+								                                                    return i;
+							                                                    } catch (NumberFormatException e) {
+								                                                    return null;
+							                                                    }
+						                                                    })
+						                                                    .ifPresent(mem::setIntervalsCount);
+						                                  if (CommanderInterface.argumentMatches(arg, "clear")) {
+							                                  mem.clear();
+							                                  logConsole("Persistence Memory removed all memorized instances.");
+						                                  }
+					                                  }
+				                                  },
+				                                  () -> logConsole("Persistence Memory is not implemented."));
 				return true;
 			}
 			default -> {

@@ -5,6 +5,7 @@ import krystal.VirtualPromise;
 import krystal.framework.KrystalFramework;
 import krystal.framework.core.flow.ScheduledTaskInterface;
 import krystal.framework.core.flow.TasksSchedulerInterface;
+import krystal.framework.database.persistence.Persistence;
 import krystal.framework.database.persistence.PersistenceInterface;
 import krystal.framework.database.persistence.annotations.Key;
 import krystal.framework.database.queryfactory.WhereClause;
@@ -100,10 +101,10 @@ public abstract class PersistenceCache implements TasksSchedulerInterface {
 	
 	public <T> VirtualPromise<Void> loadCacheCollection(Class<T> clazz, @Nullable UnaryOperator<WhereClause> queryFilter) {
 		val collection = getCollection(clazz).orElseThrow();
-		return PersistenceInterface.promiseAll(clazz, queryFilter)
-		                           .map(Stream::toList)
-		                           .accept(collection::addAll)
-		                           .catchRun(e -> log.fatal("Failed to load collection of {}.class", clazz.getSimpleName(), e));
+		return Persistence.promiseAll(clazz, queryFilter)
+		                  .map(Stream::toList)
+		                  .accept(collection::addAll)
+		                  .catchRun(e -> log.fatal("Failed to load collection of {}.class", clazz.getSimpleName(), e));
 	}
 	
 	public <T> VirtualPromise<Void> loadCacheCollection(Class<T> clazz) {
@@ -165,30 +166,30 @@ public abstract class PersistenceCache implements TasksSchedulerInterface {
 	 */
 	private <T> Optional<T> getOrConstructor(Class<T> clazz, @Nullable Predicate<T> objectValidator, Map<Field, Object> fieldsValues, Object... otherConstructorParams) {
 		val cacheCollection = getCollection(clazz).orElseThrow();
-		return (Optional<T>) cacheCollection.stream()
-		                                    .filter(o -> fieldsEquals(o, fieldsValues))
-		                                    .findAny()
-		                                    .or(() -> {
-			                                    if (cachedResourcesOnly) return Optional.empty();
-			                                    return cache(
-					                                    () -> {
-						                                    try {
-							                                    return clazz.getDeclaredConstructor(Stream.concat(fieldsValues.keySet().stream().map(Field::getType),
-							                                                                                      Arrays.stream(otherConstructorParams).map(Object::getClass))
-							                                                                              .toArray(Class[]::new))
-							                                                .newInstance(Stream.concat(fieldsValues.values().stream(),
-							                                                                           Arrays.stream(otherConstructorParams))
-							                                                                   .toArray());
-						                                    } catch (NoSuchMethodException e) {
-							                                    throw new RuntimeException("  ! Constructor is missing for provided keys types.", e);
-						                                    } catch (InstantiationException | IllegalAccessException | InvocationTargetException e) {
-							                                    throw new RuntimeException(e);
-						                                    }
-					                                    },
-					                                    objectValidator,
-					                                    cacheCollection
-			                                    );
-		                                    });
+		return cacheCollection.stream()
+		                      .filter(o -> fieldsEquals(o, fieldsValues))
+		                      .findAny()
+		                      .or(() -> {
+			                      if (cachedResourcesOnly) return Optional.empty();
+			                      return cache(
+					                      () -> {
+						                      try {
+							                      return clazz.getDeclaredConstructor(Stream.concat(fieldsValues.keySet().stream().map(Field::getType),
+							                                                                        Arrays.stream(otherConstructorParams).map(Object::getClass))
+							                                                                .toArray(Class[]::new))
+							                                  .newInstance(Stream.concat(fieldsValues.values().stream(),
+							                                                             Arrays.stream(otherConstructorParams))
+							                                                     .toArray());
+						                      } catch (NoSuchMethodException e) {
+							                      throw new RuntimeException("  ! Constructor is missing for provided keys types.", e);
+						                      } catch (InstantiationException | IllegalAccessException | InvocationTargetException e) {
+							                      throw new RuntimeException(e);
+						                      }
+					                      },
+					                      objectValidator,
+					                      cacheCollection
+			                      );
+		                      });
 	}
 	
 	private Map<Field, Object> getFieldValuesMap(Class<?> clazz, Map<String, Object> fieldValuesMap) {
@@ -246,7 +247,7 @@ public abstract class PersistenceCache implements TasksSchedulerInterface {
 	}
 	
 	public enum DefaultCacheTask implements ScheduledTaskInterface {
-		AUTO_CLEAR;
+		AUTO_CLEAR
 	}
 	
 }

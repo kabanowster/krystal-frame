@@ -2,7 +2,7 @@ package krystal.framework.database.queryfactory;
 
 import krystal.framework.database.abstraction.ColumnInterface;
 
-public record ColumnToColumnComparison(ColumnInterface first, ColumnsComparisonOperator is, ColumnInterface second) implements ColumnsComparisonInterface {
+public record ColumnToColumnComparison(ColumnInterface first, ComparisonOperator is, ColumnInterface second) implements ColumnsComparisonInterface {
 	
 	@Override
 	public String getComparison() {
@@ -14,7 +14,7 @@ public record ColumnToColumnComparison(ColumnInterface first, ColumnsComparisonO
 		return getComparison();
 	}
 	
-	public static ColumnToColumnComparison of(ColumnInterface first, ColumnsComparisonOperator is, ColumnInterface second) {
+	public static ColumnToColumnComparison of(ColumnInterface first, ComparisonOperator is, ColumnInterface second) {
 		return new ColumnToColumnComparison(first, is, second);
 	}
 	

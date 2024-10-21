@@ -11,6 +11,6 @@ import krystal.framework.commander.CommanderInterface;
  * @see ConsoleView ConsoleView
  */
 public enum BaseCommands implements CommandInterface {
-	help, cls, log, props, exit, console, providers, krystal, spring, tomcat
+	help, cls, log, props, exit, console, providers, krystal, spring, tomcat, pmem
 	// TODO restart, commanderOff, reload, etc
 }

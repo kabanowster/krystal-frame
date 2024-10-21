@@ -1,6 +1,6 @@
 package krystal.framework.database.queryfactory;
 
-public enum ColumnsComparisonOperator {
+public enum ComparisonOperator {
 	IN("IN", null),
 	NOT_IN("IN", "NOT "),
 	MORE(">", null),
@@ -14,7 +14,7 @@ public enum ColumnsComparisonOperator {
 	public final String face;
 	public final String prefix;
 	
-	ColumnsComparisonOperator(String face, String prefix) {
+	ComparisonOperator(String face, String prefix) {
 		this.face = face;
 		this.prefix = prefix == null ? "" : prefix;
 	}

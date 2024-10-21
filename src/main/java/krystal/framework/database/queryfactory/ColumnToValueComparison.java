@@ -12,13 +12,13 @@ import java.util.Objects;
 /**
  * Pairing column with values for different data comparisons in WHERE clauses.
  */
-public record ColumnToValueComparison(ColumnInterface column, ColumnsComparisonOperator is, List<Object> values) implements ColumnsComparisonInterface {
+public record ColumnToValueComparison(ColumnInterface column, ComparisonOperator is, List<Object> values) implements ColumnsComparisonInterface {
 	
 	public ColumnToValueComparison {
 		values = Query.parseValuesForSQL(values.toArray()).filter(val -> val != null && !"null".equalsIgnoreCase(String.valueOf(val))).toList();
 	}
 	
-	public ColumnToValueComparison(ColumnInterface column, ColumnsComparisonOperator is, Object... values) {
+	public ColumnToValueComparison(ColumnInterface column, ComparisonOperator is, Object... values) {
 		this(column, is, Arrays.stream(values).filter(Objects::nonNull).toList());
 	}
 	
@@ -26,7 +26,7 @@ public record ColumnToValueComparison(ColumnInterface column, ColumnsComparisonO
 	public String getComparison() {
 		boolean nullValue = values.isEmpty();
 		return String.format(
-				"%s%s %s " + (nullValue || is.equals(ColumnsComparisonOperator.BETWEEN) ? "%s" : "(%s)"),
+				"%s%s %s " + (nullValue || is.equals(ComparisonOperator.BETWEEN) ? "%s" : "(%s)"),
 				is.prefix,
 				column.getSqlName(),
 				nullValue ? "IS" : is.face,
@@ -44,15 +44,15 @@ public record ColumnToValueComparison(ColumnInterface column, ColumnsComparisonO
 		return getComparison();
 	}
 	
-	public static ColumnToValueComparison of(ColumnInterface column, ColumnsComparisonOperator operator, List<Object> values) {
+	public static ColumnToValueComparison of(ColumnInterface column, ComparisonOperator operator, List<Object> values) {
 		return new ColumnToValueComparison(column, operator, values);
 	}
 	
-	public static ColumnToValueComparison of(ColumnInterface column, ColumnsComparisonOperator operator, Object value) {
+	public static ColumnToValueComparison of(ColumnInterface column, ComparisonOperator operator, Object value) {
 		return new ColumnToValueComparison(column, operator, List.of(value));
 	}
 	
-	public static ColumnToValueComparison of(ColumnInterface column, ColumnsComparisonOperator operator, Object[] values) {
+	public static ColumnToValueComparison of(ColumnInterface column, ComparisonOperator operator, Object[] values) {
 		return new ColumnToValueComparison(column, operator, Arrays.stream(values).toList());
 	}
 	
