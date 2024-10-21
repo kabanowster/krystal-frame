@@ -7,6 +7,7 @@ import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import krystal.JSON;
 import krystal.VirtualPromise;
+import krystal.framework.database.persistence.Persistence;
 import krystal.framework.database.persistence.PersistenceInterface;
 import krystal.framework.logging.LoggingInterface;
 import lombok.Builder;
@@ -142,25 +143,27 @@ public class KrystalServlet extends HttpServlet implements LoggingInterface {
 						                             }
 						                             if (info.patternIsPlural) {
 							                             val params = req.getParameterMap();
-							                             PersistenceInterface.promiseAll(info.mapping.getPersistenceClass(), params.isEmpty() ? null : statement -> statement.filterWith(params))
-							                                                 .map(Stream::toList)
-							                                                 .map(JSON::fromObjects)
-							                                                 .map(JSONArray::toString)
-							                                                 .accept(result -> {
-								                                                 if (result.length() > 2) {
-									                                                 try {
-										                                                 resp.getWriter().write(result);
-									                                                 } catch (IOException e) {
-										                                                 log.error(e);
-										                                                 resp.setStatus(HttpServletResponse.SC_INTERNAL_SERVER_ERROR);
-									                                                 }
-								                                                 } else {
-									                                                 resp.setStatus(HttpServletResponse.SC_NOT_FOUND);
-								                                                 }
-							                                                 }).catchRun(e -> {
-								                                                 log.error(e);
-								                                                 resp.setStatus(HttpServletResponse.SC_INTERNAL_SERVER_ERROR);
-							                                                 }).join();
+							                             val loader = Persistence.promiseAll(info.mapping.getPersistenceClass(), params.isEmpty() ? null : statement -> statement.filterWith(params))
+							                                                     .map(Stream::toList)
+							                                                     .map(JSON::fromObjects)
+							                                                     .map(JSONArray::toString)
+							                                                     .accept(result -> {
+								                                                     if (result.length() > 2) {
+									                                                     try {
+										                                                     resp.getWriter().write(result);
+									                                                     } catch (IOException e) {
+										                                                     log.error(e);
+										                                                     resp.setStatus(HttpServletResponse.SC_INTERNAL_SERVER_ERROR);
+									                                                     }
+								                                                     } else {
+									                                                     resp.setStatus(HttpServletResponse.SC_NOT_FOUND);
+								                                                     }
+							                                                     }).catchRun(e -> {
+										                             log.error(e);
+										                             resp.setStatus(HttpServletResponse.SC_INTERNAL_SERVER_ERROR);
+									                             });
+							                             watchResponse(loader, resp);
+							                             loader.join();
 						                             } else {
 							                             try {
 								                             val id = req.getHttpServletMapping().getMatchValue();
@@ -199,7 +202,8 @@ public class KrystalServlet extends HttpServlet implements LoggingInterface {
 								                             val params = req.getParameterMap();
 								                             if (!params.isEmpty()) {
 									                             // parameterized call
-									                             clazz.getDeclaredConstructor().newInstance().getTable()
+									                             clazz.getDeclaredConstructor().newInstance()
+									                                  .getTable()
 									                                  .delete()
 									                                  .filterWith(params)
 									                                  .promise()
@@ -282,6 +286,28 @@ public class KrystalServlet extends HttpServlet implements LoggingInterface {
 			response.setContentType("application/json");
 			response.setCharacterEncoding(StandardCharsets.UTF_8);
 			headers.forEach(response::setHeader);
+		}
+		
+		/**
+		 * Stops loading if response times-out or is cancelled.
+		 */
+		private static void watchResponse(VirtualPromise<Void> loader, HttpServletResponse response) {
+			VirtualPromise.run(() -> {
+				while (loader.isAlive()) {
+					try {
+						// invoking this on timed-out response throws an IllegalStateException
+						response.getWriter();
+					} catch (Exception e) {
+						log.error("Response cancelled due to timeout.", e);
+						loader.cancelAndDrop();
+						response.setStatus(HttpServletResponse.SC_GATEWAY_TIMEOUT);
+					}
+					try {
+						Thread.sleep(1000);
+					} catch (InterruptedException _) {
+					}
+				}
+			});
 		}
 		
 		private static class RequestInfo {
