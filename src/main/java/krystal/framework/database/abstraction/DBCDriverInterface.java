@@ -2,6 +2,9 @@ package krystal.framework.database.abstraction;
 
 import krystal.framework.database.implementation.DBCDrivers;
 import krystal.framework.database.implementation.QueryExecutor;
+import krystal.framework.database.queryfactory.QueryType;
+
+import java.util.Set;
 
 /**
  * Driver used to establish database connections. To implement your own driver:
@@ -14,13 +17,14 @@ import krystal.framework.database.implementation.QueryExecutor;
  *
  * @see DBCDrivers
  */
-@FunctionalInterface
 public interface DBCDriverInterface {
 	
 	/**
 	 * Base element of the default driver's connection string. I.e. {@code jdbc:sqlserver://}, {@code r2dbc:h2:}, etc.
 	 */
 	String getConnectionStringBase();
+	
+	Set<QueryType> getSupportedOutputtingStatements();
 	
 	default String getDriverName() {
 		return getConnectionStringBase().split(":")[1];

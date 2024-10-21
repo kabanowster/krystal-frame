@@ -84,6 +84,10 @@ public class InsertStatement extends Query {
 				!columns.isEmpty() ? String.format(" (%s)", Tools.concat(", ", columns.stream().map(ColumnInterface::getSqlName))) : ""
 		));
 		
+		/*
+		 * Output inserted
+		 */
+		
 		val drv = provider.getDriver();
 		if (DBCDrivers.jdbcSQLServer.equals(drv)) {
 			query.append(String.format(
@@ -103,8 +107,16 @@ public class InsertStatement extends Query {
 				      .collect(Collectors.joining(", ")))
 		);
 		
+		// Supported in DB2-i
 		if (DBCDrivers.jdbcAS400.equals(provider.getDriver())) {
-			query.append(String.format("SELECT * FROM FINAL TABLE (%s)", query));
+			query.replace(0, query.length(), String.format(
+					"SELECT %s FROM FINAL TABLE (%s)",
+					output.isEmpty() ? "*" :
+					output.stream()
+					      .map(ColumnInterface::getSqlName)
+					      .collect(Collectors.joining(", ")),
+					query
+			));
 		}
 	}
 	

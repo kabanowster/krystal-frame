@@ -2,9 +2,9 @@ package krystal.framework.database.abstraction;
 
 import krystal.Tools;
 import krystal.framework.KrystalFramework;
-import krystal.framework.database.implementation.DBCDrivers;
 import krystal.framework.database.implementation.ExecutionType;
 import krystal.framework.database.implementation.QueryResult;
+import krystal.framework.database.queryfactory.QueryType;
 import krystal.framework.logging.LoggingInterface;
 import krystal.framework.logging.LoggingWrapper;
 import lombok.val;
@@ -113,18 +113,13 @@ public interface QueryExecutorInterface extends LoggingInterface {
 				                      q.setProvidersPacked(provider);
 				                      val type = q.determineType();
 				                      
-				                      return switch (type) {
-					                      case SELECT -> ExecutionType.read;
-					                      case INSERT -> {
-						                      // drivers which return inserted rows as result
-						                      if (List.of(
-								                      DBCDrivers.jdbcAS400,
-								                      DBCDrivers.jdbcSQLServer
-						                      ).contains(driver)) yield ExecutionType.read;
-						                      else yield ExecutionType.write;
-					                      }
-					                      default -> ExecutionType.write;
-				                      };
+				                      if (type == QueryType.SELECT) {
+					                      return ExecutionType.read;
+				                      } else {
+					                      if (driver.getSupportedOutputtingStatements().contains(type))
+						                      return ExecutionType.read;
+					                      else return ExecutionType.write;
+				                      }
 			                      }))
 			                      .entrySet()
 			                      .stream()
