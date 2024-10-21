@@ -2,6 +2,7 @@ package krystal.framework.database.abstraction;
 
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
+import krystal.StringRenderer;
 import krystal.VirtualPromise;
 import krystal.framework.database.persistence.PersistenceInterface;
 import lombok.val;
@@ -241,6 +242,17 @@ public interface QueryResultInterface {
 						                 Entry::getValue
 				                 ))))
 		           .keySet().size() < rows.size();
+	}
+	
+	default String renderAsStringTable() {
+		return StringRenderer.renderTable(
+				columns().entrySet().stream()
+				         .map(e -> String.format("%s (%s)", e.getKey().getSqlName(), e.getValue().getSimpleName()))
+				         .toList(),
+				rows().parallelStream()
+				      .map(r -> r.values().stream().map(String::valueOf).toList())
+				      .toList()
+		);
 	}
 	
 }

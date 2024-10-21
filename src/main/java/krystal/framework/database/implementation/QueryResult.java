@@ -1,6 +1,5 @@
 package krystal.framework.database.implementation;
 
-import krystal.StringRenderer;
 import krystal.framework.database.abstraction.ColumnInterface;
 import krystal.framework.database.abstraction.QueryResultInterface;
 import krystal.framework.logging.LoggingInterface;
@@ -78,14 +77,7 @@ public record QueryResult(List<Map<ColumnInterface, Object>> rows, Map<ColumnInt
 	
 	@Override
 	public String toString() {
-		return StringRenderer.renderTable(
-				columns.entrySet().stream()
-				       .map(e -> String.format("%s (%s)", e.getKey().getSqlName(), e.getValue().getSimpleName()))
-				       .toList(),
-				rows.parallelStream()
-				    .map(r -> r.values().stream().map(String::valueOf).toList())
-				    .toList()
-		);
+		return this.renderAsStringTable();
 	}
 	
 }
