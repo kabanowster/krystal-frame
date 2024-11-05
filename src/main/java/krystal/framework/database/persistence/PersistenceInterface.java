@@ -11,6 +11,7 @@ import krystal.framework.database.persistence.annotations.*;
 import krystal.framework.database.persistence.annotations.Vertical.PivotColumn;
 import krystal.framework.database.persistence.annotations.Vertical.UnpivotToColumns;
 import krystal.framework.database.persistence.annotations.Vertical.ValuesColumn;
+import krystal.framework.database.persistence.filters.StatementModifiers;
 import krystal.framework.database.queryfactory.*;
 import krystal.framework.logging.LoggingInterface;
 import lombok.val;
@@ -25,13 +26,13 @@ import java.lang.reflect.InvocationTargetException;
 import java.util.*;
 import java.util.Map.Entry;
 import java.util.function.Function;
-import java.util.function.UnaryOperator;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
 /**
  * TODO JDoc :)
  *
+ * @see Persistence#promiseAll(Class, QueryExecutorInterface, StatementModifiers, Object)
  * @see TableInterface
  * @see Vertical
  * @see ColumnsMapping
@@ -39,7 +40,6 @@ import java.util.stream.Stream;
  * @see Filter
  * @see Reader
  * @see Writer
- * @see Persistence#promiseAll(Class, QueryExecutorInterface, UnaryOperator, Object)
  * @see ReadOnly
  */
 @FunctionalInterface
@@ -173,7 +173,7 @@ public interface PersistenceInterface extends LoggingInterface {
 	}
 	
 	@SuppressWarnings("unchecked")
-	static <T> Function<SelectStatement, WhereClause> getFilterQuery(Class<? extends T> clazz, @Nullable T optionalDummyType) {
+	static <T> Function<SelectStatement, WhereClause> getFilteredQuery(Class<? extends T> clazz, @Nullable T optionalDummyType) {
 		try {
 			T instance;
 			if (optionalDummyType != null) {
@@ -205,8 +205,8 @@ public interface PersistenceInterface extends LoggingInterface {
 		}
 	}
 	
-	default Function<SelectStatement, WhereClause> getFilterQuery() {
-		return getFilterQuery(getClass(), this);
+	default Function<SelectStatement, WhereClause> getFilteredQuery() {
+		return getFilteredQuery(getClass(), this);
 	}
 	
 	static <T extends PersistenceInterface, D extends T, R, A extends Annotation> R getFirstAnnotatedValueOrInvokeDefaultWithOptionalDummy(Class<T> clazz, Class<A> annotation, Class<R> returnType, @Nullable D optionalDummyType,
@@ -236,6 +236,8 @@ public interface PersistenceInterface extends LoggingInterface {
 	/**
 	 * Mappings of fields names and corresponding {@link ColumnInterface columns} in database, if other than plain names.
 	 *
+	 * @param invokedOn
+	 * 		Used with {@link ColumnsMapping} annotated methods or fields (instead of {@link Enum}). If {@code null}, the method or field must be {@code static} to return value.
 	 * @see ColumnsMap
 	 * @see ColumnsMapping @ColumnsMapping
 	 */

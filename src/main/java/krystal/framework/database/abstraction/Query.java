@@ -150,4 +150,6 @@ public abstract class Query implements QueryExecutionInterface, LoggingInterface
 		return QueryType.UNDEFINED;
 	}
 	
+	// TODO generalize output inserted / deleted
+	// TODO test output ins / del with other drivers
 }

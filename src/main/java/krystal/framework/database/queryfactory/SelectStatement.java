@@ -7,9 +7,7 @@ import krystal.framework.database.abstraction.TableInterface;
 import krystal.framework.database.implementation.DBCDrivers;
 import krystal.framework.logging.LoggingInterface;
 
-import java.util.Collections;
-import java.util.LinkedHashSet;
-import java.util.Set;
+import java.util.*;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
@@ -42,6 +40,16 @@ public class SelectStatement extends Query implements WhereClauseInterface, Orde
 	
 	public static SelectStatement columns(ColumnInterface... columns) {
 		return new SelectStatement(columns);
+	}
+	
+	public SelectStatement theseColumns(List<ColumnInterface> columns) {
+		this.columns.clear();
+		this.columns.addAll(columns);
+		return this;
+	}
+	
+	public SelectStatement theseColumns(ColumnInterface... columns) {
+		return theseColumns(Arrays.stream(columns).toList());
 	}
 	
 	public SelectStatement from(TableInterface from) {

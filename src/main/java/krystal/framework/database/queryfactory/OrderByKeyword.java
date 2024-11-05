@@ -1,48 +1,40 @@
 package krystal.framework.database.queryfactory;
 
-import krystal.framework.KrystalFramework;
 import krystal.framework.database.abstraction.ColumnInterface;
 import krystal.framework.database.abstraction.Query;
 
 import java.util.Collections;
-import java.util.LinkedHashSet;
+import java.util.LinkedHashMap;
+import java.util.Map;
 import java.util.Set;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
 public class OrderByKeyword extends Query {
 	
-	private final Set<ColumnInterface> columns = Collections.synchronizedSet(new LinkedHashSet<>());
-	private OrderByDirection order;
-	
-	public OrderByKeyword(Query query, ColumnInterface... columns) {
-		super(query);
-		columns(columns);
-	}
+	private final Map<OrderByDirection, Set<ColumnInterface>> order = Collections.synchronizedMap(new LinkedHashMap<>());
 	
 	public OrderByKeyword(Query query, OrderByDirection order, ColumnInterface... columns) {
-		this(query, columns);
-		order(order);
+		super(query);
+		this.order.put(order, Stream.of(columns).collect(Collectors.toSet()));
 	}
 	
-	public OrderByKeyword order(OrderByDirection direction) {
-		order = direction;
-		return this;
-	}
-	
-	public OrderByKeyword columns(ColumnInterface... columns) {
-		this.columns.addAll(Stream.of(columns).toList());
-		return this;
+	public OrderByKeyword(Query query, Map<OrderByDirection, Set<ColumnInterface>> order) {
+		super(query);
+		this.order.putAll(order);
 	}
 	
 	@Override
 	public void build(StringBuilder query, Set<String> appendLast) {
-		if (type != QueryType.SELECT || columns.isEmpty())
-			throw new IllegalArgumentException();
+		if (type != QueryType.SELECT || order.isEmpty()) throw new IllegalArgumentException();
 		
-		query.append(String.format(" ORDER BY %s%s",
-		                           columns.stream().map(ColumnInterface::getSqlName).collect(Collectors.joining(KrystalFramework.getDefaultDelimeter())),
-		                           order != null ? " " + order : ""));
+		query.append(" ORDER BY ");
+		query.append(order.entrySet()
+		                  .stream()
+		                  .flatMap(e -> e.getValue()
+		                                 .stream()
+		                                 .map(c -> String.format("%s %s", c.getSqlName(), e.getKey())))
+		                  .collect(Collectors.joining(", ")));
 	}
 	
 }

@@ -1,5 +1,6 @@
 package krystal.framework.database.persistence.filters;
 
+import krystal.framework.database.persistence.Persistence;
 import krystal.framework.database.persistence.PersistenceInterface;
 import krystal.framework.database.queryfactory.WhereClause;
 import lombok.Builder;
@@ -11,8 +12,13 @@ import java.lang.reflect.Field;
 import java.util.Arrays;
 import java.util.Map;
 import java.util.function.Predicate;
-import java.util.function.UnaryOperator;
 
+/**
+ * Class used to define filtering on {@link Field Fields} for {@link Persistence} loading.
+ * Equivalent of {@link WhereClause} for SQL statements.
+ *
+ * @see Persistence#promiseAll(Class, long, Filter)
+ */
 @Slf4j
 @Builder
 public record Filter(ConditionalDelimiter condition, @Singular Map<String, ValuesFilter> fields) implements Predicate<Object> {
@@ -52,17 +58,18 @@ public record Filter(ConditionalDelimiter condition, @Singular Map<String, Value
 		return this::test;
 	}
 	
-	public UnaryOperator<WhereClause> toWhereClause(Class<?> clazz) {
-		return (w) -> {
-			PersistenceInterface.getFieldsToColumnsMap(clazz, null)
-			                    .columns().entrySet().stream()
-			                    .filter(e -> fields.containsKey(e.getKey().getName()))
-			                    .map(e -> {
-				                    val vf = fields.get(e.getKey().getName());
-				                    return e.getValue().is(vf.operator(), vf.values());
-			                    }).forEach(w::andWhere);
-			return w;
-		};
+	public StatementModifiers toStatementModifier(Class<?> clazz) {
+		return StatementModifiers.define()
+		                         .where((w) -> {
+			                         PersistenceInterface.getFieldsToColumnsMap(clazz, null)
+			                                             .columns().entrySet().stream()
+			                                             .filter(e -> fields.containsKey(e.getKey().getName()))
+			                                             .map(e -> {
+				                                             val vf = fields.get(e.getKey().getName());
+				                                             return e.getValue().is(vf.operator(), vf.values());
+			                                             }).forEach(w::andWhere);
+			                         return w;
+		                         }).set();
 	}
 	
 }

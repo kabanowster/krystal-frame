@@ -65,4 +65,12 @@ public interface TableInterface {
 		};
 	}
 	
+	default ColumnInterface col(String columnName) {
+		return ColumnInterface.of(columnName).from(getSqlName());
+	}
+	
+	default ColumnInterface col(ColumnInterface column) {
+		return column.from(getSqlName());
+	}
+	
 }

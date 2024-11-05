@@ -66,6 +66,10 @@ public interface ColumnInterface {
 		return () -> "%s.%s".formatted(tableAlias, getSqlName());
 	}
 	
+	default ColumnInterface from(TableInterface table) {
+		return () -> "%s.%s".formatted(table.getSqlName(), getSqlName());
+	}
+	
 	default ColumnInterface dist() {
 		return () -> "DISTINCT " + getSqlName();
 	}

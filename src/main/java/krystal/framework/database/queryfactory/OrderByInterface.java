@@ -3,6 +3,9 @@ package krystal.framework.database.queryfactory;
 import krystal.framework.database.abstraction.ColumnInterface;
 import krystal.framework.database.abstraction.Query;
 
+import java.util.Map;
+import java.util.Set;
+
 interface OrderByInterface {
 	
 	Query pack();
@@ -12,7 +15,11 @@ interface OrderByInterface {
 	}
 	
 	default OrderByKeyword orderBy(ColumnInterface... columns) {
-		return new OrderByKeyword(pack(), columns);
+		return new OrderByKeyword(pack(), OrderByDirection.ASC, columns);
+	}
+	
+	default OrderByKeyword orderBy(Map<OrderByDirection, Set<ColumnInterface>> order) {
+		return new OrderByKeyword(pack(), order);
 	}
 	
 }

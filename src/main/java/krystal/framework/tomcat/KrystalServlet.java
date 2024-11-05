@@ -9,6 +9,7 @@ import krystal.JSON;
 import krystal.VirtualPromise;
 import krystal.framework.database.persistence.Persistence;
 import krystal.framework.database.persistence.PersistenceInterface;
+import krystal.framework.database.persistence.filters.StatementModifiers;
 import krystal.framework.logging.LoggingInterface;
 import lombok.Builder;
 import lombok.Getter;
@@ -143,7 +144,8 @@ public class KrystalServlet extends HttpServlet implements LoggingInterface {
 						                             }
 						                             if (info.patternIsPlural) {
 							                             val params = req.getParameterMap();
-							                             val loader = Persistence.promiseAll(info.mapping.getPersistenceClass(), params.isEmpty() ? null : statement -> statement.filterWith(params))
+							                             val clazz = info.mapping.getPersistenceClass();
+							                             val loader = Persistence.promiseAll(clazz, params.isEmpty() ? null : StatementModifiers.fromParams(params, clazz))
 							                                                     .map(Stream::toList)
 							                                                     .map(JSON::fromObjects)
 							                                                     .map(JSONArray::toString)
@@ -205,7 +207,7 @@ public class KrystalServlet extends HttpServlet implements LoggingInterface {
 									                             clazz.getDeclaredConstructor().newInstance()
 									                                  .getTable()
 									                                  .delete()
-									                                  .filterWith(params)
+									                                  .where(params)
 									                                  .promise()
 									                                  .catchRun(e -> {
 										                                  log.error(e);

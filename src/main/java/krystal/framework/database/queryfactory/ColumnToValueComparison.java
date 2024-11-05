@@ -15,7 +15,8 @@ import java.util.Objects;
 public record ColumnToValueComparison(ColumnInterface column, ComparisonOperator is, List<Object> values) implements ColumnsComparisonInterface {
 	
 	public ColumnToValueComparison {
-		values = Query.parseValuesForSQL(values.toArray()).filter(val -> val != null && !"null".equalsIgnoreCase(String.valueOf(val))).toList();
+		if (!values.isEmpty())
+			values = Query.parseValuesForSQL(values.toArray()).filter(val -> val != null && !"null".equalsIgnoreCase(String.valueOf(val))).toList();
 	}
 	
 	public ColumnToValueComparison(ColumnInterface column, ComparisonOperator is, Object... values) {
