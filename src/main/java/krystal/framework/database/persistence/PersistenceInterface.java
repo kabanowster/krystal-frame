@@ -55,6 +55,8 @@ public interface PersistenceInterface extends LoggingInterface {
 	@SuppressWarnings("unchecked")
 	static <T> VirtualPromise<Stream<T>> mapQueryResult(QueryResultInterface qr, Class<T> clazz) {
 		
+		if (qr.rows().isEmpty()) return VirtualPromise.supply(Stream::empty);
+		
 		if (clazz.isAnnotationPresent(Vertical.class)) {
 			
 			val verticalColumns = getVerticalMandatoryAnnotations(clazz);
