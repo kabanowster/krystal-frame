@@ -2,6 +2,7 @@ package krystal.framework.database.implementation;
 
 import com.zaxxer.hikari.HikariConfig;
 import com.zaxxer.hikari.HikariDataSource;
+import jakarta.annotation.Nullable;
 import krystal.framework.database.abstraction.ConnectionPoolInterface;
 import krystal.framework.database.abstraction.ProviderInterface;
 import krystal.framework.database.abstraction.QueryExecutorInterface;
@@ -13,18 +14,20 @@ import org.springframework.stereotype.Service;
 
 import java.sql.Connection;
 import java.sql.SQLException;
-import java.time.Duration;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.Optional;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.atomic.AtomicReference;
+import java.util.function.Consumer;
 
 /**
  * Hikari Connection Pool wrapper implementation.
  *
- * @see #getMaximumPoolSizes()
- * @see #getDefaultMaximumPoolSize()
- * @see #getDefaultConnectionKeepAlive()
+ * @see #configMap
+ * @see #defaultConfig
+ * @see #createConfig(Consumer)
  */
 @Service
 public class ConnectionPool implements ConnectionPoolInterface, LoggingInterface {
@@ -33,22 +36,34 @@ public class ConnectionPool implements ConnectionPoolInterface, LoggingInterface
 	private final QueryExecutorInterface queryExecutor;
 	
 	/**
-	 * Set the maximum connection pool size for particular {@link ProviderInterface} by adding to this collection.
+	 * Map of Hikari configurations for providers.
 	 */
-	private static @Getter final Map<ProviderInterface, Integer> maximumPoolSizes = new HashMap<>();
+	private final Map<ProviderInterface, HikariConfig> configMap;
 	
 	/**
-	 * Default value if not specified within {@link #getMaximumPoolSizes()}. Set or 3 by default.
+	 * Map of configurators run upon initialisation, for each {@link ProviderInterface}, extending or overwriting {@link #defaultConfig}. The result {@link HikariConfig} can be accessed with {@link #getConfig(ProviderInterface)} method, after
+	 * initialisation.
 	 */
-	private static @Getter @Setter int defaultMaximumPoolSize = 3;
+	private static final @Getter Map<ProviderInterface, Consumer<HikariConfig>> configurators = new HashMap<>();
+	/**
+	 * Default config is set before {@link #configurators} for each {@link ProviderInterface}.
+	 */
+	private static @Getter @Setter HikariConfig defaultConfig = createConfig(c -> {
+		c.setMaximumPoolSize(3);
+	});
 	
 	/**
-	 * Default keep-alive for a connection as defined in {@link HikariDataSource#getKeepaliveTime()} ()}.
+	 * Set in millis the sleep interval while invoking {@link #getJDBCConnection(ProviderInterface)}. This supports the Virtual Threads unblocked behaviour, by producing the {@link Connection} with {@link CompletableFuture} rather than VT itself. The VT
+	 * waits for CF result by sleeping (releasing) in provided intervals.
+	 * If set to {@code 0}, the waiting is disabled and the carrying thread joins the CF immediately.
+	 * <p>
+	 * {@code Default: 100}.
 	 */
-	private static @Getter @Setter Duration defaultConnectionKeepAlive;
+	private static @Setter int sleepingInterval = 100;
 	
-	ConnectionPool(QueryExecutorInterface queryExecutor) {
+	public ConnectionPool(QueryExecutorInterface queryExecutor) {
 		this.queryExecutor = queryExecutor;
+		this.configMap = new HashMap<>();
 		log().debug("*** Building Connection Pool.");
 		pools = Collections.synchronizedMap(new HashMap<>());
 		
@@ -56,31 +71,77 @@ public class ConnectionPool implements ConnectionPoolInterface, LoggingInterface
 		             .forEach(this::createPool);
 	}
 	
-	@SuppressWarnings("resource")
+	/**
+	 * @see #sleepingInterval
+	 */
 	@Override
 	public Connection getJDBCConnection(ProviderInterface provider) throws SQLException {
-		return Optional.ofNullable(pools.get(provider))
-		               .orElseGet(() -> createPool(provider)).getConnection();
+		
+		AtomicReference<SQLException> exception = new AtomicReference<>();
+		
+		/*
+		 * Support for VirtualPromise
+		 * Blocking operation under VirtualThread, blocks the carrying thread, unless sleep() is being used.
+		 * Blocking VT this way can lead to unpredictable deadlocking results.
+		 */
+		
+		// Start a physical thread here to get the result.
+		val connection = CompletableFuture.supplyAsync(() -> {
+			try {
+				return Optional.ofNullable(pools.get(provider))
+				               .orElseGet(() -> createPool(provider))
+				               .getConnection();
+			} catch (SQLException e) {
+				exception.set(e);
+				return null;
+			}
+		});
+		
+		// VT will sleep-release here until the physical thread commits the result.
+		if (sleepingInterval > 0) {
+			while (!connection.isDone()) {
+				try {
+					Thread.sleep(sleepingInterval);
+				} catch (InterruptedException e) {
+					throw new RuntimeException(e);
+				}
+			}
+			
+			if (exception.get() != null) throw exception.get();
+		}
+		
+		return connection.join();
 	}
 	
-	private HikariDataSource createPool(ProviderInterface provider) {
+	public HikariDataSource createPool(ProviderInterface provider) {
 		log().trace("    Creating new pool for {}...", provider.name());
 		
 		val config = new HikariConfig();
+		defaultConfig.copyStateTo(config);
+		config.setPoolName(provider.name() + " connection pool");
 		config.setJdbcUrl(queryExecutor.getConnectionStrings().get(provider));
 		queryExecutor.getConnectionProperties().get(provider).forEach((p, v) -> config.addDataSourceProperty(p.toString(), v));
 		
-		config.setMaximumPoolSize(Optional.ofNullable(maximumPoolSizes.get(provider)).orElse(defaultMaximumPoolSize));
-		config.setPoolName(provider.name() + " connection pool");
-		Optional.ofNullable(defaultConnectionKeepAlive).ifPresent(duration -> config.setKeepaliveTime(duration.toMillis()));
+		Optional.ofNullable(configurators.get(provider)).ifPresent(configurator -> configurator.accept(config));
 		
 		val dataSource = new HikariDataSource(config);
 		pools.put(provider, dataSource);
+		configMap.put(provider, config);
 		return dataSource;
 	}
 	
 	public static Map<ProviderInterface, HikariDataSource> pools() {
 		return ((ConnectionPool) ConnectionPoolInterface.getInstance().orElseThrow()).getPools();
+	}
+	
+	public static HikariConfig createConfig(Consumer<HikariConfig> configurator) {
+		val config = new HikariConfig();
+		configurator.accept(config);
+		return config;
+	}
+	
+	public @Nullable HikariConfig getConfig(ProviderInterface provider) {
+		return pools.get(provider);
 	}
 	
 }
