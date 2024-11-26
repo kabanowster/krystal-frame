@@ -6,7 +6,7 @@ plugins {
 }
 
 group = "io.krystal"
-version = "1.19.0"
+version = "1.19.2"
 
 java {
 //    withJavadocJar()
@@ -14,12 +14,9 @@ java {
 }
 
 dependencies {
-    // impl
-    jdbc()
-    http()
-
-    // api
     api(project(":tools"))
+    jdbc(Config.api)
+    http(Config.api)
     jfxVisuals(Config.api)
     coreTools(Config.api)
     springCore(Config.api)

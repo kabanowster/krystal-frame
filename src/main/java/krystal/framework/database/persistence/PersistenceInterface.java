@@ -334,7 +334,7 @@ public interface PersistenceInterface extends LoggingInterface {
 	}
 	
 	/**
-	 * Fields values computed with writers or plain values - if none are set.
+	 * Fields values computed with writers or if none are set or writer returns {@code null} - plain values.
 	 *
 	 * @see Writer @Writer
 	 */

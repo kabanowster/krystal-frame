@@ -127,6 +127,7 @@ public class ConnectionPool implements ConnectionPoolInterface, LoggingInterface
 		val dataSource = new HikariDataSource(config);
 		pools.put(provider, dataSource);
 		configMap.put(provider, config);
+		dataSource.validate();
 		return dataSource;
 	}
 	

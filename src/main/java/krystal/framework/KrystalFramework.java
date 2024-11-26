@@ -252,7 +252,7 @@ public class KrystalFramework {
 		} catch (LifecycleException e) {
 			log.fatal("!!! Tomcat broke with exception:\n" + e.getMessage());
 		}
-		log.fatal("  > Tomcat are running on: %1$s:%2$s".formatted(properties.getHostName(), properties.getPort()));
+		log.fatal("  > Tomcat is running on: %1$s:%2$s".formatted(properties.getHostName(), properties.getPort()));
 	}
 	
 	/**
