@@ -5,6 +5,8 @@ import krystal.framework.database.abstraction.Query;
 import krystal.framework.database.abstraction.TableInterface;
 import lombok.experimental.UtilityClass;
 
+import java.util.Arrays;
+
 /**
  * Quick factory for basic {@link Query} abstractions.
  * Use {@code Q.t("name")} to create {@link TableInterface}, {@code Q.c("name")} for {@link ColumnInterface} or {@code Q.q("sql_query")} for quick {@link Query}.
@@ -22,6 +24,12 @@ public class Q {
 	
 	public Query q(String sql) {
 		return Query.of(sql);
+	}
+	
+	public ColumnInterface[] cols(String... names) {
+		return Arrays.stream(names)
+		             .map(Q::c)
+		             .toArray(ColumnInterface[]::new);
 	}
 	
 }
