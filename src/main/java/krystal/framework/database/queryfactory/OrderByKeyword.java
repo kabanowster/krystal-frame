@@ -4,24 +4,28 @@ import krystal.framework.database.abstraction.ColumnInterface;
 import krystal.framework.database.abstraction.Query;
 
 import java.util.Collections;
-import java.util.LinkedHashMap;
-import java.util.Map;
+import java.util.LinkedList;
+import java.util.List;
 import java.util.Set;
 import java.util.stream.Collectors;
-import java.util.stream.Stream;
 
 public class OrderByKeyword extends Query {
 	
-	private final Map<OrderByDirection, Set<ColumnInterface>> order = Collections.synchronizedMap(new LinkedHashMap<>());
+	private final List<OrderByDeclaration> order = Collections.synchronizedList(new LinkedList<>());
 	
 	public OrderByKeyword(Query query, OrderByDirection order, ColumnInterface... columns) {
 		super(query);
-		this.order.put(order, Stream.of(columns).collect(Collectors.toSet()));
+		for (var column : columns) this.order.add(new OrderByDeclaration(order, column));
 	}
 	
-	public OrderByKeyword(Query query, Map<OrderByDirection, Set<ColumnInterface>> order) {
+	public OrderByKeyword(Query query, List<OrderByDeclaration> order) {
 		super(query);
-		this.order.putAll(order);
+		this.order.addAll(order);
+	}
+	
+	public OrderByKeyword orderBy(OrderByDirection direction, ColumnInterface column) {
+		order.add(new OrderByDeclaration(direction, column));
+		return this;
 	}
 	
 	@Override
@@ -29,11 +33,8 @@ public class OrderByKeyword extends Query {
 		if (type != QueryType.SELECT || order.isEmpty()) throw new IllegalArgumentException();
 		
 		query.append(" ORDER BY ");
-		query.append(order.entrySet()
-		                  .stream()
-		                  .flatMap(e -> e.getValue()
-		                                 .stream()
-		                                 .map(c -> String.format("%s %s", c.getSqlName(), e.getKey())))
+		query.append(order.stream()
+		                  .map(o -> String.format("%s %s", o.column().getSqlName(), o.order()))
 		                  .collect(Collectors.joining(", ")));
 	}
 	
