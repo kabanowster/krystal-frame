@@ -240,6 +240,7 @@ public interface PersistenceInterface extends LoggingInterface {
 	 *
 	 * @param invokedOn
 	 * 		Used with {@link ColumnsMapping} annotated methods or fields (instead of {@link Enum}). If {@code null}, the method or field must be {@code static} to return value.
+	 * @see #getFieldsColumns(Class, Object)
 	 * @see ColumnsMap
 	 * @see ColumnsMapping @ColumnsMapping
 	 */
@@ -249,12 +250,10 @@ public interface PersistenceInterface extends LoggingInterface {
 		             .filter(c -> c.isAnnotationPresent(ColumnsMapping.class) && ColumnInterface.class.isAssignableFrom(c) && Enum.class.isAssignableFrom(c))
 		             .findFirst()
 		             .map(c -> ColumnsMap.fromColumnInterfaceEnum(clazz, (Class<E>) c))
-		             .orElseGet(() -> Tools.getFirstAnnotatedValue(ColumnsMapping.class, ColumnsMap.class, clazz, invokedOn));
+		             .or(() -> Optional.ofNullable(Tools.getFirstAnnotatedValue(ColumnsMapping.class, ColumnsMap.class, clazz, invokedOn)))
+		             .orElse(ColumnsMap.empty());
 	}
 	
-	default ColumnsMap getFieldsToColumnsMap() {
-		return getFieldsToColumnsMap(getClass(), this);
-	}
 	/*
 	 * Collecting data
 	 */
@@ -271,16 +270,16 @@ public interface PersistenceInterface extends LoggingInterface {
 	/**
 	 * Mapping of fields to database {@link ColumnInterface columns}, including defined in {@link ColumnsMap} if different from fields names.
 	 */
-	default Map<Field, ColumnInterface> getFieldsColumns() {
-		// read overwritten setup
-		val m = Optional.ofNullable(getFieldsToColumnsMap())
-		                .orElse(ColumnsMap.empty());
+	static Map<Field, ColumnInterface> getFieldsColumns(Class<?> clazz, @Nullable Object invokedOn) {
+		val map = getFieldsToColumnsMap(clazz, invokedOn);
 		// collect for all fields, either mapping or name
-		return Stream.of(getClass().getDeclaredFields())
+		return Stream.of(clazz.getDeclaredFields())
 		             .filter(f -> !Tools.isSkipped(f, SkipTypes.persistence))
 		             .collect(Collectors.toMap(
 				             f -> f,
-				             f -> Optional.ofNullable(m.columns().get(f)).orElse(f::getName)
+				             f -> Optional.ofNullable(map.columns().get(f)).orElse(f::getName),
+				             (a, b) -> a,
+				             LinkedHashMap::new
 		             ));
 	}
 	
@@ -455,7 +454,7 @@ public interface PersistenceInterface extends LoggingInterface {
 				throw new RuntimeException(String.format("Keys for %s.class have no values. Aborting %s.", getClass().getSimpleName(), execution));
 		}
 		
-		val fieldsColumns = getFieldsColumns();
+		val fieldsColumns = getFieldsColumns(getClass(), this);
 		
 		ColumnsComparisonInterface[] keysPairs = getKeyValuePairs(keys, fieldsColumns, fieldsValues, execution != PersistenceExecutions.instantiate);
 		
@@ -584,6 +583,7 @@ public interface PersistenceInterface extends LoggingInterface {
 			              }
 		              })
 		              .accept(s -> log().trace("  ! Persisted object deleted from database. Deleted rows: {}", s))
+		              .thenRun(() -> PersistenceMemory.getInstance().ifPresent(memory -> memory.remove(this.hashKeys())))
 		              .join();
 	}
 	
@@ -611,7 +611,7 @@ public interface PersistenceInterface extends LoggingInterface {
 		runWriters();
 		if (!getClass().isAnnotationPresent(Fresh.class))
 			PersistenceMemory.getInstance()
-			                 .ifPresent(memory -> memory.put(hashKeys(getClass(), fieldsValues), this));
+			                 .ifPresent(memory -> memory.put(hashKeys(getClass(), fieldsValues), this, memory.getIntervalsCount()));
 	}
 	
 	/**
@@ -697,21 +697,33 @@ public interface PersistenceInterface extends LoggingInterface {
 		return JSON.fromObject(this);
 	}
 	
+	/**
+	 * Create individual {@link String} representation for provided class and fields values. Limit to fields which have {@link Key} annotation present or take all fields if not.
+	 */
 	static String hashKeys(Class<?> clazz, Map<Field, Object> fieldsValues) {
-		val str = new StringBuilder(clazz.getName()).append('>');
+		val hasKeys = PersistenceInterface.classHasKeys(clazz);
+		
+		val str = new StringBuilder(clazz.getName());
+		if (clazz.isAnnotationPresent(Memorized.class)) str.append("@Memorized");
+		str.append('>');
+		
 		fieldsValues.entrySet()
 		            .stream()
-		            .filter(e -> e.getKey().isAnnotationPresent(Key.class))
+		            .filter(e -> !hasKeys || e.getKey().isAnnotationPresent(Key.class))
 		            .forEach(e -> str.append(e.getKey().getName()).append('=').append(e.getValue()).append('|'));
+		
 		return str.toString();
 	}
 	
+	/**
+	 * Create individual {@link String} representation of this object's {@link Key Keys} or all fields if none present.
+	 */
 	default String hashKeys() {
 		return hashKeys(getClass(), getFieldsValues());
 	}
 	
 	default void memorize(PersistenceMemory persistenceMemory) {
-		persistenceMemory.add(this);
+		persistenceMemory.put(this);
 	}
 	
 	/**

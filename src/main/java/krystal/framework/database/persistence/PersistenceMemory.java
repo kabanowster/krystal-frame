@@ -1,18 +1,21 @@
 package krystal.framework.database.persistence;
 
 import krystal.framework.KrystalFramework;
+import krystal.framework.database.persistence.filters.PersistenceFilters;
 import krystal.framework.logging.LoggingWrapper;
+import lombok.Getter;
 import lombok.NonNull;
 import lombok.Setter;
-import lombok.val;
 import org.springframework.beans.factory.NoSuchBeanDefinitionException;
 
 import javax.annotation.Nullable;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
+import java.util.Map.Entry;
 import java.util.Optional;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.function.BiConsumer;
 import java.util.function.Predicate;
 
 /**
@@ -20,16 +23,35 @@ import java.util.function.Predicate;
  */
 public class PersistenceMemory {
 	
-	private static @Setter int defaultMonitorInterval = 1000;
-	private static @Setter int defaultIntervalsCount = 3;
-	private static @Setter int parallelismThreshold = 50;
+	/**
+	 * Interval (cycle) in {@code ms} at which the {@link #monitorThread} checks the memory.
+	 */
+	private static @Setter @Getter int defaultMonitorInterval = 1000;
+	/**
+	 * Number of {@link #monitorThread} cycles objects stay in memory.
+	 */
+	private static @Setter @Getter int defaultIntervalsCount = 3;
 	
+	/**
+	 * @see ConcurrentHashMap#forEach(long, BiConsumer)
+	 */
+	private static @Setter @Getter int parallelismThreshold = 50;
+	
+	/**
+	 * Doing the job of monitoring the objects status in memory, moving to and clearing the trash.
+	 */
 	private Thread monitorThread;
 	private final ConcurrentHashMap<String, PersistenceInterface> persistenceMap;
 	private final ConcurrentHashMap<String, Integer> persistenceTimeout;
 	private final List<String> persistenceTrash;
-	private @Setter int monitorInterval;
-	private @Setter int intervalsCount;
+	/**
+	 * @see #defaultMonitorInterval
+	 */
+	private @Setter @Getter int monitorInterval;
+	/**
+	 * @see #defaultIntervalsCount
+	 */
+	private @Setter @Getter int intervalsCount;
 	
 	public PersistenceMemory() {
 		persistenceMap = new ConcurrentHashMap<>();
@@ -39,13 +61,22 @@ public class PersistenceMemory {
 		intervalsCount = defaultIntervalsCount;
 	}
 	
-	public void add(@NonNull PersistenceInterface persistence) {
-		put(persistence.hashKeys(), persistence);
+	/**
+	 * @see #put(String, PersistenceInterface, int)
+	 */
+	public void put(@NonNull PersistenceInterface persistence) {
+		put(persistence.hashKeys(), persistence, intervalsCount);
 	}
 	
-	public void put(String hashCode, @NonNull PersistenceInterface persistence) {
+	/**
+	 * Put a new entry to the memory or replace (update) existing one.
+	 *
+	 * @param intervalsCount
+	 * 		Overrides {@link #defaultIntervalsCount} and {@link #intervalsCount}
+	 */
+	public void put(String hashCode, @NonNull PersistenceInterface persistence, int intervalsCount) {
 		persistenceTrash.remove(hashCode);
-		persistenceMap.putIfAbsent(hashCode, persistence);
+		persistenceMap.put(hashCode, persistence);
 		persistenceTimeout.put(hashCode, intervalsCount);
 		startMonitorThread();
 	}
@@ -85,10 +116,11 @@ public class PersistenceMemory {
 			
 			persistenceMap.forEachKey(parallelismThreshold, key -> {
 				if (key == null) return;
+				
 				if (persistenceTimeout.computeIfPresent(key, (k, v) -> {
-					val i = v - 1;
-					if (i >= 0) return i;
-					return null;
+					if (v < 0) return null;
+					if (key.contains("@Memorized")) return v;
+					return v - 1;
 				}) == null) persistenceTrash.add(key);
 			});
 			
@@ -117,6 +149,23 @@ public class PersistenceMemory {
 		persistenceMap.clear();
 		persistenceTimeout.clear();
 		persistenceTrash.clear();
+	}
+	
+	public void clear(Class<?> clazz) {
+		persistenceMap.entrySet()
+		              .stream()
+		              .filter(e -> clazz.isInstance(e.getValue()))
+		              .map(Entry::getKey)
+		              .forEach(this::remove);
+	}
+	
+	public void clear(Class<?> clazz, PersistenceFilters filters) {
+		persistenceMap.entrySet()
+		              .stream()
+		              .filter(e -> clazz.isInstance(e.getValue()))
+		              .filter(e -> filters.test(e.getValue()))
+		              .map(Entry::getKey)
+		              .forEach(this::remove);
 	}
 	
 	public static Optional<PersistenceMemory> getInstance() {

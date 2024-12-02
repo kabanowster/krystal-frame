@@ -7,19 +7,29 @@ import krystal.framework.database.abstraction.Query;
 import krystal.framework.database.abstraction.QueryExecutorInterface;
 import krystal.framework.database.abstraction.QueryResultInterface;
 import krystal.framework.database.persistence.annotations.*;
-import krystal.framework.database.persistence.filters.Filter;
+import krystal.framework.database.persistence.filters.PersistenceFilters;
 import krystal.framework.database.persistence.filters.StatementModifiers;
+import krystal.framework.database.persistence.filters.ValuesOrder;
 import krystal.framework.database.queryfactory.WhereClause;
+import lombok.NonNull;
 import lombok.experimental.UtilityClass;
 import lombok.extern.log4j.Log4j2;
 import lombok.val;
 
 import javax.annotation.Nullable;
 import java.util.List;
-import java.util.Optional;
 import java.util.function.UnaryOperator;
 import java.util.stream.Stream;
 
+/**
+ * @see #promiseAll(Class)
+ * @see #promiseAll(Class, PersistenceFilters)
+ * @see #promiseAll(Class, StatementModifiers)
+ * @see #promiseAll(Class, long, PersistenceFilters)
+ * @see #promiseAll(Class, UnaryOperator)
+ * @see #promiseAll(Class, QueryExecutorInterface)
+ * @see #promiseAll(Class, QueryExecutorInterface, StatementModifiers, Object)
+ */
 @UtilityClass
 @Log4j2
 public class Persistence {
@@ -69,45 +79,35 @@ public class Persistence {
 	}
 	
 	/**
-	 * Unless {@link Fresh @Fresh}, Attempts to load {@code atLeast} number of objects from {@link PersistenceMemory}. If the number is not satisfied and is class not {@link Memorized} - loads elements from database with
+	 * Unless {@link Fresh @Fresh} or explicitly set false {@link PersistenceFilters#isMemorized()}, attempts to load {@code atLeast} number of objects from {@link PersistenceMemory}. If the number is not satisfied - loads elements from database with
 	 * {@link #promiseAll(Class, QueryExecutorInterface, StatementModifiers, Object)}.
 	 *
+	 * @param atLeast
+	 * 		If 0, then the method will load only from {@link PersistenceMemory}.
 	 * @see Fresh
 	 * @see Memorized
 	 */
-	public <T> VirtualPromise<Stream<T>> promiseAll(Class<T> clazz, long atLeast, Filter filter) {
-		return PersistenceMemory.getInstance()
-		                        .filter(mem -> !clazz.isAnnotationPresent(Fresh.class))
-		                        .filter(mem -> mem.containsAny(clazz))
-		                        .map(memory -> memory.find(clazz, filter.toPredicate()))
-		                        .filter(list -> list.size() >= (atLeast <= 0 ? 1 : atLeast) || clazz.isAnnotationPresent(Memorized.class))
-		                        .map(list -> VirtualPromise.supply(list::stream))
-		                        .orElseGet(() -> promiseAll(clazz, filter.toStatementModifier(clazz)));
+	public <T> VirtualPromise<Stream<T>> promiseAll(Class<T> clazz, long atLeast, @NonNull PersistenceFilters filters) {
+		if (clazz.isAnnotationPresent(Fresh.class) || !filters.isMemorized()) return promiseAll(clazz, filters.toStatementModifiers(clazz));
+		return VirtualPromise.supply(() -> {
+			val memorized = PersistenceMemory.getInstance()
+			                                 .filter(mem -> mem.containsAny(clazz))
+			                                 .map(mem -> mem.find(clazz, filters.toPredicate()))
+			                                 .orElse(List.of());
+			if (memorized.size() >= (atLeast < 0 ? 0 : atLeast)) {
+				return !filters.getOrderBy().isEmpty() ? ValuesOrder.sort(memorized, filters.getOrderBy(), clazz) : memorized.stream();
+			} else {
+				return promiseAll(clazz, filters.toStatementModifiers(clazz)).joinThrow().orElse(Stream.empty());
+			}
+		});
 	}
 	
 	/**
-	 * @see #promiseAll(Class, long, Filter)
+	 * @see #promiseAll(Class, long, PersistenceFilters)
 	 */
-	public <T> VirtualPromise<Stream<T>> promiseAll(Class<T> clazz, Filter filter) {
+	public <T> VirtualPromise<Stream<T>> promiseAll(Class<T> clazz, @Nullable PersistenceFilters filter) {
+		if (filter == null) return promiseAll(clazz);
 		return promiseAll(clazz, 1, filter);
-	}
-	
-	/**
-	 * Unless {@link Fresh}, attempts to load {@code atLeast} number of objects from {@link PersistenceMemory}.
-	 */
-	public <T> Optional<List<T>> promiseMemorized(Class<T> clazz, long atLeast, Filter filter) {
-		return PersistenceMemory.getInstance()
-		                        .filter(mem -> !clazz.isAnnotationPresent(Fresh.class))
-		                        .filter(mem -> mem.containsAny(clazz))
-		                        .map(mem -> mem.find(clazz, filter.toPredicate()))
-		                        .filter(l -> l.size() >= (atLeast <= 0 ? 1 : atLeast));
-	}
-	
-	/**
-	 * @see #promiseMemorized(Class, long, Filter)
-	 */
-	public <T> Optional<List<T>> promiseMemorized(Class<T> clazz, Filter filter) {
-		return promiseMemorized(clazz, 1, filter);
 	}
 	
 	/**
