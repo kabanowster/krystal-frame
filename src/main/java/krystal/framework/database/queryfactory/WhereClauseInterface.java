@@ -2,7 +2,7 @@ package krystal.framework.database.queryfactory;
 
 import krystal.framework.database.abstraction.Query;
 import krystal.framework.database.implementation.Q;
-import krystal.framework.database.persistence.filters.StatementModifiers;
+import krystal.framework.database.persistence.filters.PersistenceFilters;
 
 import java.util.Map;
 
@@ -29,10 +29,10 @@ interface WhereClauseInterface {
 	}
 	
 	/**
-	 * @see StatementModifiers#fromParams(Map)
+	 * @see PersistenceFilters
 	 */
 	default WhereClause where(Map<String, String[]> params) {
-		return StatementModifiers.filterWith(params, null).apply(where1is1());
+		return PersistenceFilters.fromParams(params).toStatementModifiers(null).getWhere().apply(where1is1());
 	}
 	
 }

@@ -142,6 +142,7 @@ public class BaseCommander implements CommanderInterface {
 			}
 			case props -> {
 				if (arguments.isEmpty()) {
+					// TODO move the text out of the scope and add help arg
 					logConsole("""
 					           <h2>application properties management</h2>
 					           <p>Specify the arguments of the props command (can repeat within command):</p>
@@ -223,6 +224,7 @@ public class BaseCommander implements CommanderInterface {
 				
 				try {
 					if (arguments.isEmpty()) {
+						// TODO move the text out of the scope and add help arg
 						val host = tomcat.getHost();
 						logConsole("""
 						           <h2>Tomcat Commands</h2>
@@ -314,6 +316,7 @@ public class BaseCommander implements CommanderInterface {
 				return true;
 			}
 			case pmem -> {
+				// TODO help
 				PersistenceMemory.getInstance()
 				                 .ifPresentOrElse(mem -> {
 					                                  if (arguments.isEmpty()) {

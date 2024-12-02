@@ -9,7 +9,7 @@ import krystal.JSON;
 import krystal.VirtualPromise;
 import krystal.framework.database.persistence.Persistence;
 import krystal.framework.database.persistence.PersistenceInterface;
-import krystal.framework.database.persistence.filters.StatementModifiers;
+import krystal.framework.database.persistence.filters.PersistenceFilters;
 import krystal.framework.logging.LoggingInterface;
 import lombok.Builder;
 import lombok.Getter;
@@ -145,7 +145,8 @@ public class KrystalServlet extends HttpServlet implements LoggingInterface {
 						                             if (info.patternIsPlural) {
 							                             val params = req.getParameterMap();
 							                             val clazz = info.mapping.getPersistenceClass();
-							                             val loader = Persistence.promiseAll(clazz, params.isEmpty() ? null : StatementModifiers.fromParams(params, clazz))
+							                             
+							                             val loader = Persistence.promiseAll(clazz, params.isEmpty() ? null : PersistenceFilters.fromParams(params))
 							                                                     .map(Stream::toList)
 							                                                     .map(JSON::fromObjects)
 							                                                     .map(JSONArray::toString)

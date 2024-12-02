@@ -12,6 +12,10 @@ public record ValuesFilter(ComparisonOperator operator, Object... values) implem
 		return new ValuesFilter(ComparisonOperator.EQUAL, values);
 	}
 	
+	public static ValuesFilter areNot(Object... values) {
+		return new ValuesFilter(ComparisonOperator.NOT_EQUAL, values);
+	}
+	
 	public static ValuesFilter are(ComparisonOperator operator, Object... values) {
 		return new ValuesFilter(operator, values);
 	}
