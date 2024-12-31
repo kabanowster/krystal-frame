@@ -9,7 +9,10 @@ public enum ComparisonOperator {
 	LESS_EQUAL("<=", null),
 	EQUAL("=", null),
 	NOT_EQUAL("=", "NOT "),
-	BETWEEN("BETWEEN", null);
+	BETWEEN("BETWEEN", null),
+	NOT_BETWEEN("BETWEEN", "NOT "),
+	LIKE("LIKE", null),
+	NOT_LIKE("LIKE", "NOT ");
 	
 	public final String face;
 	public final String prefix;
