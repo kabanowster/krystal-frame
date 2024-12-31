@@ -11,6 +11,7 @@ import krystal.framework.core.PropertiesInterface;
 import krystal.framework.database.abstraction.QueryExecutorInterface;
 import krystal.framework.database.persistence.PersistenceMemory;
 import krystal.framework.logging.LoggingWrapper;
+import krystal.framework.tomcat.KrystalServlet;
 import krystal.framework.tomcat.TomcatFactory;
 import lombok.val;
 import org.apache.catalina.Context;
@@ -141,23 +142,24 @@ public class BaseCommander implements CommanderInterface {
 				return true;
 			}
 			case props -> {
-				if (arguments.isEmpty()) {
-					// TODO move the text out of the scope and add help arg
-					logConsole("""
-					           <h2>application properties management</h2>
-					           <p>Specify the arguments of the props command (can repeat within command):</p>
-					           <dl>
-					           <dt><b><i>l, list</i></b></dt><dd>Lists all properties derived from <code>application.properties</code> and command line args.</dd>
-					           <dt><b><i>rm</i></b> property_name</dt><dd>Removes property.</dd>
-					           <dt><b><i>-[-]property_name</i></b> property_value</dt><dd>If only name provided, lists property value. If value provided - sets as new.</dd>
-					           </dl>
-					           """);
-				}
 				
 				// for enquoted values
 				val prevProp = new AtomicReference<PropertiesInterface>();
 				
 				for (var arg : arguments) {
+					
+					if (CommanderInterface.argumentMatches(arg, "?", "h", "help")) {
+						logConsole("""
+						           <h2>application properties management</h2>
+						           <p>Specify the arguments of the props command (can repeat within command):</p>
+						           <dl>
+						           <dt><b><i>l, list</i></b></dt><dd>Lists all properties derived from <code>application.properties</code> and command line args.</dd>
+						           <dt><b><i>rm</i></b> property_name</dt><dd>Removes property.</dd>
+						           <dt><b><i>-[-]property_name</i></b> property_value</dt><dd>If only name provided, lists property value. If value provided - sets as new.</dd>
+						           </dl>
+						           """);
+						continue;
+					}
 					
 					if (CommanderInterface.argumentIsEnclosed(arg, EnclosingType.QUOTES)) {
 						val pp = prevProp.get();
@@ -212,59 +214,67 @@ public class BaseCommander implements CommanderInterface {
 				return true;
 			}
 			case krystal -> {
-				logConsole(">>> KrystalFramework status:\n%s".formatted(KrystalFramework.frameworkStatus()));
+				if (arguments.isEmpty()) {
+					logConsole(">>> KrystalFramework status:\n%s".formatted(KrystalFramework.frameworkStatus()));
+				}
+				for (var arg : arguments) {
+					if (CommanderInterface.argumentMatches(arg, "s", "servlets")) {
+						logConsole(KrystalServlet.report());
+					}
+				}
 				return true;
 			}
 			case tomcat -> {
 				val tomcat = KrystalFramework.getTomcat();
 				if (tomcat == null) {
-					logConsole(">>> Tomcat server is not running.");
+					logConsole(">>> Tomcat server is not running. Use --start.");
 					return true;
 				}
 				
 				try {
-					if (arguments.isEmpty()) {
-						// TODO move the text out of the scope and add help arg
-						val host = tomcat.getHost();
-						logConsole("""
-						           <h2>Tomcat Commands</h2>
-						           <dl>
-						            <dt>start, stop, restart</dt>
-						            <dd><dd>
-						            <dt>app, -a</dt>
-						            <dd>Load app from provided [-n]ame and [-s]ource destination.</dd>
-						           </dl>
-						           <h2>Tomcat settings:</h2>
-						           <pre>%s</pre>
-						           <h3>Mappings:</h3>
-						           <dl>
-						           %s
-						           </dl>
-						           """.formatted(
-								new JSONObject()
-										.put("host", host.getName())
-										.put("appBase", host.getAppBase())
-										.toString(4),
-								Arrays.stream(host.findChildren())
-								      .map(Context.class::cast)
-								      .map(context -> """
-								                      <dt><strong>%s</strong></dt>
-								                      <dd>%s</dd>
-								                      """.formatted(
-										      context.getPath(),
-										      Arrays.stream(context.findServletMappings())
-										            .sorted()
-										            .collect(Collectors.joining(KrystalFramework.getDefaultDelimeter()))
-								      )).collect(Collectors.joining(System.lineSeparator()))
-						));
-						return true;
-					}
 					
 					val name = new AtomicReference<String>();
 					val source = new AtomicReference<String>();
 					boolean app = false;
 					
 					for (var arg : arguments) {
+						
+						if (CommanderInterface.argumentMatches(arg, "?", "h", "help")) {
+							val host = tomcat.getHost();
+							logConsole("""
+							           <h2>Tomcat Commands</h2>
+							           <dl>
+							            <dt>start, stop, restart</dt>
+							            <dd><dd>
+							            <dt>app, -a</dt>
+							            <dd>Load app from provided [-n]ame and [-s]ource destination.</dd>
+							           </dl>
+							           <h2>Tomcat settings:</h2>
+							           <pre>%s</pre>
+							           <h3>Mappings:</h3>
+							           <dl>
+							           %s
+							           </dl>
+							           """.formatted(
+									new JSONObject()
+											.put("host", host.getName())
+											.put("appBase", host.getAppBase())
+											.toString(4),
+									Arrays.stream(host.findChildren())
+									      .map(Context.class::cast)
+									      .map(context -> """
+									                      <dt><strong>%s</strong></dt>
+									                      <dd>%s</dd>
+									                      """.formatted(
+											      context.getPath(),
+											      Arrays.stream(context.findServletMappings())
+											            .sorted()
+											            .collect(Collectors.joining(KrystalFramework.getDefaultDelimeter()))
+									      )).collect(Collectors.joining(System.lineSeparator()))
+							));
+							return true;
+						}
+						
 						if (CommanderInterface.argumentMatches(arg, "stop")) {
 							tomcat.stop();
 							logConsole(">>> Tomcat stopped.");
@@ -316,14 +326,25 @@ public class BaseCommander implements CommanderInterface {
 				return true;
 			}
 			case pmem -> {
-				// TODO help
 				PersistenceMemory.getInstance()
 				                 .ifPresentOrElse(mem -> {
-					                                  if (arguments.isEmpty()) {
-						                                  logConsole(mem.report());
-						                                  return;
-					                                  }
+					                                  if (arguments.isEmpty()) logConsole(mem.report());
 					                                  for (var arg : arguments) {
+						                                  
+						                                  if (CommanderInterface.argumentMatches(arg, "?", "h", "help")) {
+							                                  logConsole("""
+							                                             <h2>Persistent Memory</h2>
+							                                             <dl>
+							                                              <dt>i, int, interval</dt>
+							                                              <dd>A ms tick of objects lifetime in memory.</dd>
+							                                              <dt>c, count</dt>
+							                                              <dd>Intervals count, after which the objects are trashed.</dd>
+							                                              <dt>clear</dt>
+							                                              <dd>Manually trashes all stored objects.</dd>
+							                                             </dl>
+							                                             """);
+						                                  }
+						                                  
 						                                  CommanderInterface.getValueIfArgumentMatches(arg, "i", "int", "interval")
 						                                                    .map(s -> {
 							                                                    try {
@@ -346,6 +367,7 @@ public class BaseCommander implements CommanderInterface {
 							                                                    }
 						                                                    })
 						                                                    .ifPresent(mem::setIntervalsCount);
+						                                  
 						                                  if (CommanderInterface.argumentMatches(arg, "clear")) {
 							                                  mem.clear();
 							                                  logConsole("Persistence Memory removed all memorized instances.");
