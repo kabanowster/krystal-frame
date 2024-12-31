@@ -10,7 +10,6 @@ import krystal.VirtualPromise;
 import krystal.framework.database.persistence.Persistence;
 import krystal.framework.database.persistence.PersistenceInterface;
 import krystal.framework.database.persistence.filters.PersistenceFilters;
-import krystal.framework.logging.LoggingInterface;
 import lombok.Builder;
 import lombok.Getter;
 import lombok.Singular;
@@ -25,6 +24,9 @@ import java.io.IOException;
 import java.lang.reflect.InvocationTargetException;
 import java.nio.charset.StandardCharsets;
 import java.util.*;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.atomic.AtomicReference;
+import java.util.concurrent.locks.ReentrantLock;
 import java.util.function.BiFunction;
 import java.util.function.Consumer;
 import java.util.stream.Collectors;
@@ -47,7 +49,11 @@ import java.util.stream.Stream;
 @Log4j2
 @Builder
 @WebServlet(asyncSupported = true)
-public class KrystalServlet extends HttpServlet implements LoggingInterface {
+public class KrystalServlet extends HttpServlet {
+	
+	private static final AtomicReference<Thread> RESPONSE_MONITOR = new AtomicReference<>();
+	private static final @Getter Map<VirtualPromise<Void>, HttpServletResponse> ACTIVE_SERVLETS = new ConcurrentHashMap<>();
+	private static final ReentrantLock SERVLET_LOCK = new ReentrantLock();
 	
 	/**
 	 * @see KrystalServlet
@@ -155,14 +161,14 @@ public class KrystalServlet extends HttpServlet implements LoggingInterface {
 									                                                     try {
 										                                                     resp.getWriter().write(result);
 									                                                     } catch (IOException e) {
-										                                                     log.error(e);
+										                                                     log.error("ServeGetPersistence", e);
 										                                                     resp.setStatus(HttpServletResponse.SC_INTERNAL_SERVER_ERROR);
 									                                                     }
 								                                                     } else {
 									                                                     resp.setStatus(HttpServletResponse.SC_NOT_FOUND);
 								                                                     }
 							                                                     }).catchRun(e -> {
-										                             log.error(e);
+										                             log.error("ServeGetPersistence", e);
 										                             resp.setStatus(HttpServletResponse.SC_INTERNAL_SERVER_ERROR);
 									                             });
 							                             watchResponse(loader, resp);
@@ -170,14 +176,15 @@ public class KrystalServlet extends HttpServlet implements LoggingInterface {
 						                             } else {
 							                             try {
 								                             val id = req.getHttpServletMapping().getMatchValue();
-								                             var result = info.mapping.getPersistenceClass().getDeclaredConstructor(String.class).newInstance(id); // TODO include doc explanation for String argument constructor required for persistence
+								                             // TODO include doc explanation for String argument constructor required for persistence
+								                             var result = info.mapping.getPersistenceClass().getDeclaredConstructor(String.class).newInstance(id);
 								                             if (result.noneIsNull()) resp.getWriter().write(result.toJSON().toString());
 								                             else resp.setStatus(HttpServletResponse.SC_NOT_FOUND);
 							                             } catch (NumberFormatException e) {
-								                             log.debug(e);
+								                             log.debug("ServeGetPersistence", e);
 								                             resp.setStatus(HttpServletResponse.SC_BAD_REQUEST);
 							                             } catch (NoSuchMethodException | InstantiationException | IllegalAccessException | InvocationTargetException | IOException e) {
-								                             log.error(e);
+								                             log.error("ServeGetPersistence", e);
 								                             resp.setStatus(HttpServletResponse.SC_INTERNAL_SERVER_ERROR);
 							                             }
 						                             }
@@ -211,7 +218,7 @@ public class KrystalServlet extends HttpServlet implements LoggingInterface {
 									                                  .where(params)
 									                                  .promise()
 									                                  .catchRun(e -> {
-										                                  log.error(e);
+										                                  log.error("ServeDeletePersistence", e);
 										                                  resp.setStatus(HttpServletResponse.SC_INTERNAL_SERVER_ERROR);
 									                                  })
 									                                  .join();
@@ -228,10 +235,10 @@ public class KrystalServlet extends HttpServlet implements LoggingInterface {
 								                             resp.getWriter().write(obj.toJSON().toString());
 							                             }
 						                             } catch (NumberFormatException | JSONException | ClassCastException e) {
-							                             log.debug(e);
+							                             log.debug("ServeDeletePersistence", e);
 							                             resp.setStatus(HttpServletResponse.SC_BAD_REQUEST);
 						                             } catch (NoSuchMethodException | InstantiationException | IllegalAccessException | InvocationTargetException | IOException e) {
-							                             log.error(e);
+							                             log.error("ServeDeletePersistence", e);
 							                             resp.setStatus(HttpServletResponse.SC_INTERNAL_SERVER_ERROR);
 						                             }
 					                             }));
@@ -258,16 +265,16 @@ public class KrystalServlet extends HttpServlet implements LoggingInterface {
 										                             element.save();
 										                             resp.getWriter().write(element.toJSON().toString());
 									                             } catch (Exception e) {
-										                             log.error(e);
+										                             log.error("ServePostPersistence", e);
 										                             resp.setStatus(HttpServletResponse.SC_INTERNAL_SERVER_ERROR);
 									                             }
 								                             });
 							                             }
 						                             } catch (JSONException | ClassCastException e) {
-							                             log.debug(e);
+							                             log.debug("ServePostPersistence", e);
 							                             resp.setStatus(HttpServletResponse.SC_BAD_REQUEST);
 						                             } catch (IOException e) {
-							                             log.error(e);
+							                             log.error("ServePostPersistence", e);
 							                             resp.setStatus(HttpServletResponse.SC_INTERNAL_SERVER_ERROR);
 						                             }
 					                             }));
@@ -289,28 +296,6 @@ public class KrystalServlet extends HttpServlet implements LoggingInterface {
 			response.setContentType("application/json");
 			response.setCharacterEncoding(StandardCharsets.UTF_8);
 			headers.forEach(response::setHeader);
-		}
-		
-		/**
-		 * Stops loading if response times-out or is cancelled.
-		 */
-		private static void watchResponse(VirtualPromise<Void> loader, HttpServletResponse response) {
-			VirtualPromise.run(() -> {
-				while (loader.isAlive()) {
-					try {
-						// invoking this on timed-out response throws an IllegalStateException
-						response.getWriter();
-					} catch (Exception e) {
-						log.error("Response cancelled due to timeout.", e);
-						loader.cancelAndDrop();
-						response.setStatus(HttpServletResponse.SC_GATEWAY_TIMEOUT);
-					}
-					try {
-						Thread.sleep(1000);
-					} catch (InterruptedException _) {
-					}
-				}
-			});
 		}
 		
 		private static class RequestInfo {
@@ -412,19 +397,82 @@ public class KrystalServlet extends HttpServlet implements LoggingInterface {
 	
 	private boolean serveAsync(HttpServletRequest req, HttpServletResponse resp, @Nullable BiFunction<HttpServletRequest, HttpServletResponse, VirtualPromise<Void>> serveAsyncAction) {
 		if (serveAsyncAction == null) return false;
-		
 		val asyncContext = req.startAsync();
-		serveAsyncAction.apply(req, resp)
-		                .catchRun(ex -> {
-			                log().fatal(ex.getMessage(), ex);
-			                try {
-				                resp.sendError(HttpServletResponse.SC_INTERNAL_SERVER_ERROR);
-			                } catch (IOException ignored) {
-			                }
-		                })
-		                .thenRun(asyncContext::complete)
-		                .thenRun(System::gc);
+		VirtualPromise.run(() -> serveAsyncAction.apply(req, resp).join())
+		              .thenRun(asyncContext::complete)
+		              .thenRun(System::gc);
 		return true;
+	}
+	
+	private static void watchResponses() {
+		try {
+			val trashServlets = new ArrayList<VirtualPromise<Void>>();
+			while (!ACTIVE_SERVLETS.isEmpty()) {
+				ACTIVE_SERVLETS.forEach((promise, response) -> {
+					if (promise.isIdle() || promise.hasException()) {
+						if (promise.hasException()) log.debug("Exception found in response.", promise.getException());
+						trashServlets.add(promise);
+						return;
+					}
+					
+					try {
+						response.getWriter();
+					} catch (Exception e) {
+						log.error("Response cancelled.", e);
+						try {
+							response.setStatus(HttpServletResponse.SC_GATEWAY_TIMEOUT);
+						} catch (Exception _) {
+						}
+						promise.cancelAndDrop();
+						trashServlets.add(promise);
+					}
+				});
+				trashServlets.forEach(ACTIVE_SERVLETS::remove);
+				trashServlets.clear();
+				Thread.sleep(1000);
+			}
+			RESPONSE_MONITOR.set(null);
+			log.debug("Response Watcher finished gracefully.");
+		} catch (Exception e) {
+			log.error("Response Watcher Exception", e);
+			RESPONSE_MONITOR.set(null);
+			setMonitor();
+		}
+	}
+	
+	/**
+	 * Stops loading if response times-out or is cancelled.
+	 */
+	private static void watchResponse(VirtualPromise<Void> loader, HttpServletResponse response) {
+		ACTIVE_SERVLETS.put(loader, response);
+		setMonitor();
+	}
+	
+	private static void setMonitor() {
+		try {
+			while (!SERVLET_LOCK.tryLock()) {
+				Thread.sleep(100);
+			}
+			
+			if (RESPONSE_MONITOR.get() == null) {
+				RESPONSE_MONITOR.set(Thread.ofVirtual()
+				                           .name("Response Watcher")
+				                           .start(KrystalServlet::watchResponses));
+				log.debug("Response Watcher started.");
+			}
+			
+			SERVLET_LOCK.unlock();
+		} catch (Exception e) {
+			log.fatal("Response Watcher", e);
+		}
+	}
+	
+	public static String report() {
+		val report = new StringBuilder("Active servlets: ").append(ACTIVE_SERVLETS.size());
+		ACTIVE_SERVLETS.keySet().forEach(vp -> report.append("\n *** ")
+		                                             .append(vp.getReport())
+		                                             .append(";"));
+		return report.toString();
 	}
 	
 }
