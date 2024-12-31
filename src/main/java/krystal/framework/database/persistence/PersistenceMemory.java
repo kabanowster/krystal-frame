@@ -6,6 +6,7 @@ import krystal.framework.logging.LoggingWrapper;
 import lombok.Getter;
 import lombok.NonNull;
 import lombok.Setter;
+import lombok.extern.log4j.Log4j2;
 import org.springframework.beans.factory.NoSuchBeanDefinitionException;
 
 import javax.annotation.Nullable;
@@ -15,12 +16,15 @@ import java.util.List;
 import java.util.Map.Entry;
 import java.util.Optional;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.atomic.AtomicReference;
+import java.util.concurrent.locks.ReentrantLock;
 import java.util.function.BiConsumer;
 import java.util.function.Predicate;
 
 /**
  * Each {@link PersistenceInterface} object loaded are saved in memory for quick access.
  */
+@Log4j2
 public class PersistenceMemory {
 	
 	/**
@@ -40,7 +44,8 @@ public class PersistenceMemory {
 	/**
 	 * Doing the job of monitoring the objects status in memory, moving to and clearing the trash.
 	 */
-	private Thread monitorThread;
+	private final AtomicReference<Thread> monitorThread;
+	private final ReentrantLock persistenceLock;
 	private final ConcurrentHashMap<String, PersistenceInterface> persistenceMap;
 	private final ConcurrentHashMap<String, Integer> persistenceTimeout;
 	private final List<String> persistenceTrash;
@@ -54,6 +59,8 @@ public class PersistenceMemory {
 	private @Setter @Getter int intervalsCount;
 	
 	public PersistenceMemory() {
+		monitorThread = new AtomicReference<>();
+		persistenceLock = new ReentrantLock();
 		persistenceMap = new ConcurrentHashMap<>();
 		persistenceTimeout = new ConcurrentHashMap<>();
 		persistenceTrash = Collections.synchronizedList(new ArrayList<>());
@@ -105,10 +112,24 @@ public class PersistenceMemory {
 	}
 	
 	private void startMonitorThread() {
-		if (monitorThread != null) return;
-		monitorThread = Thread.ofVirtual()
-		                      .name("Persistence Memory Monitor")
-		                      .start(this::monitor);
+		try {
+			while (!persistenceLock.tryLock()) {
+				Thread.sleep(100);
+			}
+			
+			if (monitorThread.get() == null) {
+				monitorThread.set(Thread.ofVirtual()
+				                        .name("Persistence Memory Monitor")
+				                        .start(this::monitor));
+				log.debug("Persistence Memory Monitor started.");
+			}
+			
+			persistenceLock.unlock();
+		} catch (Exception e) {
+			log.fatal("Persistence Memory Monitor", e);
+			monitorThread.set(null);
+			startMonitorThread();
+		}
 	}
 	
 	private void monitor() {
@@ -129,11 +150,11 @@ public class PersistenceMemory {
 			try {
 				Thread.sleep(monitorInterval);
 			} catch (InterruptedException e) {
-				monitorThread = null;
+				monitorThread.set(null);
 				startMonitorThread();
 			}
 		}
-		monitorThread = null;
+		monitorThread.set(null);
 	}
 	
 	private void clearTrash() {
