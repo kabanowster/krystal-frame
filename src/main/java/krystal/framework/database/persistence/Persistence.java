@@ -89,17 +89,17 @@ public class Persistence {
 	 */
 	public <T> VirtualPromise<Stream<T>> promiseAll(Class<T> clazz, long atLeast, @NonNull PersistenceFilters filters) {
 		if (clazz.isAnnotationPresent(Fresh.class) || !filters.isMemorized()) return promiseAll(clazz, filters.toStatementModifiers(clazz));
-		return VirtualPromise.supply(() -> {
-			val memorized = PersistenceMemory.getInstance()
-			                                 .filter(mem -> mem.containsAny(clazz))
-			                                 .map(mem -> mem.find(clazz, filters.toPredicate()))
-			                                 .orElse(List.of());
-			if (memorized.size() >= (atLeast < 0 ? 0 : atLeast)) {
-				return !filters.getOrderBy().isEmpty() ? ValuesOrder.sort(memorized, filters.getOrderBy(), clazz) : memorized.stream();
-			} else {
-				return promiseAll(clazz, filters.toStatementModifiers(clazz)).joinThrow().orElse(Stream.empty());
-			}
-		});
+		return VirtualPromise.supply(() -> PersistenceMemory.getInstance()
+		                                                    .filter(mem -> mem.containsAny(clazz))
+		                                                    .map(mem -> mem.find(clazz, filters.toPredicate()))
+		                                                    .orElse(List.of()))
+		                     .compose(memorized -> {
+			                     if (memorized.size() >= (atLeast < 0 ? 0 : atLeast)) {
+				                     return VirtualPromise.supply(() -> !filters.getOrderBy().isEmpty() ? ValuesOrder.sort(memorized, filters.getOrderBy(), clazz) : memorized.stream());
+			                     } else {
+				                     return promiseAll(clazz, filters.toStatementModifiers(clazz));
+			                     }
+		                     });
 	}
 	
 	/**
