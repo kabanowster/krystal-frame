@@ -108,6 +108,15 @@ public class TomcatFactory {
 			}
 		});
 		
+		// creates default Connector in tomcat
+		val connector = tomcat.getConnector();
+		
+		val connectionTimeout = properties.getConnectionTimeout();
+		if (connectionTimeout > 0) connector.setAsyncTimeout(connectionTimeout);
+		
+		// additional properties
+		Optional.ofNullable(properties.getConnectorSettings()).ifPresent(settings -> settings.accept(connector));
+		
 		return tomcat;
 	}
 	

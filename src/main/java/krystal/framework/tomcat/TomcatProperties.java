@@ -6,8 +6,10 @@ import krystal.framework.KrystalFramework;
 import lombok.Builder;
 import lombok.Getter;
 import lombok.Singular;
+import org.apache.catalina.connector.Connector;
 
 import java.util.List;
+import java.util.function.Consumer;
 
 /**
  * Define properties through convenient {@link TomcatProperties#builder()} method.
@@ -21,6 +23,8 @@ import java.util.List;
  *     <dt><b><i>appName</i></b></dt><dd>Defines the top level root context for the web application, added by providing <i>appSrc</i>. Any whitespaces and slash characters will be replaced with "_". <br /><code>Default: <i>/app</i></code></dd>
  *     <dt><b><i>appSrc</i></b></dt><dd>When provided, the {@link TomcatFactory} loads web application's content from given source - if {@code .war} file -> will unpack into <code><i>./baseDir/webappsDir/appName/</i></code> or  if the path to dir already present in the file system -> will be addressed directly.</dd>
  *     <dt><b><i>appSrcAsCollection</i></b></dt><dd>If <code><i>true</i></code> and <code><i>appSrc</i></code> is a directory, it will import {@code .war} files content from it and treat it's top-level sub-dirs as web-apps directly.</dd>
+ *     <dt><b><i>connectionTimeout</i></b></dt><dd>Connection timeout set for the {@link Connector}. If the request is not served within given time, it will be discarded (page will output error 500 though). Equivalent of {@link Connector#setAsyncTimeout(long)}.<br /><code>Default (ms): <i>30000</i></code></dd>
+ *     <dt><b><i>connectorSettings</i></b></dt><dd>Manual processing of {@link Connector}. Applied in the end if present.</dd>
  * </dl>
  */
 @Builder
@@ -36,5 +40,7 @@ public class TomcatProperties {
 	@Builder.Default private String appName = "/app";
 	private String appSrc;
 	private boolean appSrcAsCollection;
+	private long connectionTimeout;
+	private Consumer<Connector> connectorSettings;
 	
 }

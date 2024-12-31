@@ -248,7 +248,6 @@ public class KrystalFramework {
 		try {
 			tomcat = TomcatFactory.buildServer(properties);
 			tomcat.start();
-			tomcat.getConnector();
 		} catch (LifecycleException e) {
 			log.fatal("!!! Tomcat broke with exception:\n" + e.getMessage());
 		}
