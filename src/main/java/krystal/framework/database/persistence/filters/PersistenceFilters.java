@@ -146,7 +146,7 @@ public class PersistenceFilters implements Predicate<Object> {
 	}
 	
 	private ColumnInterface getColumnForParameter(String param, Map<String, ColumnInterface> map) {
-		return param.startsWith("_") ? Q.c(param.substring(1)) : Optional.ofNullable(map.get(param)).orElse(Q.c(param));
+		return param.startsWith("_") ? Q.c(param.substring(1)) : Optional.ofNullable(map.get(Tools.dequote(param))).orElse(Q.c(param));
 	}
 	
 	@Override
