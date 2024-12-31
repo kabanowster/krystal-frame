@@ -29,8 +29,10 @@ public record ValuesFilter(ComparisonOperator operator, Object... values) implem
 				return false;
 			}
 			case MORE, LESS, MORE_EQUAL, LESS_EQUAL, BETWEEN -> {
-				val dValue = Double.parseDouble(String.valueOf(value));
-				val dVals = Arrays.stream(values).map(v -> Double.valueOf(String.valueOf(v))).sorted().toList();
+				
+				val dValue = String.valueOf(value).hashCode();
+				val dVals = Arrays.stream(values).map(v -> String.valueOf(v).hashCode()).sorted().toList();
+				
 				switch (operator) {
 					case MORE -> {
 						for (val v : dVals) {
