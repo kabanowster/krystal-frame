@@ -1,12 +1,12 @@
 package krystal.framework.tomcat;
 
-import krystal.framework.database.persistence.ImportantPersistenceInterface;
+import krystal.framework.database.persistence.Entity;
 import lombok.NonNull;
 
 public interface PersistenceMappingInterface {
 	
 	@NonNull
-	Class<? extends ImportantPersistenceInterface> getPersistenceClass();
+	Class<? extends Entity> getPersistenceClass();
 	
 	String name();
 	
