@@ -1,5 +1,8 @@
 package krystal.framework.tomcat;
 
+import jakarta.servlet.AsyncContext;
+import jakarta.servlet.AsyncEvent;
+import jakarta.servlet.AsyncListener;
 import jakarta.servlet.ServletException;
 import jakarta.servlet.annotation.WebServlet;
 import jakarta.servlet.http.HttpServlet;
@@ -7,6 +10,7 @@ import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import krystal.JSON;
 import krystal.VirtualPromise;
+import krystal.VirtualPromise.ExceptionsHandler;
 import krystal.framework.database.persistence.Persistence;
 import krystal.framework.database.persistence.PersistenceInterface;
 import krystal.framework.database.persistence.filters.PersistenceFilters;
@@ -51,9 +55,8 @@ import java.util.stream.Stream;
 @WebServlet(asyncSupported = true)
 public class KrystalServlet extends HttpServlet {
 	
-	private static final AtomicReference<Thread> RESPONSE_MONITOR = new AtomicReference<>();
-	private static final @Getter Map<VirtualPromise<Void>, HttpServletResponse> ACTIVE_SERVLETS = new ConcurrentHashMap<>();
-	private static final ReentrantLock SERVLET_LOCK = new ReentrantLock();
+	private static final Responses RESPONSES = new Responses(new ConcurrentHashMap<>(), new ArrayList<>(), new AtomicReference<>(), new ReentrantLock());
+	private static final Contexts CONTEXTS = new Contexts(new ConcurrentHashMap<>(), new ArrayList<>(), new AtomicReference<>(), new ReentrantLock());
 	
 	/**
 	 * @see KrystalServlet
@@ -88,7 +91,6 @@ public class KrystalServlet extends HttpServlet {
 	 */
 	private Consumer<KrystalServlet> destroy;
 	
-	
 	/*
 	 * Builder expansion for persistence methods
 	 */
@@ -119,6 +121,10 @@ public class KrystalServlet extends HttpServlet {
 				       .build();
 	}
 	
+	/*
+	 * Servlet actions
+	 */
+	
 	public static class KrystalServletBuilder {
 		
 		public KrystalServletBuilder addPersistenceMappings(Collection<PersistenceMappingInterface> mappings) {
@@ -137,6 +143,7 @@ public class KrystalServlet extends HttpServlet {
 		public KrystalServletBuilder serveGetPersistenceMappings(Collection<PersistenceMappingInterface> mappings, Map<String, String> responseHeaders) {
 			return this.serveGet(
 					(req, resp) -> VirtualPromise.supply(() -> new RequestInfo(req, mappings))
+					                             .setExceptionsHandler(new ExceptionsHandler(e -> log.error("ServeGetPersistence", e)))
 					                             .monitor(promise -> RequestInfo.validate(promise, resp))
 					                             .accept(info -> {
 						                             // prep response
@@ -152,27 +159,26 @@ public class KrystalServlet extends HttpServlet {
 							                             val params = req.getParameterMap();
 							                             val clazz = info.mapping.getPersistenceClass();
 							                             
-							                             val loader = Persistence.promiseAll(clazz, params.isEmpty() ? null : PersistenceFilters.fromParams(params))
-							                                                     .map(Stream::toList)
-							                                                     .map(JSON::fromObjects)
-							                                                     .map(JSONArray::toString)
-							                                                     .accept(result -> {
-								                                                     if (result.length() > 2) {
-									                                                     try {
-										                                                     resp.getWriter().write(result);
-									                                                     } catch (IOException e) {
-										                                                     log.error("ServeGetPersistence", e);
-										                                                     resp.setStatus(HttpServletResponse.SC_INTERNAL_SERVER_ERROR);
-									                                                     }
-								                                                     } else {
-									                                                     resp.setStatus(HttpServletResponse.SC_NOT_FOUND);
-								                                                     }
-							                                                     }).catchRun(e -> {
-										                             log.error("ServeGetPersistence", e);
-										                             resp.setStatus(HttpServletResponse.SC_INTERNAL_SERVER_ERROR);
-									                             });
-							                             watchResponse(loader, resp);
-							                             loader.join();
+							                             Persistence.promiseAll(clazz, params.isEmpty() ? null : PersistenceFilters.fromParams(params))
+							                                        .map(Stream::toList)
+							                                        .map(JSON::fromObjects)
+							                                        .map(JSONArray::toString)
+							                                        .accept(result -> {
+								                                        if (result.length() > 2) {
+									                                        try {
+										                                        resp.getWriter().write(result);
+									                                        } catch (IOException e) {
+										                                        log.error("ServeGetPersistence", e);
+										                                        resp.setStatus(HttpServletResponse.SC_INTERNAL_SERVER_ERROR);
+									                                        }
+								                                        } else {
+									                                        resp.setStatus(HttpServletResponse.SC_NOT_FOUND);
+								                                        }
+							                                        }).catchRun(e -> {
+								                                        log.error("ServeGetPersistence", e);
+								                                        resp.setStatus(HttpServletResponse.SC_INTERNAL_SERVER_ERROR);
+							                                        })
+							                                        .join();
 						                             } else {
 							                             try {
 								                             val id = req.getHttpServletMapping().getMatchValue();
@@ -194,6 +200,7 @@ public class KrystalServlet extends HttpServlet {
 		public KrystalServletBuilder serveDeletePersistenceMappings(Collection<PersistenceMappingInterface> mappings, Map<String, String> responseHeaders) {
 			return this.serveDelete(
 					(req, resp) -> VirtualPromise.supply(() -> new RequestInfo(req, mappings))
+					                             .setExceptionsHandler(new ExceptionsHandler(e -> log.error("ServeDeletePersistence", e)))
 					                             .monitor(promise -> RequestInfo.validate(promise, resp))
 					                             .accept(info -> {
 						                             if (info.patternIsMapping) {
@@ -247,6 +254,7 @@ public class KrystalServlet extends HttpServlet {
 		public KrystalServletBuilder servePostPersistenceMappings(Collection<PersistenceMappingInterface> mappings, Map<String, String> responseHeaders) {
 			return this.servePost(
 					(req, resp) -> VirtualPromise.supply(() -> new RequestInfo(req, mappings))
+					                             .setExceptionsHandler(new ExceptionsHandler(e -> log.error("ServePostPersistence", e)))
 					                             .monitor(promise -> RequestInfo.validate(promise, resp))
 					                             .accept(info -> {
 						                             // prep response
@@ -395,84 +403,228 @@ public class KrystalServlet extends HttpServlet {
 		if (!serveAsync(req, resp, serveHead)) super.doHead(req, resp);
 	}
 	
-	private boolean serveAsync(HttpServletRequest req, HttpServletResponse resp, @Nullable BiFunction<HttpServletRequest, HttpServletResponse, VirtualPromise<Void>> serveAsyncAction) {
-		if (serveAsyncAction == null) return false;
+	private boolean serveAsync(HttpServletRequest req, HttpServletResponse resp, @Nullable BiFunction<HttpServletRequest, HttpServletResponse, VirtualPromise<Void>> asyncResponseAction) {
+		if (asyncResponseAction == null) return false;
+		val id = UUID.randomUUID().toString();
+		log.info("Received request to serve async response: {}", id);
+		log.debug("{}: {} {}", id, req.getMethod(), req.getRequestURI());
 		val asyncContext = req.startAsync();
-		VirtualPromise.run(() -> serveAsyncAction.apply(req, resp).join())
-		              .thenRun(asyncContext::complete)
-		              .thenRun(System::gc);
+		asyncContext.addListener(new AsyncListener() {
+			@Override
+			public void onComplete(AsyncEvent event) {
+				log.info("{}: Context closed.", id);
+			}
+			
+			@Override
+			public void onTimeout(AsyncEvent event) {
+				log.debug("{}: Context timeout.", id);
+				asyncContext.complete();
+			}
+			
+			@Override
+			public void onError(AsyncEvent event) {
+				log.error("{}: Context error listener.", id, event.getThrowable());
+				asyncContext.complete();
+			}
+			
+			@Override
+			public void onStartAsync(AsyncEvent event) {
+				log.debug("{}: Context started...", id);
+			}
+		});
+		
+		log.debug("{}: Context started...", id);
+		val contextAction = VirtualPromise.supply(() -> asyncResponseAction.apply(req, resp))
+		                                  .name("Response_Context_" + id)
+		                                  .apply(ara -> ara.name("Async_Response_" + id))
+		                                  .apply(ara -> log.debug(ara.getReport()))
+		                                  .apply(ara -> monitorResponse(ara, resp))
+		                                  .apply(ara -> log.debug("{}: Watching response...", id))
+		                                  .accept(VirtualPromise::join)
+		                                  .thenRun(() -> log.debug("{}: Response done.", id))
+		                                  .catchRun(e -> log.error("{}: Context action error.", id, e))
+		                                  .thenRun(asyncContext::complete)
+		                                  .thenRun(System::gc);
+		
+		monitorContext(contextAction, asyncContext);
+		
 		return true;
 	}
 	
-	private static void watchResponses() {
+	/*
+	 * Responses Monitor
+	 */
+	
+	/**
+	 * Setup responses monitor if not present.
+	 */
+	private static void setResponsesMonitor() {
 		try {
-			val trashServlets = new ArrayList<VirtualPromise<Void>>();
-			while (!ACTIVE_SERVLETS.isEmpty()) {
-				ACTIVE_SERVLETS.forEach((promise, response) -> {
-					if (promise.isIdle() || promise.hasException()) {
-						if (promise.hasException()) log.debug("Exception found in response.", promise.getException());
-						trashServlets.add(promise);
+			while (!RESPONSES.monitorLock.tryLock()) {
+				Thread.sleep(100);
+			}
+			
+			if (RESPONSES.monitor.get() == null) {
+				RESPONSES.monitor.set(Thread.ofVirtual()
+				                            .name("Responses Monitor")
+				                            .start(KrystalServlet::monitorResponses));
+				log.debug("Responses Monitor started.");
+			}
+			
+			RESPONSES.monitorLock.unlock();
+		} catch (Exception e) {
+			log.fatal("Responses Monitor", e);
+		}
+	}
+	
+	/**
+	 * Action done by monitoring thread. Stops loading if response times-out or is cancelled.
+	 */
+	private static void monitorResponses() {
+		try {
+			while (!RESPONSES.asyncResponses.isEmpty()) {
+				RESPONSES.asyncResponses.forEach((promise, response) -> {
+					if (promise.isComplete() || promise.isIdle() || promise.hasException()) {
+						if (promise.hasException()) log.debug("Exception found in {}.", promise.getName(), promise.getException());
+						RESPONSES.trash.add(promise);
 						return;
 					}
 					
 					try {
 						response.getWriter();
 					} catch (Exception e) {
-						log.error("Response cancelled.", e);
+						log.info("{} cancelled.", promise.getName(), e);
 						try {
 							response.setStatus(HttpServletResponse.SC_GATEWAY_TIMEOUT);
 						} catch (Exception _) {
 						}
 						promise.cancelAndDrop();
-						trashServlets.add(promise);
+						RESPONSES.trash.add(promise);
 					}
 				});
-				trashServlets.forEach(ACTIVE_SERVLETS::remove);
-				trashServlets.clear();
+				RESPONSES.trash.forEach(RESPONSES.asyncResponses::remove);
+				RESPONSES.trash.clear();
 				Thread.sleep(1000);
 			}
-			RESPONSE_MONITOR.set(null);
-			log.debug("Response Watcher finished gracefully.");
+			RESPONSES.monitor.set(null);
+			log.debug("Responses Monitor finished gracefully.");
 		} catch (Exception e) {
-			log.error("Response Watcher Exception", e);
-			RESPONSE_MONITOR.set(null);
-			setMonitor();
+			log.error("Response Monitor Exception", e);
+			RESPONSES.monitor.set(null);
+			setResponsesMonitor();
 		}
 	}
 	
 	/**
-	 * Stops loading if response times-out or is cancelled.
+	 * @see #monitorResponses()
 	 */
-	private static void watchResponse(VirtualPromise<Void> loader, HttpServletResponse response) {
-		ACTIVE_SERVLETS.put(loader, response);
-		setMonitor();
+	private static void monitorResponse(VirtualPromise<Void> action, HttpServletResponse response) {
+		RESPONSES.asyncResponses.put(action, response);
+		setResponsesMonitor();
 	}
 	
-	private static void setMonitor() {
+	/*
+	 * Contexts Monitor
+	 */
+	
+	/**
+	 * Setup contexts monitor if not present.
+	 */
+	private static void setContextsMonitor() {
 		try {
-			while (!SERVLET_LOCK.tryLock()) {
+			while (!CONTEXTS.monitorLock.tryLock()) {
 				Thread.sleep(100);
 			}
 			
-			if (RESPONSE_MONITOR.get() == null) {
-				RESPONSE_MONITOR.set(Thread.ofVirtual()
-				                           .name("Response Watcher")
-				                           .start(KrystalServlet::watchResponses));
-				log.debug("Response Watcher started.");
+			if (CONTEXTS.monitor.get() == null) {
+				CONTEXTS.monitor.set(Thread.ofVirtual()
+				                           .name("Contexts Monitor")
+				                           .start(KrystalServlet::monitorContexts));
+				log.debug("Contexts Monitor started.");
 			}
 			
-			SERVLET_LOCK.unlock();
+			CONTEXTS.monitorLock.unlock();
 		} catch (Exception e) {
-			log.fatal("Response Watcher", e);
+			log.fatal("Contexts Monitor", e);
 		}
 	}
 	
+	/**
+	 * Action done by monitoring thread.
+	 */
+	private static void monitorContexts() {
+		try {
+			while (!CONTEXTS.asyncContexts.isEmpty()) {
+				CONTEXTS.asyncContexts.forEach((promise, context) -> {
+					if (promise.isComplete() || promise.isIdle() || promise.hasException()) {
+						if (promise.hasException()) {
+							log.debug("Exception found in {}.", promise.getName(), promise.getException());
+							try {
+								context.complete();
+							} catch (Exception _) {
+							}
+						}
+						CONTEXTS.trash.add(promise);
+					}
+				});
+				
+				CONTEXTS.trash.forEach(CONTEXTS.asyncContexts::remove);
+				CONTEXTS.trash.clear();
+				Thread.sleep(1000);
+			}
+			CONTEXTS.monitor.set(null);
+			log.debug("Contexts Monitor finished gracefully.");
+		} catch (Exception e) {
+			log.error("Contexts Monitor Exception", e);
+			CONTEXTS.monitor.set(null);
+			setContextsMonitor();
+		}
+	}
+	
+	/**
+	 * @see #monitorContexts()
+	 */
+	private static void monitorContext(VirtualPromise<Void> action, AsyncContext context) {
+		CONTEXTS.asyncContexts.put(action, context);
+		setContextsMonitor();
+	}
+	
+	/*
+	 * Reporting
+	 */
+	
 	public static String report() {
-		val report = new StringBuilder("Active servlets: ").append(ACTIVE_SERVLETS.size());
-		ACTIVE_SERVLETS.keySet().forEach(vp -> report.append("\n *** ")
-		                                             .append(vp.getReport())
-		                                             .append(";"));
+		val report = new StringBuilder("\nAsync Responses: ").append(RESPONSES.asyncResponses.size());
+		RESPONSES.asyncResponses.keySet().forEach(vp -> report.append("\n *** ")
+		                                                      .append(vp.getReport())
+		                                                      .append(";"));
+		report.append("\nContexts: ").append(CONTEXTS.asyncContexts.size());
+		CONTEXTS.asyncContexts.keySet().forEach(vp -> report.append("\n *** ")
+		                                                    .append(vp.getReport())
+		                                                    .append(";"));
 		return report.toString();
+	}
+	
+	/*
+	 * Misc
+	 */
+	
+	private record Responses(
+			Map<VirtualPromise<Void>, HttpServletResponse> asyncResponses,
+			List<VirtualPromise<Void>> trash,
+			AtomicReference<Thread> monitor,
+			ReentrantLock monitorLock
+	) {
+	
+	}
+	
+	private record Contexts(
+			Map<VirtualPromise<Void>, AsyncContext> asyncContexts,
+			List<VirtualPromise<Void>> trash,
+			AtomicReference<Thread> monitor,
+			ReentrantLock monitorLock
+	) {
+	
 	}
 	
 }
