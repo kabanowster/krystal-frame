@@ -406,7 +406,7 @@ public class KrystalServlet extends HttpServlet {
 	private boolean serveAsync(HttpServletRequest req, HttpServletResponse resp, @Nullable BiFunction<HttpServletRequest, HttpServletResponse, VirtualPromise<Void>> asyncResponseAction) {
 		if (asyncResponseAction == null) return false;
 		val id = UUID.randomUUID().toString();
-		log.info("Received request to serve async response: {}", id);
+		log.info("{}: Request received.", id);
 		log.debug("{}: {} {}", id, req.getMethod(), req.getRequestURI());
 		val asyncContext = req.startAsync();
 		asyncContext.addListener(new AsyncListener() {
