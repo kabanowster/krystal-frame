@@ -3,7 +3,6 @@ package krystal.framework.database.persistence;
 import krystal.Skip;
 import krystal.Tools;
 import krystal.VirtualPromise;
-import krystal.framework.database.abstraction.Query;
 import krystal.framework.database.abstraction.QueryExecutorInterface;
 import krystal.framework.database.abstraction.QueryResultInterface;
 import krystal.framework.database.persistence.annotations.*;
@@ -14,7 +13,6 @@ import krystal.framework.database.queryfactory.WhereClause;
 import lombok.NonNull;
 import lombok.experimental.UtilityClass;
 import lombok.extern.log4j.Log4j2;
-import lombok.val;
 
 import javax.annotation.Nullable;
 import java.util.List;
@@ -25,7 +23,7 @@ import java.util.stream.Stream;
  * @see #promiseAll(Class)
  * @see #promiseAll(Class, PersistenceFilters)
  * @see #promiseAll(Class, StatementModifiers)
- * @see #promiseAll(Class, long, PersistenceFilters)
+ * @see #promiseAll(Class, int, PersistenceFilters)
  * @see #promiseAll(Class, UnaryOperator)
  * @see #promiseAll(Class, QueryExecutorInterface)
  * @see #promiseAll(Class, QueryExecutorInterface, StatementModifiers, Object)
@@ -47,35 +45,17 @@ public class Persistence {
 	 * @see ReadOnly @ReadOnly
 	 */
 	public <T> VirtualPromise<Stream<T>> promiseAll(Class<T> clazz, QueryExecutorInterface queryExecutor, @Nullable StatementModifiers modifiers, @Nullable T optionalDummyType) {
-		val isPersistenceClass = PersistenceInterface.class.isAssignableFrom(clazz);
-		
-		// SELECT
-		var select = PersistenceInterface.getSelectQuery(clazz, optionalDummyType);
-		
-		// LIMIT
-		if (modifiers != null) {
-			if (modifiers.getLimit() != null && modifiers.getLimit() > 0) select.limit(modifiers.getLimit());
-		}
-		
-		// WHERE
-		val filteredQuery = PersistenceInterface.getFilteredQuery(clazz, optionalDummyType).apply(select);
-		val modifiedQuery = modifiers == null || modifiers.getWhere() == null ? filteredQuery : modifiers.getWhere().apply(filteredQuery);
-		
-		// ORDER BY
-		Query orderedQuery = modifiers == null || modifiers.getOrderBy().isEmpty()
-		                     ? modifiedQuery
-		                     : modifiedQuery.orderBy(modifiers.getOrderBy());
-		
-		return orderedQuery.promise(queryExecutor)
-		                   .map(s -> s.findFirst().orElse(QueryResultInterface.empty()))
-		                   .compose(qr -> qr.toStreamOf(clazz))
-		                   .map(s -> s.peek(o -> Tools.runAnnotatedMethods(Reader.class, o)))
-		                   .map(s -> {
-			                   if (!isPersistenceClass || clazz.isAnnotationPresent(Fresh.class)) return s;
-			                   return PersistenceMemory.getInstance()
-			                                           .map(inMemory -> s.peek(o -> ((PersistenceInterface) o).memorize(inMemory)))
-			                                           .orElse(s);
-		                   });
+		return PersistenceInterface.getQuery(clazz, modifiers, optionalDummyType)
+		                           .promise(queryExecutor)
+		                           .map(s -> s.findFirst().orElse(QueryResultInterface.empty()))
+		                           .compose(qr -> qr.toStreamOf(clazz))
+		                           .map(s -> s.peek(o -> Tools.runAnnotatedMethods(Reader.class, o)))
+		                           .map(s -> {
+			                           if (!PersistenceInterface.class.isAssignableFrom(clazz) || clazz.isAnnotationPresent(Fresh.class)) return s;
+			                           return PersistenceMemory.getInstance()
+			                                                   .map(inMemory -> s.peek(o -> ((PersistenceInterface) o).memorize(inMemory)))
+			                                                   .orElse(s);
+		                           });
 	}
 	
 	/**
@@ -87,14 +67,14 @@ public class Persistence {
 	 * @see Fresh
 	 * @see Memorized
 	 */
-	public <T> VirtualPromise<Stream<T>> promiseAll(Class<T> clazz, long atLeast, @NonNull PersistenceFilters filters) {
+	public <T> VirtualPromise<Stream<T>> promiseAll(Class<T> clazz, int atLeast, @NonNull PersistenceFilters filters) {
 		if (clazz.isAnnotationPresent(Fresh.class) || !filters.isMemorized()) return promiseAll(clazz, filters.toStatementModifiers(clazz));
 		return VirtualPromise.supply(() -> PersistenceMemory.getInstance()
 		                                                    .filter(mem -> mem.containsAny(clazz))
 		                                                    .map(mem -> mem.find(clazz, filters.toPredicate()))
 		                                                    .orElse(List.of()))
 		                     .compose(memorized -> {
-			                     if (memorized.size() >= (atLeast < 0 ? 0 : atLeast)) {
+			                     if (memorized.size() >= (Math.max(atLeast, 0))) {
 				                     return VirtualPromise.supply(() -> !filters.getOrderBy().isEmpty() ? ValuesOrder.sort(memorized, filters.getOrderBy(), clazz) : memorized.stream());
 			                     } else {
 				                     return promiseAll(clazz, filters.toStatementModifiers(clazz));
@@ -103,7 +83,7 @@ public class Persistence {
 	}
 	
 	/**
-	 * @see #promiseAll(Class, long, PersistenceFilters)
+	 * @see #promiseAll(Class, int, PersistenceFilters)
 	 */
 	public <T> VirtualPromise<Stream<T>> promiseAll(Class<T> clazz, @Nullable PersistenceFilters filter) {
 		if (filter == null) return promiseAll(clazz);

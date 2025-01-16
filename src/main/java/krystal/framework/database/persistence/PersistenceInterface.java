@@ -35,6 +35,7 @@ import java.util.stream.Stream;
  * @see Persistence#promiseAll(Class, QueryExecutorInterface, StatementModifiers, Object)
  * @see TableInterface
  * @see Vertical
+ * @see Column
  * @see ColumnsMapping
  * @see Loader
  * @see Filter
@@ -66,15 +67,20 @@ public interface PersistenceInterface extends LoggingInterface {
 			
 		}
 		
+		val columns = qr.columns().values().toArray(Class<?>[]::new);
 		Constructor<T> constructor;
 		try {
 			constructor = (Constructor<T>) Stream.of(clazz.getDeclaredConstructors())
 			                                     .filter(c -> c.isAnnotationPresent(Reader.class) && c.trySetAccessible()
-					                                                  && Arrays.equals(c.getParameterTypes(), qr.columns().values().toArray(Class<?>[]::new)))
+					                                                  && Arrays.equals(c.getParameterTypes(), columns))
 			                                     .findFirst()
 			                                     .orElseThrow();
 		} catch (NoSuchElementException e) {
-			throw new RuntimeException("No @Reader constructor found in %s matching the QueryResult columns. Check constructors arguments types with used ProviderInterface.".formatted(clazz.getSimpleName()), e);
+			throw new RuntimeException("No @Reader constructor found in %s.class matching the QueryResult columns:\n[%s].\nCheck constructors arguments types with used ProviderInterface."
+					                           .formatted(
+							                           clazz.getSimpleName(),
+							                           Arrays.stream(columns).map(Class::getSimpleName).collect(Collectors.joining(", "))
+					                           ), e);
 		}
 		
 		return VirtualPromise.supply(qr::rows)
@@ -125,18 +131,19 @@ public interface PersistenceInterface extends LoggingInterface {
 	
 	/**
 	 * Declared with {@link Provider @Provider}, or {@link krystal.framework.KrystalFramework#getDefaultProvider() KrystalFramework#getDefaultProvider()} as default.
+	 *
+	 * @apiNote Can be overridden.
 	 */
 	default ProviderInterface getProvider() {
 		return Optional.ofNullable(Tools.getFirstAnnotatedValue(Provider.class, ProviderInterface.class, this)).orElse(KrystalFramework.getDefaultProvider());
 	}
 	
 	/**
-	 * Returns {@link SelectStatement} used to loadFromDatabase instance of an object of provided class, or default, or throws error if for some reason it's missing.
+	 * Returns {@link SelectStatement} used to {@link #loadFromDatabase(TableInterface, ColumnsComparisonInterface[], Map)} instance of an object of provided class, or default, or throws error if for some reason it's missing.
 	 *
 	 * @see Loader @Loader
 	 */
 	static <T> SelectStatement getSelectQuery(Class<? extends T> clazz, @Nullable T optionalDummyType) {
-		
 		try {
 			T instance;
 			if (optionalDummyType != null) {
@@ -146,19 +153,22 @@ public interface PersistenceInterface extends LoggingInterface {
 				instance = emptyConstructor.newInstance();
 			}
 			
-			return Optional.ofNullable(Tools.getFirstAnnotatedValue(Loader.class, SelectStatement.class, instance))
-			               .orElseGet(() -> {
-				               if (PersistenceInterface.class.isAssignableFrom(clazz)) {
-					               val obj = (PersistenceInterface) instance;
-					               return Arrays.stream(clazz.getDeclaredClasses())
-					                            .filter(c -> c.isAnnotationPresent(Loader.class) && ColumnInterface.class.isAssignableFrom(c) && Enum.class.isAssignableFrom(c))
-					                            .findFirst()
-					                            .map(c -> obj.getTable().select((ColumnInterface[]) c.getEnumConstants()))
-					                            .orElseGet(() -> obj.getTable().select());
-				               } else {
-					               throw new RuntimeException("Class %s is not a PersistenceInterface nor declares single @Loader SelectStatement returning method.");
-				               }
-			               });
+			// fields or methods
+			val selectQuery = Optional.ofNullable(Tools.getFirstAnnotatedValue(Loader.class, SelectStatement.class, instance));
+			
+			if (!PersistenceInterface.class.isAssignableFrom(clazz)) {
+				if (selectQuery.isPresent()) {
+					return selectQuery.get();
+				} else {
+					throw new RuntimeException("Class %s is not a PersistenceInterface nor declares single @Loader SelectStatement returning method.");
+				}
+			}
+			
+			val obj = (PersistenceInterface) instance;
+			
+			return selectQuery.orElseGet(() -> obj.getTable().select(obj.getColumns()))
+			                  .setProvider(obj.getProvider());
+			
 		} catch (InvocationTargetException | InstantiationException | IllegalAccessException | NoSuchMethodException e) {
 			
 			throw new RuntimeException("Class %s requires no args constructor, to perform annotated parameters loading.".formatted(clazz.getSimpleName()), e);
@@ -166,14 +176,13 @@ public interface PersistenceInterface extends LoggingInterface {
 	}
 	
 	/**
-	 * Returns first custom {@link Loader @Loader} query used to loadFromDatabase this class or {@code null} if missing.
-	 *
 	 * @see #getSelectQuery(Class, Object)
 	 */
-	default @Nullable SelectStatement getSelectQuery() {
+	default SelectStatement getSelectQuery() {
 		return getSelectQuery(getClass(), this);
 	}
 	
+	// TODO change type to StatementModifiers and merge within promise all (StatementModifiers.merge)
 	@SuppressWarnings("unchecked")
 	static <T> Function<SelectStatement, WhereClause> getFilteredQuery(Class<? extends T> clazz, @Nullable T optionalDummyType) {
 		try {
@@ -211,6 +220,29 @@ public interface PersistenceInterface extends LoggingInterface {
 		return getFilteredQuery(getClass(), this);
 	}
 	
+	static <T> Query getQuery(Class<? extends T> clazz, @Nullable StatementModifiers modifiers, @Nullable T optionalDummyType) {
+		// SELECT
+		var select = PersistenceInterface.getSelectQuery(clazz, optionalDummyType);
+		
+		// LIMIT
+		if (modifiers != null) {
+			if (modifiers.getLimit() != null && modifiers.getLimit() > 0) select.limit(modifiers.getLimit());
+		}
+		
+		// WHERE
+		val filteredQuery = PersistenceInterface.getFilteredQuery(clazz, optionalDummyType).apply(select);
+		val modifiedQuery = modifiers == null || modifiers.getWhere() == null ? filteredQuery : modifiers.getWhere().apply(filteredQuery);
+		
+		// ORDER BY
+		return modifiers == null || modifiers.getOrderBy().isEmpty()
+		       ? modifiedQuery
+		       : modifiedQuery.orderBy(modifiers.getOrderBy());
+	}
+	
+	default Query getQuery(@Nullable StatementModifiers modifiers) {
+		return getQuery(getClass(), modifiers, this);
+	}
+	
 	static <T extends PersistenceInterface, D extends T, R, A extends Annotation> R getFirstAnnotatedValueOrInvokeDefaultWithOptionalDummy(Class<T> clazz, Class<A> annotation, Class<R> returnType, @Nullable D optionalDummyType,
 	                                                                                                                                       Function<PersistenceInterface, R> invoker) {
 		try {
@@ -243,15 +275,23 @@ public interface PersistenceInterface extends LoggingInterface {
 	 * @see #getFieldsColumns(Class, Object)
 	 * @see ColumnsMap
 	 * @see ColumnsMapping @ColumnsMapping
+	 * @see Column @Column
 	 */
 	@SuppressWarnings("unchecked")
 	static <E extends Enum<?> & ColumnInterface> ColumnsMap getFieldsToColumnsMap(Class<?> clazz, @Nullable Object invokedOn) {
-		return Arrays.stream(clazz.getDeclaredClasses())
-		             .filter(c -> c.isAnnotationPresent(ColumnsMapping.class) && ColumnInterface.class.isAssignableFrom(c) && Enum.class.isAssignableFrom(c))
-		             .findFirst()
-		             .map(c -> ColumnsMap.fromColumnInterfaceEnum(clazz, (Class<E>) c))
-		             .or(() -> Optional.ofNullable(Tools.getFirstAnnotatedValue(ColumnsMapping.class, ColumnsMap.class, clazz, invokedOn)))
-		             .orElse(ColumnsMap.empty());
+		val defined = Arrays.stream(clazz.getDeclaredClasses())
+		                    .filter(c -> c.isAnnotationPresent(ColumnsMapping.class) && ColumnInterface.class.isAssignableFrom(c) && Enum.class.isAssignableFrom(c))
+		                    .findFirst()
+		                    .map(c -> ColumnsMap.fromColumnInterfaceEnum(clazz, (Class<E>) c))
+		                    .or(() -> Optional.ofNullable(Tools.getFirstAnnotatedValue(ColumnsMapping.class, ColumnsMap.class, clazz, invokedOn)))
+		                    .orElse(ColumnsMap.empty())
+		                    .toBuilder();
+		
+		Arrays.stream(clazz.getDeclaredFields())
+		      .filter(f -> f.isAnnotationPresent(Column.class))
+		      .forEach(f -> defined.column(f, () -> f.getAnnotation(Column.class).value()));
+		
+		return defined.set();
 	}
 	
 	/*
@@ -281,6 +321,39 @@ public interface PersistenceInterface extends LoggingInterface {
 				             (a, b) -> a,
 				             LinkedHashMap::new
 		             ));
+	}
+	
+	default Map<Field, ColumnInterface> getFieldsColumns() {
+		return getFieldsColumns(getClass(), this);
+	}
+	
+	static ColumnInterface[] getColumns(Class<?> clazz, @Nullable Object invokedOn) {
+		return Arrays.stream(clazz.getDeclaredClasses())
+		             .filter(c -> c.isAnnotationPresent(Loader.class) && ColumnInterface.class.isAssignableFrom(c) && Enum.class.isAssignableFrom(c))
+		             .findFirst()
+		             .map(c -> (ColumnInterface[]) c.getEnumConstants())
+		             .orElseGet(() -> {
+			             val fieldsColumns = getFieldsColumns(clazz, null);
+			             
+			             if (clazz.isAnnotationPresent(Vertical.class)) {
+				             val verticalColumns = getVerticalMandatoryAnnotations(clazz);
+				             List<ColumnInterface> columns = fieldsColumns.entrySet().stream()
+				                                                          .collect(Collectors.partitioningBy(e -> e.getValue().getSqlName().equals(verticalColumns.get(PivotColumn.class).getSqlName())))
+				                                                          .get(false)
+				                                                          .stream()
+				                                                          .map(Entry::getValue)
+				                                                          .collect(Collectors.toCollection(LinkedList::new));
+				             columns.add(verticalColumns.get(PivotColumn.class));
+				             columns.add(verticalColumns.get(ValuesColumn.class));
+				             return columns.toArray(ColumnInterface[]::new);
+			             } else {
+				             return fieldsColumns.values().toArray(ColumnInterface[]::new);
+			             }
+		             });
+	}
+	
+	default ColumnInterface[] getColumns() {
+		return getColumns(getClass(), this);
 	}
 	
 	default Map<Field, Object> getWriters() {
@@ -482,33 +555,10 @@ public interface PersistenceInterface extends LoggingInterface {
 	 * Load persistence object from database.
 	 */
 	private Optional<? extends PersistenceInterface> loadFromDatabase(TableInterface table, ColumnsComparisonInterface[] keysPairs, Map<Field, ColumnInterface> fieldsColumns) {
-		var query = getSelectQuery();
-		if (query == null) {
-			val clazz = getClass();
-			ColumnInterface[] queryColumns;
-			if (clazz.isAnnotationPresent(Vertical.class)) {
-				
-				val verticalColumns = getVerticalMandatoryAnnotations(clazz);
-				
-				List<ColumnInterface> columns = fieldsColumns.entrySet().stream()
-				                                             .collect(Collectors.partitioningBy(e -> e.getValue().getSqlName().equals(verticalColumns.get(PivotColumn.class).getSqlName())))
-				                                             .get(false)
-				                                             .stream()
-				                                             .map(Entry::getValue)
-				                                             .collect(Collectors.toCollection(LinkedList::new));
-				columns.add(verticalColumns.get(PivotColumn.class));
-				columns.add(verticalColumns.get(ValuesColumn.class));
-				queryColumns = columns.toArray(ColumnInterface[]::new);
-			} else {
-				queryColumns = fieldsColumns.values().toArray(ColumnInterface[]::new);
-			}
-			
-			query = table.select(queryColumns);
-		}
-		return query.where(keysPairs).setProvider(getProvider()).promise()
-		            .compose(qr -> qr.toStreamOf(getClass()))
-		            .joinThrow()
-		            .flatMap(Stream::findFirst);
+		return getSelectQuery().where(keysPairs).promise()
+		                       .compose(qr -> qr.toStreamOf(getClass()))
+		                       .joinThrow()
+		                       .flatMap(Stream::findFirst);
 	}
 	
 	/**
