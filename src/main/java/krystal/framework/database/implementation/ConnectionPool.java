@@ -12,12 +12,10 @@ import lombok.Setter;
 import lombok.val;
 import org.springframework.stereotype.Service;
 
+import java.lang.reflect.Modifier;
 import java.sql.Connection;
 import java.sql.SQLException;
-import java.util.Collections;
-import java.util.HashMap;
-import java.util.Map;
-import java.util.Optional;
+import java.util.*;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.Consumer;
@@ -117,11 +115,27 @@ public class ConnectionPool implements ConnectionPoolInterface, LoggingInterface
 		log().trace("    Creating new pool for {}...", provider.name());
 		
 		val config = new HikariConfig();
-		defaultConfig.copyStateTo(config);
+		
+		// defaultConfig.copyStateTo(config);
+		// custom copy
+		for (var field : HikariConfig.class.getDeclaredFields()) {
+			if (!Modifier.isFinal(field.getModifiers()) && field.trySetAccessible()) {
+				try {
+					val value = field.get(defaultConfig);
+					if (field.getType() == Properties.class) {
+						field.set(config, new Properties((Properties) value));
+					} else {
+						field.set(config, value);
+					}
+				} catch (Exception e) {
+					throw new RuntimeException("Failed to copy HikariConfig state: " + e.getMessage(), e);
+				}
+			}
+		}
+		
 		config.setPoolName(provider.name() + " connection pool");
 		config.setJdbcUrl(queryExecutor.getConnectionStrings().get(provider));
 		queryExecutor.getConnectionProperties().get(provider).forEach((p, v) -> config.addDataSourceProperty(p.toString(), v));
-		
 		Optional.ofNullable(configurators.get(provider)).ifPresent(configurator -> configurator.accept(config));
 		
 		val dataSource = new HikariDataSource(config);
