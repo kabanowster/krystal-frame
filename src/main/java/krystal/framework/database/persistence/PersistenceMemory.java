@@ -10,12 +10,11 @@ import lombok.extern.log4j.Log4j2;
 import org.springframework.beans.factory.NoSuchBeanDefinitionException;
 
 import javax.annotation.Nullable;
-import java.util.ArrayList;
-import java.util.Collections;
 import java.util.List;
 import java.util.Map.Entry;
 import java.util.Optional;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.concurrent.locks.ReentrantLock;
 import java.util.function.BiConsumer;
@@ -63,7 +62,7 @@ public class PersistenceMemory {
 		persistenceLock = new ReentrantLock();
 		persistenceMap = new ConcurrentHashMap<>();
 		persistenceTimeout = new ConcurrentHashMap<>();
-		persistenceTrash = Collections.synchronizedList(new ArrayList<>());
+		persistenceTrash = new CopyOnWriteArrayList<>();
 		monitorInterval = defaultMonitorInterval;
 		intervalsCount = defaultIntervalsCount;
 	}

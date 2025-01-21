@@ -9,9 +9,9 @@ import krystal.framework.database.implementation.DBCDrivers;
 import lombok.val;
 
 import java.util.Collections;
-import java.util.HashSet;
 import java.util.LinkedHashSet;
 import java.util.Set;
+import java.util.concurrent.CopyOnWriteArraySet;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
@@ -23,7 +23,7 @@ public class UpdateStatement extends Query implements WhereClauseInterface {
 	
 	public UpdateStatement(TableInterface table) {
 		super(QueryType.UPDATE);
-		columnSetPairs = Collections.synchronizedSet(new HashSet<>());
+		columnSetPairs = new CopyOnWriteArraySet<>();
 		output = Collections.synchronizedSet(new LinkedHashSet<>());
 		this.table = table;
 	}

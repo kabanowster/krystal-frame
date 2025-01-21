@@ -15,8 +15,12 @@ import org.springframework.stereotype.Service;
 import java.lang.reflect.Modifier;
 import java.sql.Connection;
 import java.sql.SQLException;
-import java.util.*;
+import java.util.HashMap;
+import java.util.Map;
+import java.util.Optional;
+import java.util.Properties;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.Consumer;
 
@@ -63,7 +67,7 @@ public class ConnectionPool implements ConnectionPoolInterface, LoggingInterface
 		this.queryExecutor = queryExecutor;
 		this.configMap = new HashMap<>();
 		log().debug("*** Building Connection Pool.");
-		pools = Collections.synchronizedMap(new HashMap<>());
+		pools = new ConcurrentHashMap<>();
 		
 		queryExecutor.getConnectionStrings().keySet()
 		             .forEach(this::createPool);

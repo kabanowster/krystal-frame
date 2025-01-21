@@ -5,9 +5,8 @@ import krystal.framework.core.flow.FlowInterface;
 import lombok.Getter;
 import org.springframework.stereotype.Service;
 
-import java.util.Collections;
-import java.util.HashMap;
 import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.Phaser;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.ScheduledThreadPoolExecutor;
@@ -20,7 +19,7 @@ public class FlowControl implements FlowControlInterface {
 	private final ScheduledExecutorService scheduledExecutor;
 	
 	private FlowControl() {
-		flowControls = Collections.synchronizedMap(new HashMap<>());
+		flowControls = new ConcurrentHashMap<>();
 		scheduledExecutor = new ScheduledThreadPoolExecutor(1);
 		initialize(Flows.values());
 	}

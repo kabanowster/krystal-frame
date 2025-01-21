@@ -6,7 +6,11 @@ import krystal.framework.database.abstraction.QueryExecutorInterface;
 import lombok.Getter;
 import org.springframework.stereotype.Service;
 
-import java.util.*;
+import java.util.Arrays;
+import java.util.List;
+import java.util.Map;
+import java.util.Properties;
+import java.util.concurrent.ConcurrentHashMap;
 
 /**
  * Basic settings and operations on databases
@@ -19,8 +23,8 @@ public final class QueryExecutor implements QueryExecutorInterface {
 	private final Map<ProviderInterface, String> connectionStrings;
 	
 	private QueryExecutor() {
-		connectionProperties = Collections.synchronizedMap(new HashMap<>());
-		connectionStrings = Collections.synchronizedMap(new HashMap<>());
+		connectionProperties = new ConcurrentHashMap<>();
+		connectionStrings = new ConcurrentHashMap<>();
 		
 		// load props and urls
 		this.loadProviders(KrystalFramework.getProvidersPool());

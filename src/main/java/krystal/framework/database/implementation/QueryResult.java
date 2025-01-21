@@ -8,7 +8,11 @@ import lombok.val;
 import java.sql.ResultSet;
 import java.sql.ResultSetMetaData;
 import java.sql.SQLException;
-import java.util.*;
+import java.util.Collections;
+import java.util.LinkedHashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.concurrent.CopyOnWriteArrayList;
 
 /**
  * Parses and stores the ResultSet data.
@@ -18,7 +22,7 @@ import java.util.*;
 public record QueryResult(List<Map<ColumnInterface, Object>> rows, Map<ColumnInterface, Class<?>> columns) implements QueryResultInterface, LoggingInterface {
 	
 	public QueryResult() {
-		this(Collections.synchronizedList(new ArrayList<>()), Collections.synchronizedMap(new LinkedHashMap<>()));
+		this(new CopyOnWriteArrayList<>(), Collections.synchronizedMap(new LinkedHashMap<>()));
 	}
 	
 	public QueryResult(ResultSet rs) {
