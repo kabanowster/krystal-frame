@@ -195,8 +195,6 @@ public interface QueryResultInterface {
 		}
 		rows().addAll(rowsProcessed);
 		
-		if (rows().size() > batchSize) VirtualPromise.run(System::gc);
-		
 		// fix batches
 		while (needsReducing(groupBy, rows()))
 			reduceGroupedRows(groupBy, rows());
@@ -240,8 +238,7 @@ public interface QueryResultInterface {
 				                 .collect(Collectors.toMap(
 						                 Entry::getKey,
 						                 Entry::getValue
-				                 ))))
-		           .keySet().size() < rows.size();
+				                 )))).size() < rows.size();
 	}
 	
 	default String renderAsStringTable() {
