@@ -117,7 +117,7 @@ public class KrystalServlet extends HttpServlet {
 				       .serveOptions((req, resp) -> VirtualPromise.run(() -> {
 					       options.forEach(resp::setHeader);
 					       resp.setStatus(HttpServletResponse.SC_NO_CONTENT);
-				       }))
+				       }).thenClose())
 				       .build();
 	}
 	
@@ -328,7 +328,7 @@ public class KrystalServlet extends HttpServlet {
 					log.error(ex);
 					response.setStatus(HttpServletResponse.SC_INTERNAL_SERVER_ERROR);
 				}
-				info.cancelAndDrop();
+				info.kill();
 			}
 			
 		}
@@ -443,8 +443,7 @@ public class KrystalServlet extends HttpServlet {
 		                                  .accept(VirtualPromise::join)
 		                                  .thenRun(() -> log.debug("{}: Response done.", id))
 		                                  .catchRun(e -> log.error("{}: Context action error.", id, e))
-		                                  .thenRun(asyncContext::complete)
-		                                  .thenRun(System::gc);
+		                                  .thenRun(asyncContext::complete);
 		
 		monitorContext(contextAction, asyncContext);
 		
@@ -484,25 +483,38 @@ public class KrystalServlet extends HttpServlet {
 		try {
 			while (!RESPONSES.asyncResponses.isEmpty()) {
 				RESPONSES.asyncResponses.forEach((promise, response) -> {
-					if (promise.isComplete() || promise.isIdle() || promise.hasException()) {
-						if (promise.hasException()) log.debug("Exception found in {}.", promise.getName(), promise.getException());
-						RESPONSES.trash.add(promise);
-						return;
-					}
-					
 					try {
-						response.getWriter();
-					} catch (Exception e) {
-						log.info("{} cancelled.", promise.getName(), e);
-						try {
-							response.setStatus(HttpServletResponse.SC_GATEWAY_TIMEOUT);
-						} catch (Exception _) {
+						if (promise.isDestroyed()) {
+							RESPONSES.trash.add(promise);
+							return;
 						}
-						promise.cancelAndDrop();
+						
+						if (promise.isComplete() || promise.isIdle() || promise.hasException()) {
+							if (promise.hasException()) log.debug("Exception found in {}.", promise.getName(), promise.getException());
+							RESPONSES.trash.add(promise);
+							return;
+						}
+						
+						try {
+							response.getWriter();
+						} catch (Exception e) {
+							log.info("{} cancelled.", promise.getName(), e);
+							try {
+								response.setStatus(HttpServletResponse.SC_GATEWAY_TIMEOUT);
+							} catch (Exception _) {
+							}
+							RESPONSES.trash.add(promise);
+						}
+					} catch (NullPointerException e) {
+						log.warn("De-sync - the promise is, most likely, concurrently destroyed.", e);
 						RESPONSES.trash.add(promise);
 					}
 				});
-				RESPONSES.trash.forEach(RESPONSES.asyncResponses::remove);
+				
+				RESPONSES.trash.forEach(r -> {
+					if (!r.isDestroyed()) r.kill();
+					RESPONSES.asyncResponses.remove(r);
+				});
 				RESPONSES.trash.clear();
 				Thread.sleep(1000);
 			}
@@ -556,19 +568,32 @@ public class KrystalServlet extends HttpServlet {
 		try {
 			while (!CONTEXTS.asyncContexts.isEmpty()) {
 				CONTEXTS.asyncContexts.forEach((promise, context) -> {
-					if (promise.isComplete() || promise.isIdle() || promise.hasException()) {
-						if (promise.hasException()) {
-							log.debug("Exception found in {}.", promise.getName(), promise.getException());
-							try {
-								context.complete();
-							} catch (Exception _) {
-							}
+					try {
+						if (promise.isDestroyed()) {
+							CONTEXTS.trash.add(promise);
+							return;
 						}
+						
+						if (promise.isComplete() || promise.isIdle() || promise.hasException()) {
+							if (promise.hasException()) {
+								log.debug("Exception found in {}.", promise.getName(), promise.getException());
+								try {
+									context.complete();
+								} catch (Exception _) {
+								}
+							}
+							CONTEXTS.trash.add(promise);
+						}
+					} catch (NullPointerException e) {
+						log.warn("De-sync - the promise is, most likely, concurrently destroyed.", e);
 						CONTEXTS.trash.add(promise);
 					}
 				});
 				
-				CONTEXTS.trash.forEach(CONTEXTS.asyncContexts::remove);
+				CONTEXTS.trash.forEach(c -> {
+					if (!c.isDestroyed()) c.kill();
+					CONTEXTS.asyncContexts.remove(c);
+				});
 				CONTEXTS.trash.clear();
 				Thread.sleep(1000);
 			}

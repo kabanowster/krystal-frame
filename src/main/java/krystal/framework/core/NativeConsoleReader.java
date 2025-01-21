@@ -43,6 +43,7 @@ public class NativeConsoleReader {
 				commander.parseCommand(input.nextLine());
 			}
 		});
+		process.thenClose();
 	}
 	
 	public void stop() {
@@ -51,7 +52,7 @@ public class NativeConsoleReader {
 			return;
 		}
 		
-		process.cancelAndDrop();
+		process.kill();
 		process = null;
 	}
 	
