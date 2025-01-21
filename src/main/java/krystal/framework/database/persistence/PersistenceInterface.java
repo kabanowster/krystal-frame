@@ -7,6 +7,7 @@ import krystal.Tools;
 import krystal.VirtualPromise;
 import krystal.framework.KrystalFramework;
 import krystal.framework.database.abstraction.*;
+import krystal.framework.database.implementation.Q;
 import krystal.framework.database.persistence.annotations.*;
 import krystal.framework.database.persistence.annotations.Vertical.PivotColumn;
 import krystal.framework.database.persistence.annotations.Vertical.UnpivotToColumns;
@@ -43,7 +44,6 @@ import java.util.stream.Stream;
  * @see Writer
  * @see ReadOnly
  */
-@FunctionalInterface
 public interface PersistenceInterface extends LoggingInterface {
 	
 	/**
@@ -112,13 +112,22 @@ public interface PersistenceInterface extends LoggingInterface {
 	 */
 	
 	/**
-	 * Table linked with object's persistence. Each row of table represents a single object, unless class is {@link Vertical @Vertical}. You can use Lombok to set a {@link lombok.Getter @Getter} marked field - in that case also mark it with
+	 * {@link TableInterface} (database table) linked with object's persistence. Each row of table represents a single object, unless class is {@link Vertical @Vertical}. You can use Lombok to set a {@link lombok.Getter @Getter} marked field - in that
+	 * case also mark it with
 	 * {@link Skip @Skip}.
 	 * As being a method, you can condition its output on values of other fields that can be {@link Skip Skipped}.
 	 *
 	 * @see TableInterface
 	 */
-	TableInterface getTable();
+	default TableInterface getTable() {
+		return getTable(getClass()).orElseThrow();
+	}
+	
+	static Optional<TableInterface> getTable(Class<?> clazz) {
+		return Optional.ofNullable(clazz.getDeclaredAnnotation(Table.class))
+		               .map(Table::value)
+		               .map(Q::t);
+	}
 	
 	/**
 	 * Returns {@link ProviderInterface} used to loadFromDatabase instance of an object of provided class.

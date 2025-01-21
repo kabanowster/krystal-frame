@@ -10,7 +10,7 @@ import java.lang.annotation.Target;
 
 /**
  * Defines a {@link ColumnsMap} which is used to translate object's fields to {@link ColumnInterface}.
- * Annotate either a method, returning that type or {@link Enum} implementing {@link ColumnInterface}, or mark field with {@link Column}.
+ * Annotate either a method, returning {@link ColumnsMap} or {@link Enum} implementing {@link ColumnInterface}, or mark field with {@link Column}.
  * With method annotation, you can define more complex, conditional mappings.
  *
  * @see Column

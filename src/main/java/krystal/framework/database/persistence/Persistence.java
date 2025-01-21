@@ -20,6 +20,8 @@ import java.util.function.UnaryOperator;
 import java.util.stream.Stream;
 
 /**
+ * Retrieval operations on {@link Entity} objects.
+ *
  * @see #promiseAll(Class)
  * @see #promiseAll(Class, PersistenceFilters)
  * @see #promiseAll(Class, StatementModifiers)
@@ -34,7 +36,7 @@ public class Persistence {
 	
 	/**
 	 * Get all persisted objects from the database of particular type. The class must declare empty (no arguments) constructor. Use {@link QueryExecutorInterface} for initial dependency injection. Use
-	 * {@link krystal.framework.database.persistence.annotations.Filter @Filter} for
+	 * {@link Filter @Filter} for
 	 * filtering the {@link Loader loading} query. Utilises {@link VirtualPromise} for fetching the data and parallel mapping of objects.
 	 *
 	 * @param optionalDummyType
