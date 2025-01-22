@@ -2,7 +2,6 @@ package krystal.framework.database.persistence;
 
 import krystal.framework.KrystalFramework;
 import krystal.framework.database.persistence.filters.PersistenceFilters;
-import krystal.framework.logging.LoggingWrapper;
 import lombok.Getter;
 import lombok.NonNull;
 import lombok.Setter;
@@ -191,10 +190,7 @@ public class PersistenceMemory {
 	public static Optional<PersistenceMemory> getInstance() {
 		try {
 			return Optional.of(KrystalFramework.getSpringContext().getBean(PersistenceMemory.class));
-		} catch (NullPointerException e) {
-			return java.util.Optional.empty();
-		} catch (NoSuchBeanDefinitionException e) {
-			LoggingWrapper.ROOT_LOGGER.fatal(e.getMessage());
+		} catch (NullPointerException | NoSuchBeanDefinitionException e) {
 			return java.util.Optional.empty();
 		}
 	}
