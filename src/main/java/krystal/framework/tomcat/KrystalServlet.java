@@ -512,7 +512,10 @@ public class KrystalServlet extends HttpServlet {
 				});
 				
 				RESPONSES.trash.forEach(r -> {
-					if (!r.isDestroyed()) r.kill();
+					try {
+						if (!r.isDestroyed()) r.kill();
+					} catch (NullPointerException _) {
+					}
 					RESPONSES.asyncResponses.remove(r);
 				});
 				RESPONSES.trash.clear();
@@ -591,7 +594,10 @@ public class KrystalServlet extends HttpServlet {
 				});
 				
 				CONTEXTS.trash.forEach(c -> {
-					if (!c.isDestroyed()) c.kill();
+					try {
+						if (!c.isDestroyed()) c.kill();
+					} catch (NullPointerException _) {
+					}
 					CONTEXTS.asyncContexts.remove(c);
 				});
 				CONTEXTS.trash.clear();
