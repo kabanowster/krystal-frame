@@ -19,7 +19,11 @@ public interface PersistenceMappingInterface {
 	}
 	
 	default String plural() {
-		return mapping() + ('s' == name().charAt(name().length() - 1) ? "es" : "s");
+		return switch (name().charAt(name().length() - 1)) {
+			case 's' -> mapping() + "es";
+			case 'y' -> mapping().substring(0, mapping().length() - 1) + "ies";
+			default -> mapping() + "s";
+		};
 	}
 	
 	default boolean matches(String pattern) {
