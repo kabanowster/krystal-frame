@@ -1,6 +1,8 @@
 package krystal.framework.database.persistence;
 
 import krystal.framework.KrystalFramework;
+import krystal.framework.database.persistence.annotations.Fresh;
+import krystal.framework.database.persistence.annotations.Memorized;
 import krystal.framework.database.persistence.filters.PersistenceFilters;
 import lombok.Getter;
 import lombok.NonNull;
@@ -21,6 +23,10 @@ import java.util.function.Predicate;
 
 /**
  * Each {@link PersistenceInterface} object loaded are saved in memory for quick access.
+ * <p>
+ *
+ * @see Memorized
+ * @see Fresh
  */
 @Log4j2
 public class PersistenceMemory {

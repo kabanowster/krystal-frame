@@ -9,6 +9,8 @@ import java.lang.annotation.Target;
 
 /**
  * Prevent usage of {@link PersistenceMemory} for this class.
+ *
+ * @see Memorized
  */
 @Target(ElementType.TYPE)
 @Retention(RetentionPolicy.RUNTIME)

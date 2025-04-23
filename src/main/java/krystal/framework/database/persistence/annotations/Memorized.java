@@ -11,6 +11,8 @@ import java.lang.annotation.Target;
 
 /**
  * The {@link PersistenceMemory} will hold objects of this class infinitely unless explicitly cleared. {@link Persistence} and {@link PersistenceInterface} operations, besides database, will also overwrite or remove the memorized records.
+ *
+ * @see Fresh
  */
 @Target(ElementType.TYPE)
 @Retention(RetentionPolicy.RUNTIME)
