@@ -148,7 +148,7 @@ public interface PersistenceInterface extends LoggingInterface {
 	}
 	
 	/**
-	 * Returns {@link SelectStatement} used to {@link #loadFromDatabase(TableInterface, ColumnsComparisonInterface[], Map)} instance of an object of provided class, or default, or throws error if for some reason it's missing.
+	 * Returns {@link SelectStatement} used to {@link #loadFromDatabase(TableInterface, ColumnsComparisonInterface[])} instance of an object of provided class, or default, or throws error if for some reason it's missing.
 	 *
 	 * @see Loader @Loader
 	 */
@@ -547,7 +547,7 @@ public interface PersistenceInterface extends LoggingInterface {
 			                              .filter(mem -> !getClass().isAnnotationPresent(Fresh.class))
 			                              .map(mem -> mem.get(hashKeys(getClass(), fieldsValues)))
 			                              .ifPresentOrElse(this::copyFrom,
-			                                               () -> loadFromDatabase(table, keysPairs, fieldsColumns)
+			                                               () -> loadFromDatabase(table, keysPairs)
 					                                                     .ifPresentOrElse(another -> {
 						                                                     copyFrom(another);
 						                                                     runReaders();
@@ -563,7 +563,8 @@ public interface PersistenceInterface extends LoggingInterface {
 	/**
 	 * Load persistence object from database.
 	 */
-	private Optional<? extends PersistenceInterface> loadFromDatabase(TableInterface table, ColumnsComparisonInterface[] keysPairs, Map<Field, ColumnInterface> fieldsColumns) {
+	private Optional<? extends PersistenceInterface> loadFromDatabase(TableInterface table, ColumnsComparisonInterface[] keysPairs) {
+		if (keysPairs == null || keysPairs.length == 0) return Optional.empty();
 		return getSelectQuery().where(keysPairs).promise()
 		                       .compose(qr -> qr.toStreamOf(getClass()))
 		                       .joinThrow()
@@ -574,7 +575,7 @@ public interface PersistenceInterface extends LoggingInterface {
 	 * Load persistence object or create a new record if none found.
 	 */
 	private void instantiateInDatabase(TableInterface table, ColumnsComparisonInterface[] keysPairs, Map<Field, ColumnInterface> fieldsColumns, Map<Field, Object> fieldsValues) {
-		loadFromDatabase(table, keysPairs, fieldsColumns)
+		loadFromDatabase(table, keysPairs)
 				.ifPresentOrElse(
 						another -> {
 							copyFrom(another);
@@ -595,7 +596,7 @@ public interface PersistenceInterface extends LoggingInterface {
 			deleteFromDatabase(table, keysPairs);
 			insertInDatabaseAndConsume(table, fieldsColumns, fieldsValues);
 		} else {
-			loadFromDatabase(table, keysPairs, fieldsColumns)
+			loadFromDatabase(table, keysPairs)
 					.ifPresentOrElse(
 							_ -> table.update(fieldsValues.entrySet().stream()
 							                              .filter(e -> !e.getKey().isAnnotationPresent(Key.class))

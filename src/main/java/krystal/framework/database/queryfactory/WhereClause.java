@@ -28,6 +28,10 @@ public class WhereClause extends Query implements OrderByInterface, GroupByInter
 		return this;
 	}
 	
+	public WhereClause orWhere(ColumnsComparisonInterface[] columnIs) {
+		return orWhere(WhereClauseDelimiter.OR, columnIs);
+	}
+	
 	public WhereClause andWhere(WhereClauseDelimiter delimiter, ColumnsComparisonInterface... columnsAre) {
 		where.add(new WhereClauseOuterBlock(WhereClauseDelimiter.AND, new WhereClauseInnerBlock(delimiter, columnsAre)));
 		return this;
@@ -36,6 +40,10 @@ public class WhereClause extends Query implements OrderByInterface, GroupByInter
 	public WhereClause andWhere(ColumnsComparisonInterface columnIs) {
 		where.add(new WhereClauseOuterBlock(WhereClauseDelimiter.AND, new WhereClauseInnerBlock(WhereClauseDelimiter.NULL, columnIs)));
 		return this;
+	}
+	
+	public WhereClause andWhere(ColumnsComparisonInterface[] columnIs) {
+		return andWhere(WhereClauseDelimiter.AND, columnIs);
 	}
 	
 	@Override

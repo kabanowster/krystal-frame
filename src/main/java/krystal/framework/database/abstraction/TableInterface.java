@@ -5,6 +5,8 @@ import krystal.framework.database.queryfactory.*;
 import lombok.NonNull;
 import lombok.val;
 
+import java.util.Arrays;
+
 /**
  * Represents the database table instance. Attach to {@link Enum} to create a convenient query factory out of it.
  *
@@ -28,6 +30,10 @@ public interface TableInterface {
 	
 	default SelectStatement select(ColumnInterface... columns) {
 		return new SelectStatement(this, columns);
+	}
+	
+	default SelectStatement select(String... columns) {
+		return select(Arrays.stream(columns).map(ColumnInterface::of).toArray(ColumnInterface[]::new));
 	}
 	
 	default UpdateStatement update(ColumnsComparisonInterface... columnSetPairs) {

@@ -9,11 +9,13 @@ import java.util.function.Predicate;
 public record ValuesFilter(ComparisonOperator operator, Object... values) implements Predicate<Object> {
 	
 	public static ValuesFilter are(Object... values) {
-		return new ValuesFilter(ComparisonOperator.EQUAL, values);
+		if (values.length == 1) return new ValuesFilter(ComparisonOperator.EQUAL, values);
+		return new ValuesFilter(ComparisonOperator.IN, values);
 	}
 	
 	public static ValuesFilter areNot(Object... values) {
-		return new ValuesFilter(ComparisonOperator.NOT_EQUAL, values);
+		if (values.length == 1) return new ValuesFilter(ComparisonOperator.NOT_EQUAL, values);
+		return new ValuesFilter(ComparisonOperator.NOT_IN, values);
 	}
 	
 	public static ValuesFilter are(ComparisonOperator operator, Object... values) {

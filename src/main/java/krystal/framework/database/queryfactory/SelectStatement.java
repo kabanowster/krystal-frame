@@ -42,6 +42,10 @@ public class SelectStatement extends Query implements WhereClauseInterface, Orde
 		return new SelectStatement(columns);
 	}
 	
+	public static SelectStatement columns(String... columns) {
+		return columns(Arrays.stream(columns).map(ColumnInterface::of).toArray(ColumnInterface[]::new));
+	}
+	
 	public SelectStatement theseColumns(List<ColumnInterface> columns) {
 		this.columns.clear();
 		this.columns.addAll(columns);
