@@ -11,6 +11,7 @@ import jakarta.servlet.http.HttpServletResponse;
 import krystal.JSON;
 import krystal.VirtualPromise;
 import krystal.VirtualPromise.ExceptionsHandler;
+import krystal.framework.database.abstraction.QueryResultInterface;
 import krystal.framework.database.persistence.Persistence;
 import krystal.framework.database.persistence.PersistenceInterface;
 import krystal.framework.database.persistence.filters.PersistenceFilters;
@@ -19,6 +20,7 @@ import lombok.Getter;
 import lombok.Singular;
 import lombok.extern.log4j.Log4j2;
 import lombok.val;
+import org.apache.logging.log4j.util.TriConsumer;
 import org.json.JSONArray;
 import org.json.JSONException;
 import org.json.JSONObject;
@@ -31,6 +33,7 @@ import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.concurrent.locks.ReentrantLock;
+import java.util.function.BiConsumer;
 import java.util.function.BiFunction;
 import java.util.function.Consumer;
 import java.util.stream.Collectors;
@@ -82,6 +85,7 @@ public class KrystalServlet extends HttpServlet {
 	private BiFunction<HttpServletRequest, HttpServletResponse, VirtualPromise<Void>> serveDelete;
 	private BiFunction<HttpServletRequest, HttpServletResponse, VirtualPromise<Void>> serveOptions;
 	private BiFunction<HttpServletRequest, HttpServletResponse, VirtualPromise<Void>> serveHead;
+	
 	/**
 	 * @see KrystalServlet
 	 */
@@ -96,6 +100,15 @@ public class KrystalServlet extends HttpServlet {
 	 */
 	
 	public static KrystalServlet getPersistenceServlet(String context, String name, Set<PersistenceMappingInterface> mappings, String allowOrigin) {
+		return KrystalServlet.getPersistenceServletBuilder(context, name, mappings, allowOrigin, null).build();
+	}
+	
+	public static KrystalServletBuilder getPersistenceServletBuilder(String context,
+	                                                                 String name,
+	                                                                 Set<PersistenceMappingInterface> mappings,
+	                                                                 String allowOrigin,
+	                                                                 @Nullable Map<String, BeforeAndAfter> beforeAndAfterMethods) {
+		
 		val origin = Map.of(
 				"Access-Control-Allow-Origin", allowOrigin,
 				"Access-Control-Allow-Credentials", "true"
@@ -106,28 +119,34 @@ public class KrystalServlet extends HttpServlet {
 				"Access-Control-Allow-Headers", "Origin, Content-Type, Accept, Authorization"
 		);
 		
-		return KrystalServlet
-				       .builder()
-				       .servletName(name)
-				       .servletContextString(context)
-				       .addPersistenceMappings(mappings)
-				       .serveGetPersistenceMappings(mappings, origin)
-				       .servePostPersistenceMappings(mappings, origin)
-				       .serveDeletePersistenceMappings(mappings, origin)
-				       .serveOptions((req, resp) -> VirtualPromise.run(() -> {
-					       options.forEach(resp::setHeader);
-					       resp.setStatus(HttpServletResponse.SC_NO_CONTENT);
-				       }).thenClose())
-				       .build();
+		return KrystalServlet.builder()
+		                     .servletName(name)
+		                     .servletContextString(context)
+		                     .addCountableMappings(mappings)
+		                     .serveGetPersistenceMappings(mappings, origin, beforeAndAfterMethods != null ? beforeAndAfterMethods.get("GET") : null)
+		                     .servePostPersistenceMappings(mappings, origin, beforeAndAfterMethods != null ? beforeAndAfterMethods.get("POST") : null)
+		                     .serveDeletePersistenceMappings(mappings, origin, beforeAndAfterMethods != null ? beforeAndAfterMethods.get("DELETE") : null)
+		                     .serveOptions((req, resp) -> VirtualPromise.run(() -> {
+			                     options.forEach(resp::setHeader);
+			                     resp.setStatus(HttpServletResponse.SC_NO_CONTENT);
+		                     }).thenClose());
 	}
 	
 	/*
 	 * Servlet actions
 	 */
 	
+	/**
+	 * @param after
+	 * 		Object is either {@link PersistenceInterface}, {@link List} of {@link PersistenceInterface}, or {@link Optional} of {@link QueryResultInterface}.
+	 */
+	public record BeforeAndAfter(@Nullable BiConsumer<HttpServletRequest, HttpServletResponse> before, @Nullable TriConsumer<HttpServletRequest, HttpServletResponse, Object> after) {
+	
+	}
+	
 	public static class KrystalServletBuilder {
 		
-		public KrystalServletBuilder addPersistenceMappings(Collection<PersistenceMappingInterface> mappings) {
+		public KrystalServletBuilder addCountableMappings(Collection<? extends CountableMappingInterface> mappings) {
 			val builderMappings = Optional.ofNullable(this.mappings).orElseGet(() -> {
 				this.mappings = new ArrayList<>();
 				return this.mappings;
@@ -140,7 +159,9 @@ public class KrystalServlet extends HttpServlet {
 			return this;
 		}
 		
-		public KrystalServletBuilder serveGetPersistenceMappings(Collection<PersistenceMappingInterface> mappings, Map<String, String> responseHeaders) {
+		public KrystalServletBuilder serveGetPersistenceMappings(Collection<PersistenceMappingInterface> mappings,
+		                                                         Map<String, String> responseHeaders,
+		                                                         @Nullable BeforeAndAfter beforeAndAfter) {
 			return this.serveGet(
 					(req, resp) -> VirtualPromise.supply(() -> new RequestInfo(req, mappings))
 					                             .setExceptionsHandler(new ExceptionsHandler(e -> log.error("ServeGetPersistence", e)))
@@ -155,12 +176,17 @@ public class KrystalServlet extends HttpServlet {
 							                             resp.setStatus(HttpServletResponse.SC_BAD_REQUEST);
 							                             return;
 						                             }
+						                             
+						                             if (beforeAndAfter != null && beforeAndAfter.before != null) beforeAndAfter.before.accept(req, resp);
+						                             AtomicReference<Object> requestResult = new AtomicReference<>();
+						                             
 						                             if (info.patternIsPlural) {
 							                             val params = req.getParameterMap();
 							                             val clazz = info.mapping.getPersistenceClass();
 							                             
 							                             Persistence.promiseAll(clazz, params.isEmpty() ? null : PersistenceFilters.fromParams(params))
 							                                        .map(Stream::toList)
+							                                        .apply(requestResult::set)
 							                                        .map(JSON::fromObjects)
 							                                        .map(JSONArray::toString)
 							                                        .accept(result -> {
@@ -186,6 +212,7 @@ public class KrystalServlet extends HttpServlet {
 								                             var result = info.mapping.getPersistenceClass().getDeclaredConstructor(String.class).newInstance(id);
 								                             if (result.noneIsNull()) resp.getWriter().write(result.toJSON().toString());
 								                             else resp.setStatus(HttpServletResponse.SC_NOT_FOUND);
+								                             requestResult.set(result);
 							                             } catch (NumberFormatException e) {
 								                             log.debug("ServeGetPersistence", e);
 								                             resp.setStatus(HttpServletResponse.SC_BAD_REQUEST);
@@ -194,10 +221,16 @@ public class KrystalServlet extends HttpServlet {
 								                             resp.setStatus(HttpServletResponse.SC_INTERNAL_SERVER_ERROR);
 							                             }
 						                             }
+						                             
+						                             if (resp.getStatus() < 300 && beforeAndAfter != null && beforeAndAfter.after != null) {
+							                             beforeAndAfter.after.accept(req, resp, requestResult);
+						                             }
 					                             }));
 		}
 		
-		public KrystalServletBuilder serveDeletePersistenceMappings(Collection<PersistenceMappingInterface> mappings, Map<String, String> responseHeaders) {
+		public KrystalServletBuilder serveDeletePersistenceMappings(Collection<PersistenceMappingInterface> mappings,
+		                                                            Map<String, String> responseHeaders,
+		                                                            @Nullable BeforeAndAfter beforeAndAfter) {
 			return this.serveDelete(
 					(req, resp) -> VirtualPromise.supply(() -> new RequestInfo(req, mappings))
 					                             .setExceptionsHandler(new ExceptionsHandler(e -> log.error("ServeDeletePersistence", e)))
@@ -212,6 +245,9 @@ public class KrystalServlet extends HttpServlet {
 						                             // prep response
 						                             prepStandardResponseWithHeaders(resp, responseHeaders);
 						                             
+						                             if (beforeAndAfter != null && beforeAndAfter.before != null) beforeAndAfter.before.accept(req, resp);
+						                             AtomicReference<Object> requestResult = new AtomicReference<>();
+						                             
 						                             try {
 							                             val clazz = info.mapping.getPersistenceClass();
 							                             
@@ -219,27 +255,29 @@ public class KrystalServlet extends HttpServlet {
 								                             val params = req.getParameterMap();
 								                             if (!params.isEmpty()) {
 									                             // parameterized call
-									                             clazz.getDeclaredConstructor().newInstance()
-									                                  .getTable()
-									                                  .delete()
-									                                  .where(params)
-									                                  .promise()
-									                                  .catchRun(e -> {
-										                                  log.error("ServeDeletePersistence", e);
-										                                  resp.setStatus(HttpServletResponse.SC_INTERNAL_SERVER_ERROR);
-									                                  })
-									                                  .join();
+									                             requestResult.set(clazz.getDeclaredConstructor().newInstance()
+									                                                    .getTable()
+									                                                    .delete()
+									                                                    .where(params)
+									                                                    .promise()
+									                                                    .catchRun(e -> {
+										                                                    log.error("ServeDeletePersistence", e);
+										                                                    resp.setStatus(HttpServletResponse.SC_INTERNAL_SERVER_ERROR);
+									                                                    })
+									                                                    .join());
 								                             } else {
 									                             // objects posted
 									                             val str = req.getReader().lines().collect(Collectors.joining());
 									                             val results = processBodyOfArray(new JSONArray(str), clazz, PersistenceInterface::delete);
 									                             resp.getWriter().write(JSON.fromObjects(results).toString());
+									                             requestResult.set(results);
 								                             }
 							                             } else {
 								                             // single object by /id
 								                             val obj = clazz.getDeclaredConstructor(String.class).newInstance(req.getHttpServletMapping().getMatchValue());
 								                             obj.delete();
 								                             resp.getWriter().write(obj.toJSON().toString());
+								                             requestResult.set(obj);
 							                             }
 						                             } catch (NumberFormatException | JSONException | ClassCastException e) {
 							                             log.debug("ServeDeletePersistence", e);
@@ -248,10 +286,16 @@ public class KrystalServlet extends HttpServlet {
 							                             log.error("ServeDeletePersistence", e);
 							                             resp.setStatus(HttpServletResponse.SC_INTERNAL_SERVER_ERROR);
 						                             }
+						                             
+						                             if (resp.getStatus() < 300 && beforeAndAfter != null && beforeAndAfter.after != null) {
+							                             beforeAndAfter.after.accept(req, resp, requestResult);
+						                             }
 					                             }));
 		}
 		
-		public KrystalServletBuilder servePostPersistenceMappings(Collection<PersistenceMappingInterface> mappings, Map<String, String> responseHeaders) {
+		public KrystalServletBuilder servePostPersistenceMappings(Collection<PersistenceMappingInterface> mappings,
+		                                                          Map<String, String> responseHeaders,
+		                                                          @Nullable BeforeAndAfter beforeAndAfter) {
 			return this.servePost(
 					(req, resp) -> VirtualPromise.supply(() -> new RequestInfo(req, mappings))
 					                             .setExceptionsHandler(new ExceptionsHandler(e -> log.error("ServePostPersistence", e)))
@@ -260,6 +304,9 @@ public class KrystalServlet extends HttpServlet {
 						                             // prep response
 						                             prepStandardResponseWithHeaders(resp, responseHeaders);
 						                             
+						                             if (beforeAndAfter != null && beforeAndAfter.before != null) beforeAndAfter.before.accept(req, resp);
+						                             AtomicReference<Object> requestResult = new AtomicReference<>();
+						                             
 						                             try {
 							                             val str = req.getReader().lines().collect(Collectors.joining());
 							                             val clazz = info.mapping.getPersistenceClass();
@@ -267,11 +314,13 @@ public class KrystalServlet extends HttpServlet {
 							                             if (info.patternIsPlural) {
 								                             val results = processBodyOfArray(new JSONArray(str), clazz, PersistenceInterface::save);
 								                             resp.getWriter().write(JSON.fromObjects(results).toString());
+								                             requestResult.set(results);
 							                             } else {
 								                             processSingleJsonElement(new JSONObject(str), clazz, element -> {
 									                             try {
 										                             element.save();
 										                             resp.getWriter().write(element.toJSON().toString());
+										                             requestResult.set(element);
 									                             } catch (Exception e) {
 										                             log.error("ServePostPersistence", e);
 										                             resp.setStatus(HttpServletResponse.SC_INTERNAL_SERVER_ERROR);
@@ -284,6 +333,10 @@ public class KrystalServlet extends HttpServlet {
 						                             } catch (IOException e) {
 							                             log.error("ServePostPersistence", e);
 							                             resp.setStatus(HttpServletResponse.SC_INTERNAL_SERVER_ERROR);
+						                             }
+						                             
+						                             if (resp.getStatus() < 300 && beforeAndAfter != null && beforeAndAfter.after != null) {
+							                             beforeAndAfter.after.accept(req, resp, requestResult);
 						                             }
 					                             }));
 		}
