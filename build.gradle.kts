@@ -1,8 +1,8 @@
 plugins {
     `java-library`
-    id("setup")
-    id("publish")
-    id("myJavaFx")
+    id("io.krystal.setup")
+    id("io.krystal.publish")
+    id("io.krystal.myJavaFx")
 }
 
 group = "io.krystal"
