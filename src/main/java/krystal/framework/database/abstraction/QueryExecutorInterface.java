@@ -147,7 +147,7 @@ public interface QueryExecutorInterface extends LoggingInterface {
 				val sql = q.sqlQuery();
 				log().trace("    Loader: " + sql);
 				try {
-					return new QueryResult(conn.createStatement().executeQuery(sql));
+					return (QueryResultInterface) new QueryResult(conn.createStatement().executeQuery(sql));
 				} catch (SQLException e) {
 					log().fatal("!!! Failed query execution.\n" + e.getMessage());
 					return null;
@@ -156,7 +156,7 @@ public interface QueryExecutorInterface extends LoggingInterface {
 				log().fatal("!!! FATAL error during Database connection.\n" + e.getMessage());
 				return null;
 			}
-		});
+		}).filter(Objects::nonNull);
 		
 	}
 	
