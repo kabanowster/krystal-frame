@@ -265,7 +265,7 @@ public class KrystalFramework {
 				windowTitle,
 				LoggingWrapper.ROOT_LOGGER,
 				PatternLayout.newBuilder()
-				             .setPattern(loggingPattern)
+				             .withPattern(loggingPattern)
 				             .build(),
 				command -> CommanderInterface.getInstance().ifPresent(ci -> ci.parseCommand(command))
 		);

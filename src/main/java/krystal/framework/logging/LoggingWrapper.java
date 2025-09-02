@@ -109,18 +109,18 @@ public class LoggingWrapper {
 		
 		fileAppender = RollingFileAppender
 				               .newBuilder()
-				               .setFileName(logfile + ".log")
+				               .withFileName(logfile + ".log")
 				               .setName("RollingFile")
-				               .setFilePattern(logfile + "-%i.log")
+				               .withFilePattern(logfile + "-%i.log")
 				               .setLayout(
 						               PatternLayout.newBuilder()
-						                            .setPattern(KrystalFramework.getLoggingPattern())
+						                            .withPattern(KrystalFramework.getLoggingPattern())
 						                            .build())
-				               .setPolicy(
+				               .withPolicy(
 						               SizeBasedTriggeringPolicy.createPolicy("5MB"))
-				               .setStrategy(
+				               .withStrategy(
 						               DefaultRolloverStrategy.newBuilder()
-						                                      .setMax("3")
+						                                      .withMax("3")
 						                                      .build())
 				               .build();
 		
