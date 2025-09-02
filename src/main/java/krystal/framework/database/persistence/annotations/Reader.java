@@ -11,7 +11,7 @@ import java.lang.annotation.Target;
 
 /**
  * Marks constructor used to parse data from {@link QueryResultInterface QueryResultInterface}, or void methods run after the constructor.
- * The constructor's parameters types must match the {@link ColumnInterface columns} types, as well as their order. Use custom methods to map incoming values with
+ * The constructor's parameter types must match the {@link ColumnInterface columns} types, as well as their order. Use custom methods to map incoming values with
  * actual fields types.
  *
  * @apiNote If there is no need to change field types, you can set this annotation on {@link lombok.AllArgsConstructor @AllArgsConstructor}.

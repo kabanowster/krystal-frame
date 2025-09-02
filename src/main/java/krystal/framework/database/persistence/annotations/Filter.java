@@ -9,8 +9,8 @@ import java.lang.annotation.Target;
 
 /**
  * Defines a method returning {@code Function<SelectStatement, WhereClause>} modifying {@link Loader @Loader} statement (either generic or custom).
- *
- * @see PersistenceInterface#getFilteredQuery(Class, Object)
+ * Applies as default filter - in addition to any other statement modifiers.
+ * @see PersistenceInterface#getFilter(Class, Object)
  */
 @Target({ElementType.METHOD})
 @Retention(RetentionPolicy.RUNTIME)

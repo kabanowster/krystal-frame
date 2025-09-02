@@ -7,7 +7,7 @@ import java.lang.annotation.Target;
 
 /**
  * Use to mark methods that are writers - mapping methods for fields to return desired values and types when saving to the database. It is defined by creating a method declared as {@code writeFieldName()}, or by using this annotation with
- * the field's name as parameter. Methods of type {@code void} can be marked without parameter, and will be invoked as the last step of Persistence saving execution, thus creating additional writing logic.
+ * the field's name as parameter. Methods of type {@code void} can be marked without a parameter, and will be invoked as the last step of Persistence saving execution, thus creating additional writing logic.
  *
  * @see Remover
  */

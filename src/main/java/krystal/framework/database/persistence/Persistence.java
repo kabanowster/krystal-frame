@@ -41,7 +41,7 @@ public class Persistence {
 	 *
 	 * @param optionalDummyType
 	 * 		If provided, will be taken as source for invoked methods in query construction. With, i.e. additional {@link Skip} fields as parameters, you can set up different conditional outputs
-	 * 		for key methods, like {@link PersistenceInterface#getTable()} or {@link PersistenceInterface#getSelectQuery()}.
+	 * 		for key methods, like {@link PersistenceInterface#getTable()} or {@link PersistenceInterface#getLoader()}.
 	 * @see Loader @Loader
 	 * @see Reader @Reader
 	 * @see ReadOnly @ReadOnly

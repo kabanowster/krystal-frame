@@ -130,7 +130,7 @@ public class PersistenceFilters implements Predicate<Object> {
 		modifiers.limit(limit);
 		
 		val namesMap = Optional.ofNullable(clazz).stream()
-		                       .map(c -> PersistenceInterface.getFieldsColumns(c, null))
+		                       .map(c -> PersistenceInterface.getFieldsToColumns(c, null))
 		                       .map(Map::entrySet)
 		                       .flatMap(Collection::stream)
 		                       .collect(Collectors.toMap(e -> e.getKey().getName(), Map.Entry::getValue));

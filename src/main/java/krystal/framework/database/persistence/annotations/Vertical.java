@@ -13,7 +13,7 @@ import java.util.List;
 
 /**
  * By default, each row of declared {@link PersistenceInterface#getTable() persitence table}, represents a single persisted object. With this annotation present, the fields are constructed from provided static returns of
- * {@link PivotColumn @PivotColumn} and {@link ValuesColumn @ValuesColumn}. Basically, un-pivoting the underlying {@link PersistenceInterface#getSelectQuery() query}, before passing to the
+ * {@link PivotColumn @PivotColumn} and {@link ValuesColumn @ValuesColumn}. Basically, un-pivoting the underlying {@link PersistenceInterface#getLoader() query}, before passing to the
  * {@link Reader constructor}. In addition and unless {@link ReadOnly @ReadOnly}, {@link Key @Keys} fields are mandatory (treated as group-by fields) for writing operations.
  *
  * @see PersistenceInterface#mapQueryResult(QueryResultInterface, Class)
