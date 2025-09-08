@@ -149,11 +149,11 @@ public interface QueryExecutorInterface extends LoggingInterface {
 				try {
 					return (QueryResultInterface) new QueryResult(conn.createStatement().executeQuery(sql));
 				} catch (SQLException e) {
-					log().fatal("!!! Failed query execution.\n" + e.getMessage());
+					log().fatal("!!! Failed query execution.\n", e);
 					return null;
 				}
 			} catch (SQLException e) {
-				log().fatal("!!! FATAL error during Database connection.\n" + e.getMessage());
+				log().fatal("!!! FATAL error during Database connection.\n", e);
 				return null;
 			}
 		}).filter(Objects::nonNull);
@@ -171,7 +171,7 @@ public interface QueryExecutorInterface extends LoggingInterface {
 				try {
 					batch.addBatch(sql);
 				} catch (SQLException e) {
-					log().fatal("!!! Failed adding query to the batch.\n" + e.getMessage());
+					log().fatal("!!! Failed adding query to the batch.\n", e);
 				}
 			});
 			
@@ -180,7 +180,7 @@ public interface QueryExecutorInterface extends LoggingInterface {
 			return Arrays.stream(result).mapToObj(i -> QueryResult.of(QueryResultInterface.singleton(ColumnInterface.of("#"), i)));
 			
 		} catch (SQLException e) {
-			log().fatal("!!! FATAL error during Database connection.\n" + e.getMessage());
+			log().fatal("!!! FATAL error during Database connection.\n", e);
 			return Stream.empty();
 		}
 	}
@@ -190,15 +190,19 @@ public interface QueryExecutorInterface extends LoggingInterface {
 	 */
 	
 	private Connection connectToJDBCProvider(ProviderInterface provider) throws SQLException {
-		return ConnectionPoolInterface.getInstance()
-		                              .map(c -> {
-			                              try {
-				                              return c.getJDBCConnection(provider);
-			                              } catch (SQLException e) {
-				                              throw new RuntimeException(e);
-			                              }
-		                              })
-		                              .orElse(DriverManager.getConnection(getConnectionStrings().get(provider), getConnectionProperties().get(provider)));
+		try {
+			return ConnectionPoolInterface.getInstance()
+			                              .map(c -> {
+				                              try {
+					                              return c.getJDBCConnection(provider);
+				                              } catch (SQLException e) {
+					                              throw new RuntimeException(e);
+				                              }
+			                              })
+			                              .orElse(DriverManager.getConnection(getConnectionStrings().get(provider), getConnectionProperties().get(provider)));
+		} catch (RuntimeException e) {
+			throw new SQLException(e);
+		}
 	}
 	
 	/**
