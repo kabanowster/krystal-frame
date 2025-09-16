@@ -8,7 +8,9 @@ import krystal.framework.KrystalFramework;
 import krystal.framework.commander.CommandInterface;
 import krystal.framework.commander.CommanderInterface;
 import krystal.framework.core.PropertiesInterface;
+import krystal.framework.database.abstraction.ConnectionPoolInterface;
 import krystal.framework.database.abstraction.QueryExecutorInterface;
+import krystal.framework.database.implementation.ConnectionPool;
 import krystal.framework.database.persistence.PersistenceMemory;
 import krystal.framework.logging.LoggingWrapper;
 import krystal.framework.tomcat.KrystalServlet;
@@ -23,6 +25,7 @@ import org.springframework.stereotype.Service;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
+import java.util.Map.Entry;
 import java.util.Optional;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.stream.Collectors;
@@ -377,10 +380,72 @@ public class BaseCommander implements CommanderInterface {
 				                                  () -> logConsole("Persistence Memory is not implemented."));
 				return true;
 			}
+			case cpool -> ConnectionPoolInterface.getInstance().ifPresentOrElse(
+					c -> {
+						if (c instanceof ConnectionPool cp) {
+							val data = cp.getPools().entrySet().stream().collect(Collectors.toMap(
+									Entry::getKey,
+									e -> {
+										val pool = e.getValue();
+										val configBean = pool.getHikariConfigMXBean();
+										val poolBean = pool.getHikariPoolMXBean();
+										val obj = new JSONObject();
+										obj.put("jdbcUrl", pool.getJdbcUrl());
+										val config = new JSONObject();
+										config.put("poolName", configBean.getPoolName());
+										config.put("minimumIdle", configBean.getMinimumIdle());
+										config.put("maximumPoolSize", configBean.getMaximumPoolSize());
+										config.put("idleTimeout", configBean.getIdleTimeout());
+										config.put("maxLifetime", configBean.getMaxLifetime());
+										config.put("connectionTimeout", configBean.getConnectionTimeout());
+										config.put("validationTimeout", configBean.getValidationTimeout());
+										config.put("leakDetectionThreshold", configBean.getLeakDetectionThreshold());
+										obj.put("config", config);
+										val status = new JSONObject();
+										status.put("activeConnections", poolBean.getActiveConnections());
+										status.put("idleConnections", poolBean.getIdleConnections());
+										status.put("totalConnections", poolBean.getTotalConnections());
+										status.put("threadsAwaitingConnection", poolBean.getThreadsAwaitingConnection());
+										obj.put("status", status);
+										
+										return obj;
+									}
+							));
+							
+							val msg = new StringBuilder("<h2>Connection Pools</h2><dl>");
+							cp.getPools().keySet().forEach(provider -> {
+								msg.append("<dt>").append(provider).append("</dt>").append("<dd><pre>");
+								val obj = data.get(provider);
+								
+								if (arguments.isEmpty()) {
+									msg.append(obj.toString(4));
+								} else {
+									val logObj = new JSONObject();
+									for (val arg : arguments) {
+										if (CommanderInterface.argumentMatches(arg, "jdbcUrl", "url", "u")) {
+											logObj.put("jdbcUrl", obj.get("jdbcUrl"));
+										}
+										if (CommanderInterface.argumentMatches(arg, "config", "conf", "c")) {
+											logObj.put("config", obj.get("config"));
+										}
+										if (CommanderInterface.argumentMatches(arg, "status", "stat", "s")) {
+											logObj.put("status", obj.get("status"));
+										}
+									}
+									msg.append(logObj.toString(4));
+								}
+							});
+							
+							msg.append("</pre></dd>").append("</dl>");
+							logConsole(msg.toString());
+						} else logConsole("Conneciton Pool is custom implementation.");
+					},
+					() -> logConsole("Connection Pool not implemented."));
 			default -> {
 				return false;
 			}
 		}
+		return false;
 	}
 	
 }
