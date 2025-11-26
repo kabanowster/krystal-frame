@@ -109,7 +109,10 @@ public class ConnectionPool implements ConnectionPoolInterface, LoggingInterface
 				}
 			}
 			
-			if (exception.get() != null) throw exception.get();
+			if (exception.get() != null) {
+				connection.complete(null);
+				throw exception.get();
+			};
 		}
 		
 		return connection.join();

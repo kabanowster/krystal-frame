@@ -81,7 +81,7 @@ public interface QueryExecutorInterface extends LoggingInterface {
 							connectionStrings.put(provider, provider.getDriver().getConnectionStringBase() + String.join("/", mandatories));
 							
 						} catch (IOException | IllegalArgumentException ex) {
-							log().fatal(String.format("!!! Exception while loading '%s' provider properties file at '%s'. Skipping. %s", provider.name(), path.getPath(), ex.getMessage()));
+							log().fatal("!!! Exception while loading '{}' provider properties file at '{}'. Skipping. {}", provider.name(), path.getPath(), ex.getMessage());
 						}
 					}
 			);
@@ -105,7 +105,7 @@ public interface QueryExecutorInterface extends LoggingInterface {
 			              val provider = e.getKey();
 			              val driver = provider.getDriver();
 			              
-			              log().trace("--> Querying database: " + provider.name());
+			              log().trace("--> Querying database: {}", provider.name());
 			              
 			              return e.getValue()
 			                      .stream()
@@ -145,14 +145,16 @@ public interface QueryExecutorInterface extends LoggingInterface {
 				log().trace("  - Connected Successfully.");
 				
 				val sql = q.sqlQuery();
-				log().trace("    Loader: " + sql);
+				log().trace("    Loader: {}", sql);
 				try {
 					return (QueryResultInterface) new QueryResult(conn.createStatement().executeQuery(sql));
 				} catch (SQLException e) {
-					log().fatal("!!! Failed query execution.\n", e);
+					log().fatal("!!! Failed query execution:\n{}\n", sql, e);
 					return null;
+				} finally {
+					conn.close();
 				}
-			} catch (SQLException e) {
+			} catch (Exception e) {
 				log().fatal("!!! FATAL error during Database connection.\n", e);
 				return null;
 			}
@@ -165,21 +167,22 @@ public interface QueryExecutorInterface extends LoggingInterface {
 			log().trace("    Connected Successfully.");
 			val batch = conn.createStatement();
 			
-			queries.forEach(q -> {
-				val sql = q.sqlQuery();
-				log().trace("    Loader: " + sql);
-				try {
-					batch.addBatch(sql);
-				} catch (SQLException e) {
-					log().fatal("!!! Failed adding query to the batch.\n", e);
-				}
-			});
+			val sqls = queries.stream().map(Query::sqlQuery).toList();
 			
-			val result = batch.executeBatch();
+			for (val sql : sqls) {
+				log().trace("    Writer: {}", sql);
+				batch.addBatch(sql);
+			}
 			
-			return Arrays.stream(result).mapToObj(i -> QueryResult.of(QueryResultInterface.singleton(ColumnInterface.of("#"), i)));
+			try {
+				val result = batch.executeBatch();
+				return Arrays.stream(result).mapToObj(i -> QueryResult.of(QueryResultInterface.singleton(ColumnInterface.of("#"), i)));
+			} catch (SQLException e) {
+				log().fatal("!!! Failed query execution:\n{}\n", String.join("\n", sqls), e);
+				return Stream.empty();
+			}
 			
-		} catch (SQLException e) {
+		} catch (Exception e) {
 			log().fatal("!!! FATAL error during Database connection.\n", e);
 			return Stream.empty();
 		}
