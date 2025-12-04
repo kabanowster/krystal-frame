@@ -510,7 +510,7 @@ public interface PersistenceInterface extends LoggingInterface {
 	/**
 	 * Load persistence object from database.
 	 */
-	private Optional<? extends PersistenceInterface> loadFromDatabase(ColumnsComparisonInterface[] keyValuePairs) {
+	private Optional<? extends PersistenceInterface> loadFromDatabase(ColumnsComparisonInterface[] keyValuePairs) throws RuntimeException{
 		if (keyValuePairs == null || keyValuePairs.length == 0) return Optional.empty();
 		return getLoader().where(keyValuePairs).promise().compose(qr -> qr.toStreamOf(getClass())).joinThrow().flatMap(Stream::findFirst);
 	}
@@ -518,7 +518,7 @@ public interface PersistenceInterface extends LoggingInterface {
 	/**
 	 * Load persistence object or create a new record if none found.
 	 */
-	private void instantiateInDatabase(TableInterface table, ColumnsComparisonInterface[] keyValuePairs, Map<Field, ColumnInterface> fieldsToColumns, Map<Field, Object> fieldsToValues) {
+	private void instantiateInDatabase(TableInterface table, ColumnsComparisonInterface[] keyValuePairs, Map<Field, ColumnInterface> fieldsToColumns, Map<Field, Object> fieldsToValues) throws RuntimeException {
 		loadFromDatabase(keyValuePairs).ifPresentOrElse(another -> {
 			copyFrom(another);
 			runReaders();
@@ -531,7 +531,7 @@ public interface PersistenceInterface extends LoggingInterface {
 	/**
 	 * In case of {@link Vertical} - rewrites the object, with consequences for all {@link Incremental} fields. Otherwise, check if the object is persisted - update its values, or instantiate a new record.
 	 */
-	private void saveToDatabase(TableInterface table, ColumnsComparisonInterface[] keyValuePairs, Map<Field, ColumnInterface> fieldsToColumns, Map<Field, Object> fieldsToValues) {
+	private void saveToDatabase(TableInterface table, ColumnsComparisonInterface[] keyValuePairs, Map<Field, ColumnInterface> fieldsToColumns, Map<Field, Object> fieldsToValues) throws RuntimeException{
 		if (getClass().isAnnotationPresent(Vertical.class)) {
 			deleteFromDatabase(table, keyValuePairs);
 			insertToDatabaseAndConsume(table, fieldsToColumns, fieldsToValues);
@@ -546,7 +546,11 @@ public interface PersistenceInterface extends LoggingInterface {
 						                                            .toArray(ColumnSetValueComparison[]::new))
 				                                    .where(keyValuePairs);
 				
-				updater.setProvider(getProvider()).promise().thenRun(this::runWriters).thenRun(() -> log().trace("    Record updated.")).joinThrow();
+				updater.setProvider(getProvider())
+				       .promise()
+				       .thenRun(this::runWriters)
+				       .thenRun(() -> log().trace("    Record updated."))
+				       .joinThrow();
 			}, () -> insertToDatabaseAndConsume(table, fieldsToColumns, fieldsToValues));
 		}
 	}
@@ -557,7 +561,7 @@ public interface PersistenceInterface extends LoggingInterface {
 	 * @see Incremental @Incremental
 	 * @see Key @Key
 	 */
-	private void copyAsNew(TableInterface table, Set<Field> keys, Map<Field, ColumnInterface> fieldsToColumns, Map<Field, Object> fieldsToValues) {
+	private void copyAsNew(TableInterface table, Set<Field> keys, Map<Field, ColumnInterface> fieldsToColumns, Map<Field, Object> fieldsToValues) throws RuntimeException {
 		if (keys.stream().noneMatch(f -> f.isAnnotationPresent(Incremental.class))) throw new RuntimeException(String.format("%s.class does not have @Incremental keys, thus copying amd saving would result in ambiguity.", getClass().getSimpleName()));
 		
 		if (keysAreMissingValues(true, keys, fieldsToValues)) throw new RuntimeException(String.format("Obligatory keys have no values. Aborting creation of %s.class.", getClass().getSimpleName()));
@@ -586,7 +590,7 @@ public interface PersistenceInterface extends LoggingInterface {
 	/**
 	 * Create a persistence record and consume it.
 	 */
-	private void insertToDatabaseAndConsume(TableInterface table, Map<Field, ColumnInterface> fieldsToColumns, Map<Field, Object> fieldsToValues) {
+	private void insertToDatabaseAndConsume(TableInterface table, Map<Field, ColumnInterface> fieldsToColumns, Map<Field, Object> fieldsToValues) throws RuntimeException{
 		
 		val insert = new AtomicReference<Query>();
 		val output = new AtomicBoolean(true);

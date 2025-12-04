@@ -25,7 +25,7 @@ public record QueryResult(List<Map<ColumnInterface, Object>> rows, Map<ColumnInt
 		this(new CopyOnWriteArrayList<>(), Collections.synchronizedMap(new LinkedHashMap<>()));
 	}
 	
-	public QueryResult(ResultSet rs) {
+	public QueryResult(ResultSet rs) throws ResultSetProcessingException {
 		this();
 		
 		try {
@@ -62,8 +62,8 @@ public record QueryResult(List<Map<ColumnInterface, Object>> rows, Map<ColumnInt
 			}
 			
 			log().trace("    Loader loaded %s rows.".formatted(rows.size()));
-		} catch (SQLException ex) {
-			log().fatal("!!! Error processing the ResultSet.\n{}", ex.getMessage());
+		} catch (Exception ex) {
+			throw new ResultSetProcessingException(ex);
 		}
 		
 	}
@@ -84,4 +84,11 @@ public record QueryResult(List<Map<ColumnInterface, Object>> rows, Map<ColumnInt
 		return this.renderAsStringTable();
 	}
 	
+	public static class ResultSetProcessingException extends Exception{
+		
+		public ResultSetProcessingException(Throwable cause) {
+			super(cause);
+		}
+		
+	}
 }

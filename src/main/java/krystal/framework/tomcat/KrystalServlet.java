@@ -282,7 +282,7 @@ public class KrystalServlet extends HttpServlet {
 						                             } catch (NumberFormatException | JSONException | ClassCastException e) {
 							                             log.debug("ServeDeletePersistence", e);
 							                             resp.setStatus(HttpServletResponse.SC_BAD_REQUEST);
-						                             } catch (NoSuchMethodException | InstantiationException | IllegalAccessException | InvocationTargetException | IOException e) {
+						                             } catch (Exception e) {
 							                             log.error("ServeDeletePersistence", e);
 							                             resp.setStatus(HttpServletResponse.SC_INTERNAL_SERVER_ERROR);
 						                             }
@@ -330,7 +330,7 @@ public class KrystalServlet extends HttpServlet {
 						                             } catch (JSONException | ClassCastException e) {
 							                             log.debug("ServePostPersistence", e);
 							                             resp.setStatus(HttpServletResponse.SC_BAD_REQUEST);
-						                             } catch (IOException e) {
+						                             } catch (Exception e) {
 							                             log.error("ServePostPersistence", e);
 							                             resp.setStatus(HttpServletResponse.SC_INTERNAL_SERVER_ERROR);
 						                             }
@@ -375,11 +375,13 @@ public class KrystalServlet extends HttpServlet {
 			
 			public static void validate(VirtualPromise<RequestInfo> info, HttpServletResponse response) {
 				if (!info.hasException()) return;
-				val ex = info.getException();
-				if (ex instanceof NoSuchElementException) response.setStatus(HttpServletResponse.SC_NOT_FOUND);
-				else {
-					log.error(ex);
-					response.setStatus(HttpServletResponse.SC_INTERNAL_SERVER_ERROR);
+				val e = info.getException();
+				if (e != null) {
+					if (e instanceof NoSuchElementException) response.setStatus(HttpServletResponse.SC_NOT_FOUND);
+					else {
+						log.error(e);
+						response.setStatus(HttpServletResponse.SC_INTERNAL_SERVER_ERROR);
+					}
 				}
 				info.kill();
 			}

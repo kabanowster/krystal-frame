@@ -4,6 +4,7 @@ import krystal.Tools;
 import krystal.framework.KrystalFramework;
 import krystal.framework.database.implementation.ExecutionType;
 import krystal.framework.database.implementation.QueryResult;
+import krystal.framework.database.implementation.QueryResult.ResultSetProcessingException;
 import krystal.framework.database.queryfactory.QueryType;
 import krystal.framework.logging.LoggingInterface;
 import krystal.framework.logging.LoggingWrapper;
@@ -13,6 +14,7 @@ import org.springframework.beans.factory.NoSuchBeanDefinitionException;
 import java.io.IOException;
 import java.sql.Connection;
 import java.sql.DriverManager;
+import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.util.*;
 import java.util.stream.Collectors;
@@ -95,36 +97,35 @@ public interface QueryExecutorInterface extends LoggingInterface {
 	/**
 	 * Execute the list of {@link Query queries}, read or write determined automatically
 	 */
-	default Stream<QueryResultInterface> execute(List<Query> queries) {
-		
-		return queries.stream()
-		              .collect(Collectors.groupingBy(q -> Optional.ofNullable(q.getProvider()).orElse(KrystalFramework.getDefaultProvider())))
-		              .entrySet()
-		              .stream()
-		              .flatMap(e -> {
-			              val provider = e.getKey();
-			              val driver = provider.getDriver();
-			              
-			              log().trace("--> Querying database: {}", provider.name());
-			              
-			              return e.getValue()
-			                      .stream()
-			                      .collect(Collectors.groupingBy(q -> {
-				                      q.setProvidersPacked(provider);
-				                      val type = q.determineType();
-				                      
-				                      if (type == QueryType.SELECT) {
-					                      return ExecutionType.read;
-				                      } else {
-					                      if (driver.getSupportedOutputtingStatements().contains(type))
+	default Stream<QueryResultInterface> execute(List<Query> queries) throws RuntimeException {
+			return queries.stream()
+			              .collect(Collectors.groupingBy(q -> Optional.ofNullable(q.getProvider()).orElse(KrystalFramework.getDefaultProvider())))
+			              .entrySet()
+			              .stream()
+			              .flatMap(e -> {
+				              val provider = e.getKey();
+				              val driver = provider.getDriver();
+				              
+				              log().trace("--> Querying database: {}", provider.name());
+				              
+				              return e.getValue()
+				                      .stream()
+				                      .collect(Collectors.groupingBy(q -> {
+					                      q.setProvidersPacked(provider);
+					                      val type = q.determineType();
+					                      
+					                      if (type == QueryType.SELECT) {
 						                      return ExecutionType.read;
-					                      else return ExecutionType.write;
-				                      }
-			                      }))
-			                      .entrySet()
-			                      .stream()
-			                      .flatMap(g -> executeJDBC(g.getKey(), provider, g.getValue()));
-		              });
+					                      } else {
+						                      if (driver.getSupportedOutputtingStatements().contains(type))
+							                      return ExecutionType.read;
+						                      else return ExecutionType.write;
+					                      }
+				                      }))
+				                      .entrySet()
+				                      .stream()
+				                      .flatMap(g -> executeJDBC(g.getKey(), provider, g.getValue()));
+			              });
 	}
 	
 	
@@ -132,37 +133,37 @@ public interface QueryExecutorInterface extends LoggingInterface {
 	 * JDBC
 	 */
 	
-	private Stream<QueryResultInterface> executeJDBC(ExecutionType exeType, ProviderInterface provider, List<Query> queries) {
+	private Stream<QueryResultInterface> executeJDBC(ExecutionType exeType, ProviderInterface provider, List<Query> queries) throws RuntimeException {
 		return switch (exeType) {
 			case read -> readJDBC(provider, queries);
 			case write -> writeJDBC(provider, queries);
 		};
 	}
 	
-	private Stream<QueryResultInterface> readJDBC(ProviderInterface provider, List<Query> queries) {
+	private Stream<QueryResultInterface> readJDBC(ProviderInterface provider, List<Query> queries) throws RuntimeException {
 		return queries.stream().map(q -> {
+			RuntimeException error;
 			try (Connection conn = connectToJDBCProvider(provider)) {
 				log().trace("  - Connected Successfully.");
 				
 				val sql = q.sqlQuery();
 				log().trace("    Loader: {}", sql);
-				try {
-					return (QueryResultInterface) new QueryResult(conn.createStatement().executeQuery(sql));
+				try (ResultSet rs = conn.createStatement().executeQuery(sql)) {
+					return (QueryResultInterface) new QueryResult(rs);
 				} catch (SQLException e) {
-					log().fatal("!!! Failed query execution:\n{}\n", sql, e);
-					return null;
-				} finally {
-					conn.close();
+					error = new RuntimeException("!!! Failed query execution:\n%s\n".formatted(sql), e);
+				} catch (ResultSetProcessingException e) {
+					error = new RuntimeException("!!! Error processing the ResultSet.\n%s\n".formatted(sql), e);
 				}
-			} catch (Exception e) {
-				log().fatal("!!! FATAL error during Database connection.\n", e);
-				return null;
+			} catch (SQLException e) {
+				error = new RuntimeException("!!! FATAL error during Database connection.\n", e);
 			}
-		}).filter(Objects::nonNull);
+			throw error;
+		});
 		
 	}
 	
-	private Stream<QueryResultInterface> writeJDBC(ProviderInterface provider, List<Query> queries) {
+	private Stream<QueryResultInterface> writeJDBC(ProviderInterface provider, List<Query> queries) throws RuntimeException {
 		try (Connection conn = connectToJDBCProvider(provider)) {
 			log().trace("    Connected Successfully.");
 			val batch = conn.createStatement();
@@ -178,13 +179,11 @@ public interface QueryExecutorInterface extends LoggingInterface {
 				val result = batch.executeBatch();
 				return Arrays.stream(result).mapToObj(i -> QueryResult.of(QueryResultInterface.singleton(ColumnInterface.of("#"), i)));
 			} catch (SQLException e) {
-				log().fatal("!!! Failed query execution:\n{}\n", String.join("\n", sqls), e);
-				return Stream.empty();
+				throw new RuntimeException("!!! Failed query execution:\n%s\n".formatted(String.join("\n", sqls)), e);
 			}
 			
 		} catch (Exception e) {
-			log().fatal("!!! FATAL error during Database connection.\n", e);
-			return Stream.empty();
+			throw new RuntimeException("!!! FATAL error during Database connection.\n", e);
 		}
 	}
 	
@@ -198,7 +197,7 @@ public interface QueryExecutorInterface extends LoggingInterface {
 			                              .map(c -> {
 				                              try {
 					                              return c.getJDBCConnection(provider);
-				                              } catch (SQLException e) {
+				                              } catch (Exception e) {
 					                              throw new RuntimeException(e);
 				                              }
 			                              })

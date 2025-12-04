@@ -252,4 +252,7 @@ public interface QueryResultInterface {
 		);
 	}
 	
+	default boolean isEmpty() {
+		return rows().isEmpty() && columns().isEmpty();
+	}
 }

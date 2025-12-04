@@ -37,7 +37,7 @@ public class Batch implements QueryExecutionInterface, LoggingInterface {
 	 *
 	 * @see krystal.framework.database.persistence.PersistenceInterface PersistenceInterface
 	 */
-	public @Nullable Map<? extends Class<?>, ? extends List<?>> toListsOf(Class<?>... clazzes) {
+	public @Nullable Map<? extends Class<?>, ? extends List<?>> toListsOf(Class<?>... clazzes) throws RuntimeException {
 		if (clazzes.length != queries.size())
 			throw new RuntimeException("The queries count must be equal with the classes count in the toStreamOf() method of the Batch.");
 		
