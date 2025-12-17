@@ -34,7 +34,7 @@ public class InsertStatement extends Query {
 	
 	public InsertStatement(TableInterface into, Object... values) {
 		this(into);
-		this.values.add(parseValuesForSQL(values).toArray());
+		this.values.add(values);
 	}
 	
 	public static InsertStatement into(TableInterface into) {
@@ -63,7 +63,7 @@ public class InsertStatement extends Query {
 	 * Can be chained for multiple rows inserts.
 	 */
 	public InsertStatement values(Object... values) {
-		this.values.add(parseValuesForSQL(values).toArray());
+		this.values.add(values);
 		return this;
 	}
 	
@@ -78,16 +78,14 @@ public class InsertStatement extends Query {
 		if (values.isEmpty() || into == null)
 			throw new IllegalArgumentException();
 		
+		// insert
 		query.append(String.format(
 				"INSERT INTO %s%s",
 				into.getSqlName(),
 				!columns.isEmpty() ? String.format(" (%s)", Tools.concat(", ", columns.stream().map(ColumnInterface::getSqlName))) : ""
 		));
 		
-		/*
-		 * Output inserted
-		 */
-		
+		// sqls output inserted
 		val drv = provider.getDriver();
 		if (DBCDrivers.jdbcSQLServer.equals(drv)) {
 			query.append(String.format(
@@ -99,15 +97,18 @@ public class InsertStatement extends Query {
 			));
 		}
 		
+		// values
 		query.append(String.format(
 				" VALUES %s",
 				values.stream()
+				      .map(Query::parseValuesForSQL)
+				      .map(Stream::toArray)
 				      .filter(v -> columns.isEmpty() || v.length == columns.size())
 				      .map(v -> String.format("(%s)", Tools.concat(", ", Stream.of(v))))
 				      .collect(Collectors.joining(", ")))
 		);
 		
-		// Supported in DB2-i
+		// output supported in DB2-i
 		if (DBCDrivers.jdbcAS400.equals(provider.getDriver())) {
 			query.replace(0, query.length(), String.format(
 					"SELECT %s FROM FINAL TABLE (%s)",

@@ -61,10 +61,7 @@ public class UpdateStatement extends Query implements WhereClauseInterface {
 		query.append("UPDATE ").append(table.getSqlName());
 		query.append(" SET ").append(Tools.concat(", ", columnSetPairs.stream()));
 		
-		/*
-		 * Output updated
-		 */
-		
+		// sqls output
 		val drv = provider.getDriver();
 		if (DBCDrivers.jdbcSQLServer.equals(drv)) {
 			query.append(String.format(

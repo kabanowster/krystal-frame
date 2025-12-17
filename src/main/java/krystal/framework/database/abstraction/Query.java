@@ -1,5 +1,6 @@
 package krystal.framework.database.abstraction;
 
+import krystal.Tools;
 import krystal.VirtualPromise;
 import krystal.framework.KrystalFramework;
 import krystal.framework.database.implementation.Q;
@@ -63,19 +64,20 @@ public abstract class Query implements QueryExecutionInterface, LoggingInterface
 	public static Object parseValueForSQL(Object value) {
 		
 		// Enquoted format
-		String senq = "'%s'";
+		String withSingleQuotes = "'%s'";
+		val asString = String.valueOf(value);
 		
-		if (value == null || String.valueOf(value).equalsIgnoreCase("null")) return "NULL";
+		if (value == null || asString.equalsIgnoreCase("null")) return "NULL";
 		return switch (value) {
-			case String val -> String.format(senq, val);
-			case LocalDateTime val -> String.format(senq, val.format(KrystalFramework.getDatetimeFormat()));
-			case LocalDate val -> String.format(senq, val.format(KrystalFramework.getDateFormat()));
-			case Double val -> String.valueOf(val).replace(",", ".");
-			case Integer val -> String.valueOf(val);
-			case Boolean val -> val.equals(true) ? "1" : "0";
+			case String val -> String.format(withSingleQuotes, Tools.sanitizeForSql(val));
+			case LocalDateTime val -> String.format(withSingleQuotes, Tools.sanitizeForSql(val.format(KrystalFramework.getDatetimeFormat())));
+			case LocalDate val -> String.format(withSingleQuotes, Tools.sanitizeForSql(val.format(KrystalFramework.getDateFormat())));
+			case Double val -> asString.replace(",", ".");
+			case Integer val -> asString;
+			case Boolean val -> val ? "1" : "0";
 			default ->
 				// else
-					String.format(senq, value);
+					String.format(withSingleQuotes, Tools.sanitizeForSql(asString));
 		};
 		
 	}
