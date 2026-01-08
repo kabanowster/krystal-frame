@@ -501,7 +501,7 @@ public interface PersistenceInterface extends LoggingInterface {
 					             }, () -> log().trace("  ! No record found for persistence to loadFromDatabase {}.class.", getClass().getSimpleName())));
 			case instantiate -> instantiateInDatabase(table, keyValuePairs, fieldsToColumns, fieldsToValues);
 			case delete -> deleteFromDatabase(table, keyValuePairs);
-			case save -> saveToDatabase(table, keyValuePairs, fieldsToColumns, fieldsToValues);
+			case save -> saveToDatabaseAndConsume(table, keyValuePairs, fieldsToColumns, fieldsToValues);
 			case copyAsNew -> copyAsNew(table, keys, fieldsToColumns, fieldsToValues);
 		}
 		
@@ -510,7 +510,7 @@ public interface PersistenceInterface extends LoggingInterface {
 	/**
 	 * Load persistence object from database.
 	 */
-	private Optional<? extends PersistenceInterface> loadFromDatabase(ColumnsComparisonInterface[] keyValuePairs) throws RuntimeException{
+	private Optional<? extends PersistenceInterface> loadFromDatabase(ColumnsComparisonInterface[] keyValuePairs) throws RuntimeException {
 		if (keyValuePairs == null || keyValuePairs.length == 0) return Optional.empty();
 		return getLoader().where(keyValuePairs).promise().compose(qr -> qr.toStreamOf(getClass())).joinThrow().flatMap(Stream::findFirst);
 	}
@@ -529,28 +529,84 @@ public interface PersistenceInterface extends LoggingInterface {
 	}
 	
 	/**
+	 * Create a persistence record and consume it.
+	 */
+	private void insertToDatabaseAndConsume(TableInterface table, Map<Field, ColumnInterface> fieldsToColumns, Map<Field, Object> fieldsToValues) throws RuntimeException {
+		
+		val insert = new AtomicReference<Query>();
+		val output = new AtomicBoolean(getProvider().getDriver().getSupportedOutputtingStatements().contains(QueryType.INSERT));
+		
+		Stream.of(getClass().getDeclaredMethods())
+		      .filter(m -> m.isAnnotationPresent(Inserter.class) && Query.class.isAssignableFrom(m.getReturnType()) && m.trySetAccessible())
+		      .findFirst()
+		      .ifPresentOrElse(m -> {
+			      try {
+				      insert.set((Query) m.invoke(this));
+				      if (output.get()) output.set(m.getAnnotation(Inserter.class).withOutput());
+			      } catch (IllegalAccessException | InvocationTargetException e) {
+				      throw new RuntimeException(e);
+			      }
+		      }, () -> {
+			      val values = getColumnsToValues(fieldsToColumns, fieldsToValues);
+			      val q = table.insert().into(values.getFirst().keySet().toArray(ColumnInterface[]::new));
+			      if (output.get()) q.output(getLoader().getColumns().toArray(ColumnInterface[]::new));
+			      values.forEach(v -> q.values(v.values().toArray()));
+			      insert.set(q);
+		      });
+		
+		val promise = insert.get().setProvider(getProvider()).promise();
+		if (output.get()) promise.compose(qr -> qr.toStreamOf(getClass()))
+		                         .accept(s -> s.findFirst().ifPresent(this::copyFrom));
+		
+		promise.thenRun(this::runWriters)
+		       .thenRun(() -> log().trace("    Record inserted."))
+		       .joinThrow();
+		
+		if (!getClass().isAnnotationPresent(Fresh.class))
+			PersistenceMemory.getInstance()
+			                 .ifPresent(memory -> memory.put(hashKeys(getClass(), fieldsToValues), this, memory.getIntervalsCount()));
+	}
+	
+	/**
 	 * In case of {@link Vertical} - rewrites the object, with consequences for all {@link Incremental} fields. Otherwise, check if the object is persisted - update its values, or instantiate a new record.
 	 */
-	private void saveToDatabase(TableInterface table, ColumnsComparisonInterface[] keyValuePairs, Map<Field, ColumnInterface> fieldsToColumns, Map<Field, Object> fieldsToValues) throws RuntimeException{
+	private void saveToDatabaseAndConsume(TableInterface table, ColumnsComparisonInterface[] keyValuePairs, Map<Field, ColumnInterface> fieldsToColumns, Map<Field, Object> fieldsToValues) throws RuntimeException {
 		if (getClass().isAnnotationPresent(Vertical.class)) {
 			deleteFromDatabase(table, keyValuePairs);
 			insertToDatabaseAndConsume(table, fieldsToColumns, fieldsToValues);
 		} else {
 			loadFromDatabase(keyValuePairs).ifPresentOrElse(_ -> {
-				var updater = Tools.getFirstAnnotatedValue(Updater.class, Query.class, this);
-				if (updater == null) updater = table.update(fieldsToValues
-						                                            .entrySet()
-						                                            .stream()
-						                                            .filter(e -> !e.getKey().isAnnotationPresent(Key.class))
-						                                            .map(e -> ColumnSetValueComparison.of(fieldsToColumns.get(e.getKey()), e.getValue()))
-						                                            .toArray(ColumnSetValueComparison[]::new))
-				                                    .where(keyValuePairs);
+				val update = new AtomicReference<Query>();
+				val output = new AtomicBoolean(getProvider().getDriver().getSupportedOutputtingStatements().contains(QueryType.UPDATE));
 				
-				updater.setProvider(getProvider())
-				       .promise()
-				       .thenRun(this::runWriters)
+				Stream.of(getClass().getDeclaredMethods())
+				      .filter(m -> m.isAnnotationPresent(Updater.class) && Query.class.isAssignableFrom(m.getReturnType()) && m.trySetAccessible())
+				      .findFirst()
+				      .ifPresentOrElse(m -> {
+					      try {
+						      update.set((Query) m.invoke(this));
+						      if (output.get()) output.set(m.getAnnotation(Updater.class).withOutput());
+					      } catch (IllegalAccessException | InvocationTargetException e) {
+						      throw new RuntimeException(e);
+					      }
+				      }, () -> {
+					      val q = table.update(fieldsToValues.entrySet()
+					                                         .stream()
+					                                         .filter(e -> !e.getKey().isAnnotationPresent(Key.class))
+					                                         .map(e -> ColumnSetValueComparison.of(fieldsToColumns.get(e.getKey()), e.getValue()))
+					                                         .toArray(ColumnSetValueComparison[]::new));
+					      if (output.get()) q.output(getLoader().getColumns().toArray(ColumnInterface[]::new));
+					      update.set(q.where(keyValuePairs));
+				      });
+				
+				val promise = update.get().setProvider(getProvider()).promise();
+				if (output.get()) promise.compose(qr -> qr.toStreamOf(getClass()))
+				                         .accept(s -> s.findFirst().ifPresent(this::copyFrom));
+				
+				promise.thenRun(this::runWriters)
 				       .thenRun(() -> log().trace("    Record updated."))
 				       .joinThrow();
+				
 			}, () -> insertToDatabaseAndConsume(table, fieldsToColumns, fieldsToValues));
 		}
 	}
@@ -584,44 +640,8 @@ public interface PersistenceInterface extends LoggingInterface {
 				              return qr.getResult().map(String::valueOf);
 			              }
 		              }).accept(s -> log().trace("  ! Persisted object deleted from database. Deleted rows: {}", s))
-		              .thenRun(() -> PersistenceMemory.getInstance().ifPresent(memory -> memory.remove(this.hashKeys()))).join();
-	}
-	
-	/**
-	 * Create a persistence record and consume it.
-	 */
-	private void insertToDatabaseAndConsume(TableInterface table, Map<Field, ColumnInterface> fieldsToColumns, Map<Field, Object> fieldsToValues) throws RuntimeException{
-		
-		val insert = new AtomicReference<Query>();
-		val output = new AtomicBoolean(true);
-		
-		Stream.of(getClass().getDeclaredMethods())
-		      .filter(m -> m.isAnnotationPresent(Inserter.class) && Query.class.isAssignableFrom(m.getReturnType()) && m.trySetAccessible())
-		      .findFirst()
-		      .ifPresentOrElse(m -> {
-			      try {
-				      insert.set((Query) m.invoke(this));
-				      output.set(m.getAnnotation(Inserter.class).withOutput());
-			      } catch (IllegalAccessException | InvocationTargetException e) {
-				      throw new RuntimeException(e);
-			      }
-		      }, () -> {
-			      val values = getColumnsToValues(fieldsToColumns, fieldsToValues);
-			      val q = table.insert().into(values.getFirst().keySet().toArray(ColumnInterface[]::new));
-			      values.forEach(v -> q.values(v.values().toArray()));
-			      insert.set(q);
-		      });
-		
-		val promise = insert.get().setProvider(getProvider()).promise();
-		if (output.get()) promise.compose(qr -> qr.toStreamOf(getClass()))
-		                         .accept(s -> s.findFirst().ifPresent(this::copyFrom));
-		promise.joinThrow();
-		
-		runWriters();
-		
-		if (!getClass().isAnnotationPresent(Fresh.class))
-			PersistenceMemory.getInstance()
-			                 .ifPresent(memory -> memory.put(hashKeys(getClass(), fieldsToValues), this, memory.getIntervalsCount()));
+		              .thenRun(() -> PersistenceMemory.getInstance().ifPresent(memory -> memory.remove(this.hashKeys())))
+		              .join();
 	}
 	
 	default void runReaders() {

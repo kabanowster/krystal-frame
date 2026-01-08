@@ -6,10 +6,34 @@ plugins {
 }
 
 group = "io.krystal"
-version = "1.23.5"
+version = "1.23.10"
 
 java {
     withSourcesJar()
+}
+
+tasks.javadoc {
+    destinationDir = file("$projectDir/javadoc")
+
+    source = fileTree("src/main/java") {
+        include("krystal/**")
+    }
+
+    classpath = sourceSets.main.get().compileClasspath
+
+    options {
+        val opts = this as StandardJavadocDocletOptions
+        opts.addStringOption("sourcepath", file("src/main/java").absolutePath)
+        opts.addStringOption("Xdoclint:none", "-quiet")
+        opts.memberLevel = JavadocMemberLevel.PACKAGE
+        opts.encoding = "UTF-8"
+        opts.links(
+            "https://docs.oracle.com/en/java/javase/17/docs/api/",
+            "https://docs.spring.io/spring-framework/docs/current/javadoc-api/"
+        )
+    }
+
+    isFailOnError = false
 }
 
 dependencies {

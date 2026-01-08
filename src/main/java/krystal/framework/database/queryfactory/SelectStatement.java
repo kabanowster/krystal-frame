@@ -6,6 +6,7 @@ import krystal.framework.database.abstraction.Query;
 import krystal.framework.database.abstraction.TableInterface;
 import krystal.framework.database.implementation.DBCDrivers;
 import krystal.framework.logging.LoggingInterface;
+import lombok.Getter;
 
 import java.util.*;
 import java.util.stream.Collectors;
@@ -13,7 +14,7 @@ import java.util.stream.Stream;
 
 public class SelectStatement extends Query implements WhereClauseInterface, OrderByInterface, GroupByInterface, LoggingInterface {
 	
-	private final Set<ColumnInterface> columns;
+	private final @Getter Set<ColumnInterface> columns;
 	private TableInterface from;
 	private int limit;
 	private boolean distinct;

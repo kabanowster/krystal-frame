@@ -2,7 +2,10 @@ package krystal.framework.database.abstraction;
 
 import krystal.framework.database.implementation.DBCDrivers;
 import krystal.framework.database.implementation.QueryExecutor;
+import krystal.framework.database.queryfactory.DeleteStatement;
+import krystal.framework.database.queryfactory.InsertStatement;
 import krystal.framework.database.queryfactory.QueryType;
+import krystal.framework.database.queryfactory.UpdateStatement;
 
 import java.util.Set;
 
@@ -24,6 +27,9 @@ public interface DBCDriverInterface {
 	 */
 	String getConnectionStringBase();
 	
+	/**
+	 * Define if the driver supports OUTPUT statements. Strictly related to {@link InsertStatement}, {@link UpdateStatement} and {@link DeleteStatement} implementations.
+	 */
 	Set<QueryType> getSupportedOutputtingStatements();
 	
 	default String getDriverName() {
