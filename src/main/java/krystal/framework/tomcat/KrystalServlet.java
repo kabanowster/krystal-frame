@@ -354,8 +354,7 @@ public class KrystalServlet extends HttpServlet {
 		}
 		
 		private void prepStandardResponseWithHeaders(HttpServletResponse response, Map<String, String> headers) {
-			response.setContentType("application/json");
-			response.setCharacterEncoding(StandardCharsets.UTF_8);
+			response.setContentType("application/json; charset=utf-8");
 			headers.forEach(response::setHeader);
 		}
 		
