@@ -1,0 +1,15 @@
+krystal.framework
+krystal.framework.commander
+krystal.framework.commander.implementation
+krystal.framework.core
+krystal.framework.core.cache
+krystal.framework.core.flow
+krystal.framework.core.flow.implementation
+krystal.framework.database.abstraction
+krystal.framework.database.implementation
+krystal.framework.database.persistence
+krystal.framework.database.persistence.annotations
+krystal.framework.database.persistence.filters
+krystal.framework.database.queryfactory
+krystal.framework.logging
+krystal.framework.tomcat
