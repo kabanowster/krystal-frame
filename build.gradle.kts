@@ -13,7 +13,7 @@ java {
 }
 
 tasks.javadoc {
-    destinationDir = file("$projectDir/javadoc")
+    destinationDir = file("$projectDir/docs")
 
     source = fileTree("src/main/java") {
         include("krystal/**")
