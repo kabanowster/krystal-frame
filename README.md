@@ -1,5 +1,9 @@
 # Krystal Frame
 
+*click for video summary:*
+
+[![KrystalFrame - A Direct Approach](https://img.youtube.com/vi/3QmOlU5Q4_A/0.jpg)](https://youtu.be/3QmOlU5Q4_A)
+
 **Krystal Frame** is a comprehensive Java framework designed to streamline application development through high-level **persistence**, programmatic **query abstraction**, and efficient **flow management**. It bridges the gap between raw database operations and business logic, offering a suite of tools for rapid, type-safe development.
 
 ![Krystal Frame Infographic](/static/infographic1.png)
