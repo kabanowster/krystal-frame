@@ -6,7 +6,7 @@ plugins {
 }
 
 group = "io.github.kabanowster"
-version = "1.23.11"
+version = "1.23.12"
 
 java {
     withSourcesJar()

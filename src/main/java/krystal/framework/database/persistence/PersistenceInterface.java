@@ -340,18 +340,23 @@ public interface PersistenceInterface extends LoggingInterface {
 	 * @see Writer @Writer
 	 */
 	default Map<Field, Object> getFieldsToValues() {
-		val m = getWriters();
+		val writers = getWriters();
 		val map = new HashMap<Field, Object>();
 		
 		// collector does not allow null values -> foreach loop
-		Stream.of(getClass().getDeclaredFields()).filter(f -> !Tools.isSkipped(f, SkipTypes.persistence)).forEach(f -> map.put(f, Optional.ofNullable(m.get(f)).orElseGet(() -> {
-			try {
-				f.setAccessible(true);
-				return f.get(this);
-			} catch (IllegalAccessException e) {
-				throw new RuntimeException(e);
+		Stream.of(getClass().getDeclaredFields()).filter(f -> !Tools.isSkipped(f, SkipTypes.persistence)).forEach(f -> {
+			// the value output by writer can be intentionally null
+			if (writers.containsKey(f)) {
+				map.put(f, writers.get(f));
+			} else {
+				try {
+					f.setAccessible(true);
+					map.put(f, f.get(this));
+				} catch (IllegalAccessException e) {
+					throw new RuntimeException(e);
+				}
 			}
-		})));
+		});
 		
 		return map;
 	}
