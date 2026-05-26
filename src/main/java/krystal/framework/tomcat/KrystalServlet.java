@@ -496,7 +496,7 @@ public class KrystalServlet extends HttpServlet {
 		                                  .apply(ara -> log.debug("{}: Watching response...", id))
 		                                  .accept(VirtualPromise::join)
 		                                  .thenRun(() -> log.debug("{}: Response done.", id))
-		                                  .catchRun(e -> log.error("{}: Context action error.", id, e))
+		                                  .catchRun(e -> log.error(id + ": Context action error.", e))
 		                                  .thenRun(asyncContext::complete);
 		
 		monitorContext(contextAction, asyncContext);
