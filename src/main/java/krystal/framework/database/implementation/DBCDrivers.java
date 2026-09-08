@@ -14,11 +14,8 @@ import java.util.Set;
 @Getter
 public enum DBCDrivers implements DBCDriverInterface {
 	jdbcSQLServer("jdbc:sqlserver://", QueryType.CUDs()),
-	jdbcAS400("jdbc:as400://", QueryType.INSERT),
-	jdbcH2("jdbc:h2:"),
-	jdbcPostgresql("jdbc:postgresql://"),
-	jdbcMySQL("jdbc:mysql://");
-	
+	jdbcAS400("jdbc:as400://", QueryType.INSERT);
+
 	private final String connectionStringBase;
 	private final Set<QueryType> supportedOutputtingStatements;
 	

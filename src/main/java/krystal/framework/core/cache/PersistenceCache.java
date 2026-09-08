@@ -1,5 +1,6 @@
 package krystal.framework.core.cache;
 
+import jakarta.annotation.Nullable;
 import krystal.Tools;
 import krystal.VirtualPromise;
 import krystal.framework.KrystalFramework;
@@ -16,7 +17,6 @@ import lombok.extern.log4j.Log4j2;
 import lombok.val;
 import org.springframework.beans.factory.NoSuchBeanDefinitionException;
 
-import javax.annotation.Nullable;
 import java.lang.reflect.AccessibleObject;
 import java.lang.reflect.Field;
 import java.lang.reflect.InvocationTargetException;

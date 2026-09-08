@@ -2,14 +2,14 @@ plugins {
     `java-library`
     id("io.github.kabanowster.setup")
     id("io.github.kabanowster.publish")
-    id("io.github.kabanowster.myJavaFx")
 }
 
 group = "io.github.kabanowster"
-version = "1.23.12"
+version = "1.24.0"
 
 java {
     withSourcesJar()
+    toolchain.languageVersion.set(JavaLanguageVersion.of(26))
 }
 
 tasks.javadoc {
@@ -39,8 +39,6 @@ tasks.javadoc {
 dependencies {
     api(project(":tools"))
     jdbc(Config.api)
-    http(Config.api)
-    jfxVisuals(Config.api)
     coreTools(Config.api)
     springCore(Config.api)
     tomcatServer(Config.api)

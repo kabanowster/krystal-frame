@@ -1,12 +1,12 @@
 package krystal.framework.database.implementation;
 
+import jakarta.annotation.Nullable;
 import krystal.VirtualPromise;
 import krystal.framework.database.abstraction.*;
 import krystal.framework.logging.LoggingInterface;
 import lombok.Builder;
 import lombok.Singular;
 
-import javax.annotation.Nullable;
 import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;

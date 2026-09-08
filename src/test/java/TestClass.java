@@ -23,5 +23,5 @@ public class TestClass implements LoggingInterface {
 	void cleanRun() {
 		logTest("Is running...");
 	}
-	
+
 }

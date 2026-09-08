@@ -1,5 +1,6 @@
 package krystal.framework.database.persistence;
 
+import jakarta.annotation.Nullable;
 import krystal.framework.KrystalFramework;
 import krystal.framework.database.persistence.annotations.Fresh;
 import krystal.framework.database.persistence.annotations.Memorized;
@@ -10,7 +11,6 @@ import lombok.Setter;
 import lombok.extern.log4j.Log4j2;
 import org.springframework.beans.factory.NoSuchBeanDefinitionException;
 
-import javax.annotation.Nullable;
 import java.util.List;
 import java.util.Map.Entry;
 import java.util.Optional;

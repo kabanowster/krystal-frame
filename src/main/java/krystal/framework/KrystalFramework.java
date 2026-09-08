@@ -1,6 +1,6 @@
 package krystal.framework;
 
-import javafx.application.Application;
+import jakarta.annotation.Nullable;
 import krystal.ConsoleView;
 import krystal.JSON;
 import krystal.framework.commander.CommanderInterface;
@@ -8,7 +8,6 @@ import krystal.framework.core.NativeConsoleReader;
 import krystal.framework.core.PropertiesAndArguments;
 import krystal.framework.core.PropertiesInterface;
 import krystal.framework.core.flow.FlowControlInterface;
-import krystal.framework.core.jfxApp;
 import krystal.framework.database.abstraction.ConnectionPoolInterface;
 import krystal.framework.database.abstraction.ProviderInterface;
 import krystal.framework.database.abstraction.QueryExecutorInterface;
@@ -28,7 +27,6 @@ import org.springframework.beans.BeansException;
 import org.springframework.context.ApplicationContext;
 import org.springframework.context.annotation.AnnotationConfigApplicationContext;
 
-import javax.annotation.Nullable;
 import java.time.format.DateTimeFormatter;
 import java.util.*;
 import java.util.stream.Collectors;
@@ -43,7 +41,6 @@ import java.util.stream.Collectors;
  *
  * @see #primaryInitialization(String...)
  * @see #frameSpringConsole(String, List, String...)
- * @see #frameSpringJavaFX(List, String...)
  * @see #startTomcatServer(TomcatProperties)
  */
 @Log4j2
@@ -123,13 +120,6 @@ public class KrystalFramework {
 	 */
 	private @Getter @Setter List<ProviderInterface> providersPool = Arrays.stream(DefaultProviders.values()).collect(Collectors.toCollection(ArrayList::new));
 	/**
-	 * Access JavaFX application context here if created ({@link jfxApp}). Also holds convenient utilities.
-	 *
-	 * @see jfxApp
-	 * @see #startJavaFX(String...)
-	 */
-	private @Getter @Setter jfxApp jfxApplication;
-	/**
 	 * @see #selectDefaultImplementations(DefaultImplementation...)
 	 */
 	private @Getter Set<DefaultImplementation> selectedDefaultImplementations;
@@ -176,7 +166,6 @@ public class KrystalFramework {
 	 * @see #selectAllDefaultImplementationsExcept(DefaultImplementation...)
 	 * @see #setInitializationSplash(String)
 	 * @see #getSpringContext()
-	 * @see #getJfxApplication()
 	 * @see #getTomcat()
 	 */
 	public void primaryInitialization(String... args) {
@@ -203,24 +192,9 @@ public class KrystalFramework {
 		}
 		
 		// default provider from properties / args
-		PropertiesAndArguments
-				.provider.value()
-				         .flatMap(
-						         p -> providersPool
-								              .stream()
-								              .filter(pp -> p.equals(pp.name()))
-								              .findFirst())
-				         .ifPresent(dp -> defaultProvider = dp);
+		PropertiesAndArguments.provider.value().flatMap(p -> providersPool.stream().filter(pp -> p.equals(pp.name())).findFirst()).ifPresent(dp -> defaultProvider = dp);
 		
 		log.fatal("=== App started" + (PropertiesInterface.areAny() ? " with properties: " + PropertiesInterface.printAll() : "."));
-	}
-	
-	/**
-	 * Launches JavaFX application, using basic framework implementation {@link jfxApp}. Follow-up with {@link javafx.application.Platform#runLater(Runnable) Platform.runLater()}.
-	 */
-	public void startJavaFX(String... args) {
-		// only platform thread, not virtual
-		Thread.ofPlatform().start(() -> Application.launch(jfxApp.class, args));
 	}
 	
 	/**
@@ -231,8 +205,7 @@ public class KrystalFramework {
 	public void startSpringCore(List<Class<?>> contextRootClasses) {
 		val classes = new ArrayList<>(contextRootClasses);
 		// classes.addFirst(KrystalFramework.class);
-		if (selectedDefaultImplementations == null)
-			selectDefaultImplementations();
+		if (selectedDefaultImplementations == null) selectDefaultImplementations();
 		classes.addAll(selectedDefaultImplementations.stream().map(i -> i.implementation).toList());
 		springContext = new AnnotationConfigApplicationContext(classes.toArray(Class[]::new));
 	}
@@ -261,14 +234,7 @@ public class KrystalFramework {
 	 */
 	public void startConsole(@Nullable String windowTitle) {
 		disposeConsole();
-		console = new ConsoleView(
-				windowTitle,
-				LoggingWrapper.ROOT_LOGGER,
-				PatternLayout.newBuilder()
-				             .withPattern(loggingPattern)
-				             .build(),
-				command -> CommanderInterface.getInstance().ifPresent(ci -> ci.parseCommand(command))
-		);
+		console = new ConsoleView(windowTitle, LoggingWrapper.ROOT_LOGGER, PatternLayout.newBuilder().withPattern(loggingPattern).build(), command -> CommanderInterface.getInstance().ifPresent(ci -> ci.parseCommand(command)));
 	}
 	
 	/**
@@ -284,8 +250,7 @@ public class KrystalFramework {
 	 * @see ConsoleView
 	 */
 	public void disposeConsole() {
-		if (console != null)
-			console.dispose();
+		if (console != null) console.dispose();
 		console = null;
 	}
 	
@@ -305,15 +270,6 @@ public class KrystalFramework {
 	/*
 	 * Launch templates
 	 */
-	
-	/**
-	 * Frame JavaFX application, backed by Spring annotation context.
-	 */
-	public void frameSpringJavaFX(List<Class<?>> springContextRootClasses, String... args) {
-		primaryInitialization(args);
-		startJavaFX(args);
-		startSpringCore(springContextRootClasses);
-	}
 	
 	/**
 	 * Frame simple Swing console-log output, backed by Spring annotation context.
@@ -354,8 +310,7 @@ public class KrystalFramework {
 	 */
 	public void selectAllDefaultImplementationsExcept(DefaultImplementation... excludedImplementations) {
 		selectedDefaultImplementations = new HashSet<>(Set.of(DefaultImplementation.values()));
-		if (excludedImplementations.length > 0)
-			selectedDefaultImplementations.removeAll(Set.of(excludedImplementations));
+		if (excludedImplementations.length > 0) selectedDefaultImplementations.removeAll(Set.of(excludedImplementations));
 	}
 	
 	/**
@@ -371,12 +326,8 @@ public class KrystalFramework {
 	 * @see krystal.framework.database.persistence.PersistenceMemory PersistenceMemory
 	 */
 	public enum DefaultImplementation {
-		FlowControl(krystal.framework.core.flow.implementation.FlowControl.class),
-		QueryExecutor(krystal.framework.database.implementation.QueryExecutor.class),
-		BaseCommander(krystal.framework.commander.implementation.BaseCommander.class),
-		ConnectionPool(krystal.framework.database.implementation.ConnectionPool.class),
-		NativeConsole(NativeConsoleReader.class),
-		PersistenceMemory(krystal.framework.database.persistence.PersistenceMemory.class);
+		FlowControl(krystal.framework.core.flow.implementation.FlowControl.class), QueryExecutor(krystal.framework.database.implementation.QueryExecutor.class), BaseCommander(krystal.framework.commander.implementation.BaseCommander.class),
+		ConnectionPool(krystal.framework.database.implementation.ConnectionPool.class), NativeConsole(NativeConsoleReader.class), PersistenceMemory(krystal.framework.database.persistence.PersistenceMemory.class);
 		
 		public final Class<?> implementation;
 		
@@ -401,7 +352,6 @@ public class KrystalFramework {
 		map.put("dateFormat", dateFormat.toString());
 		map.put("loggingPattern", loggingPattern);
 		map.put("springContext", springContext != null ? "established" : "n/a");
-		map.put("jfxApplication", jfxApplication != null ? "established" : "n/a");
 		map.put("tomcat", tomcat != null ? "established" : "n/a");
 		map.put("console", console != null ? "established" : "n/a");
 		map.put("selectedDefaultImplementations", selectedDefaultImplementations.stream().map(Enum::toString).toList());

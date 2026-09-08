@@ -10,10 +10,7 @@ import lombok.Getter;
 @Getter
 public enum DefaultProviders implements ProviderInterface {
 	sqlserver(DBCDrivers.jdbcSQLServer),
-	as400(DBCDrivers.jdbcAS400),
-	h2(DBCDrivers.jdbcH2),
-	postgres(DBCDrivers.jdbcPostgresql),
-	mysql(DBCDrivers.jdbcMySQL);
+	as400(DBCDrivers.jdbcAS400);
 	
 	private final DBCDriverInterface driver;
 	

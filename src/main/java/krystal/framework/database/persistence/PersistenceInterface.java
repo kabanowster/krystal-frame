@@ -1,5 +1,6 @@
 package krystal.framework.database.persistence;
 
+import jakarta.annotation.Nullable;
 import krystal.JSON;
 import krystal.Skip;
 import krystal.Skip.SkipTypes;
@@ -18,7 +19,6 @@ import krystal.framework.logging.LoggingInterface;
 import lombok.val;
 import org.json.JSONObject;
 
-import javax.annotation.Nullable;
 import java.lang.annotation.Annotation;
 import java.lang.reflect.AccessibleObject;
 import java.lang.reflect.Constructor;

@@ -1,5 +1,6 @@
 package krystal.framework.database.persistence;
 
+import jakarta.annotation.Nullable;
 import krystal.Skip;
 import krystal.Tools;
 import krystal.VirtualPromise;
@@ -14,7 +15,6 @@ import lombok.NonNull;
 import lombok.experimental.UtilityClass;
 import lombok.extern.log4j.Log4j2;
 
-import javax.annotation.Nullable;
 import java.util.List;
 import java.util.function.UnaryOperator;
 import java.util.stream.Stream;

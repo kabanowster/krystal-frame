@@ -2,6 +2,7 @@ package krystal.framework.commander;
 
 import com.google.common.base.Strings;
 import com.google.common.io.Files;
+import jakarta.annotation.Nullable;
 import krystal.Tools;
 import krystal.framework.KrystalFramework;
 import krystal.framework.logging.LoggingInterface;
@@ -9,7 +10,6 @@ import lombok.NonNull;
 import lombok.val;
 import org.springframework.beans.factory.NoSuchBeanDefinitionException;
 
-import javax.annotation.Nullable;
 import java.io.File;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
